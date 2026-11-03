@@ -1,5 +1,7 @@
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import { spawn } from 'node:child_process'
+import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
 
 // Always provision a disposable local instance, never read a live database URI.
 const binary = {
@@ -9,6 +11,7 @@ const binary = {
     : {}),
 }
 const server = await MongoMemoryServer.create({ binary })
+const documentsDirectory = join(server.instanceInfo.dbPath, 'document-originals')
 async function verify(selector, phase = '') {
   return new Promise((resolve, reject) => {
     const child = spawn(
@@ -22,6 +25,7 @@ async function verify(selector, phase = '') {
           GOWORK: 'off',
           ODEE_TEST_MONGODB_URI: server.getUri(),
           ODEE_TEST_RESTART_PHASE: phase,
+          ODEE_TEST_DOCUMENTS_DIR: documentsDirectory,
         },
       },
     )
@@ -30,13 +34,14 @@ async function verify(selector, phase = '') {
   })
 }
 try {
+  await mkdir(documentsDirectory)
   process.exitCode = await verify('TestMongo')
   if (!process.exitCode) {
-    process.exitCode = await verify('TestMongoDiskPersistence', 'write')
+    process.exitCode = await verify('TestMongo.*DiskPersistence', 'write')
     if (!process.exitCode) {
       await server.stop({ doCleanup: false })
       await server.start()
-      process.exitCode = await verify('TestMongoDiskPersistence', 'read')
+      process.exitCode = await verify('TestMongo.*DiskPersistence', 'read')
     }
   }
 } finally {
