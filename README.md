@@ -68,6 +68,10 @@ GOWORK=off go run ./cmd/odee
 Open **http://localhost:8098** (matching `ODEE_ORIGIN`). The backend serves the compiled frontend and API
 on the same origin. Environment files are not loaded automatically.
 
+In explicit token development mode, `localhost` and loopback IP aliases work on
+the same scheme and port when the request host matches the browser origin.
+Production/token and GitHub-authenticated modes still require the exact origin.
+
 Normal mode requires `MONGODB_URI`; there is **no automatic memory fallback**.
 Connection, ping, and required-index failures prevent startup. One client is
 reused throughout the process and disconnected during graceful shutdown.
@@ -178,6 +182,11 @@ rows are proposed when possible; otherwise a reconciled summary line or manual
 completion is required. Missing/ambiguous fields are flagged. Non-EUR documents
 are retained but cannot be converted into EUR bills. A difference between the
 entered and scanned total needs explicit acknowledgement.
+Invoice totals take precedence over a remaining balance due, including on
+already-paid bills. VAT amounts must follow their own labels; table headers
+cannot borrow amounts from adjacent payment columns. A different payment balance
+is flagged for review and never creates a payment automatically. After a parser
+update, use **Retry scan** on an unconverted original to refresh its proposed lines.
 
 Limits: 20 MiB/file, 20 files/batch, 10 PDF pages, and 20 million pixels/image
 (maximum 20,000 pixels per dimension). Batches process serially; the server

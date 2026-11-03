@@ -9,7 +9,9 @@ import (
 	"io"
 	"log/slog"
 	"mime"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -64,7 +66,7 @@ func (s *Server) Handler() http.Handler {
 				return
 			}
 		}
-		if r.Method != http.MethodGet && r.Header.Get("Origin") != s.Origin {
+		if r.Method != http.MethodGet && !s.allowsOrigin(r) {
 			reply(w, http.StatusForbidden, map[string]string{"error": "Request origin is not allowed."})
 			return
 		}
@@ -90,6 +92,32 @@ func (s *Server) Handler() http.Handler {
 		defer cancel()
 		mux.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (s *Server) allowsOrigin(r *http.Request) bool {
+	if r.Header.Get("Origin") == s.Origin {
+		return true
+	}
+	if !s.Dev || s.Auth != nil {
+		return false
+	}
+	expected, incoming := loopbackOrigin(s.Origin), loopbackOrigin(r.Header.Get("Origin"))
+	return expected != nil && incoming != nil &&
+		expected.Scheme == incoming.Scheme && expected.Port() == incoming.Port() &&
+		strings.EqualFold(r.Host, incoming.Host)
+}
+
+func loopbackOrigin(value string) *url.URL {
+	u, err := url.Parse(value)
+	if err != nil || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" ||
+		(u.Scheme != "http" && u.Scheme != "https") {
+		return nil
+	}
+	ip := net.ParseIP(u.Hostname())
+	if !strings.EqualFold(u.Hostname(), "localhost") && (ip == nil || !ip.IsLoopback()) {
+		return nil
+	}
+	return u
 }
 
 func reply(w http.ResponseWriter, status int, value any) {

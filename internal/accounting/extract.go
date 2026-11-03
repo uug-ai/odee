@@ -7,7 +7,9 @@ import (
 	"time"
 )
 
-var moneyPattern = regexp.MustCompile(`\d(?:[\d., '\x{00a0}]*\d)?[.,]\d{2}`)
+const currencyCodes = `EUR|USD|GBP|CHF|CAD|AUD|JPY|SEK|NOK|DKK|PLN|CNY`
+
+var moneyPattern = regexp.MustCompile(`(?:\d{1,3}(?:[., '\x{00a0}]\d{3})+|\d+)[.,]\d{2}`)
 var datePattern = regexp.MustCompile(`\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b`)
 var itemPattern = regexp.MustCompile(`^(.+?)\s+(\d{1,5})\s+([\d.,]+)\s+(\d{1,3}(?:[.,]\d{1,2})?)%\s+([\d.,]+)\s*$`)
 
@@ -81,14 +83,12 @@ func extractedDate(text string) string {
 func labelledAmount(text, pattern string) (int64, bool) {
 	var amount int64
 	found := false
-	label := regexp.MustCompile(`(?i)` + pattern)
+	label := regexp.MustCompile(`(?i)^\s*(?:` + pattern + `)(?:[ \t]*:[ \t]*|[ \t]+)(?:(?:` + currencyCodes + `|[€$£])[ \t]*)?(` + moneyPattern.String() + `)(?:[^0-9.,]|$)`)
 	for _, line := range strings.Split(text, "\n") {
-		if !label.MatchString(line) {
-			continue
-		}
-		values := moneyPattern.FindAllString(line, -1)
-		if len(values) > 0 {
-			if parsed, ok := parseAmount(values[len(values)-1]); ok {
+		line = strings.NewReplacer("\u00a0", " ", "\u202f", " ").Replace(line)
+		match := label.FindStringSubmatch(line)
+		if len(match) == 2 {
+			if parsed, ok := parseAmount(match[1]); ok {
 				amount, found = parsed, true
 			}
 		}
@@ -122,7 +122,7 @@ func extract(text string) Scan {
 	}
 	currency := regexp.MustCompile(`(?i)\b[A-Z]{3}\b`).FindString(field(text, `currency|valuta|devise`))
 	if currency == "" {
-		currency = regexp.MustCompile(`(?i)\b(EUR|USD|GBP|CHF|CAD|AUD|JPY|SEK|NOK|DKK|PLN|CNY)\b`).FindString(text)
+		currency = regexp.MustCompile(`(?i)\b(?:` + currencyCodes + `)\b`).FindString(text)
 	}
 	scan.Currency = strings.ToUpper(currency)
 	if scan.Currency == "" && strings.Contains(text, "€") {
@@ -140,9 +140,15 @@ func extract(text string) Scan {
 	if scan.Currency != "" && scan.Currency != "EUR" {
 		scan.Warnings = append(scan.Warnings, "This bill is not in EUR. Multi-currency bills cannot be converted in this release.")
 	}
-	subtotal, subtotalKnown := labelledAmount(text, `^\s*(?:subtotal|sub[\s-]total|net(?: amount)?|excl(?:usive)?\.?\s*(?:vat|btw)|totaal excl|montant ht)\b`)
-	tax, taxKnown := labelledAmount(text, `^\s*(?:vat|btw|tva|tax)\b`)
-	total, totalKnown := labelledAmount(text, `^\s*(?:grand total|total(?:\s+(?:incl|amount|due|to pay))?|amount due|balance due|te betalen|totaal(?:\s+incl)?|montant ttc)\b`)
+	subtotal, subtotalKnown := labelledAmount(text, `subtotal|sub[\s-]total|subtotaal|net(?: amount)?|excl(?:usive)?\.?\s*(?:vat|btw)|totaal\s+excl(?:\.|usief)?(?:\s+btw)?|(?:montant|total)\s+ht`)
+	tax, taxKnown := labelledAmount(text, `(?:(?:total|totaal)\s+)?(?:vat|btw|tva|tax(?:es)?)(?:\s+(?:rate\s*:?\s*)?\d{1,3}(?:[.,]\d{1,2})?\s*%)?`)
+	total, totalKnown := labelledAmount(text, `(?:grand total|invoice total|total|totaal)(?:\s+(?:incl(?:\.|usive|usief)?(?:\s+(?:vat|btw|tax(?:es)?))?|amount))?|(?:montant|total)\s+ttc`)
+	balance, balanceKnown := labelledAmount(text, `(?:amount|balance|total)\s+due|total\s+to\s+pay|te\s+betalen`)
+	if !totalKnown {
+		total, totalKnown = balance, balanceKnown
+	} else if balanceKnown && balance != total {
+		scan.Warnings = append(scan.Warnings, "The balance due differs from the invoice total. Verify prior payments separately; no payment is imported automatically.")
+	}
 	if !subtotalKnown && totalKnown && taxKnown && total > tax {
 		subtotal, subtotalKnown = total-tax, true
 		scan.Warnings = append(scan.Warnings, "Subtotal inferred from total and VAT. Verify the tax breakdown.")
