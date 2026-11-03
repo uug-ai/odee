@@ -90,6 +90,9 @@ comparison and synthetic adapter-contract examples. It has no application-source
 lease and avoids the original dirty accounting/auth/contact hotspots. No provider
 signup, credentials, registration or transport is authorized. Source-changing
 ODEE-004/005/007 work waits for explicit dirty-path reconciliation and leases.
+
+[Peppol provider discovery](peppol-provider-contract.md)
+
 For dated coordinator-reported dispatches, see the decision log; live
 in-progress state belongs only to the coordinator, not this planning document.
 
