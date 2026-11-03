@@ -1,0 +1,117 @@
+name: Security scan
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_ref:
+        description: Odee GHCR tag or digest to verify instead of building
+        required: false
+        type: string
+        default: ""
+  workflow_call:
+    inputs:
+      image_ref:
+        description: Odee GHCR tag or digest to verify instead of building
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  security-scan:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      IMAGE_REF: ${{ inputs.image_ref || format('odee-{0}', matrix.architecture) }}
+      TRIVY_PLATFORM: linux/${{ matrix.architecture }}
+      TRIVY_USERNAME: ${{ github.actor }}
+      TRIVY_PASSWORD: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release image
+        if: ${{ inputs.image_ref != '' }}
+        run: |
+          case "$IMAGE_REF" in
+            ghcr.io/uug-ai/odee:*|ghcr.io/uug-ai/odee@sha256:*) ;;
+            *) echo "::error::image_ref must be an Odee GHCR tag or digest"; exit 1 ;;
+          esac
+      - uses: docker/login-action@v3
+        if: ${{ inputs.image_ref != '' }}
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Pull release image
+        if: ${{ inputs.image_ref != '' }}
+        run: docker pull --platform "$TRIVY_PLATFORM" -- "$IMAGE_REF"
+      - name: Build runtime image
+        if: ${{ inputs.image_ref == '' }}
+        run: docker build --pull --provenance=false -t "$IMAGE_REF" .
+      - name: Verify native scanner tools and languages
+        run: |
+          docker run --rm --network none --read-only \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --entrypoint sh -- "$IMAGE_REF" -ec '
+              test "$(id -u)" = 10001
+              for tool in pdfinfo pdftotext pdftoppm tesseract; do
+                command -v "$tool"
+              done
+              languages="$(tesseract --list-langs)"
+              for language in eng nld fra; do
+                printf "%s\n" "$languages" | grep -Fx "$language"
+              done
+            '
+      - name: Verify frontend and API in isolated temporary demo
+        run: |
+          docker run --detach --name odee-smoke \
+            --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=0700,size=512m \
+            --env ODEE_AUTH_MODE=token --env ODEE_DEMO=true --env ODEE_DEV_MODE=true \
+            --env ODEE_ADDR=127.0.0.1:8098 --env ODEE_ORIGIN=http://localhost:8098 \
+            -- "$IMAGE_REF"
+          trap 'docker logs odee-smoke; docker rm --force odee-smoke' EXIT
+          for attempt in {1..20}; do
+            if docker exec odee-smoke wget -q -O /dev/null http://127.0.0.1:8098/healthz; then
+              docker exec odee-smoke wget -q -O - http://127.0.0.1:8098/ | grep -q '<div id="root">'
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Odee did not become ready"
+          exit 1
+      - name: Report all image vulnerabilities
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          version: v0.76.1
+          image-ref: ${{ env.IMAGE_REF }}
+          scanners: vuln
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: "0"
+          timeout: 10m
+      - name: Block high or critical image findings
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          version: v0.76.1
+          skip-setup-trivy: true
+          image-ref: ${{ env.IMAGE_REF }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: "1"
+          timeout: 10m

@@ -1,0 +1,58 @@
+name: Check Odee
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Formatting, vet, race tests and build
+        run: |
+          test -z "$(gofmt -l cmd internal)"
+          go vet ./...
+          go test -race ./...
+          go build ./cmd/odee
+
+  web:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Install local scanner dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils tesseract-ocr \
+            tesseract-ocr-eng tesseract-ocr-nld tesseract-ocr-fra
+      - run: npm ci
+      - run: npm run build && npm test
+      - run: npm run test:scans
+      - run: npm run test:mongo
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: odee-browser-failures
+          path: web/test-results/

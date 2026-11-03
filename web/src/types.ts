@@ -1,0 +1,155 @@
+export type Kind = 'invoice' | 'bill'
+export type View =
+  'apps' | 'contacts' | 'dashboard' | 'invoices' | 'bills' | 'journal' | 'accounts' | 'reports'
+export interface Line {
+  description: string
+  quantity: number
+  unitCents: number
+  taxBps: number
+  accountCode: string
+}
+export interface Entry {
+  accountCode: string
+  debit: number
+  credit: number
+}
+export interface Payment {
+  id: string
+  date: string
+  amount: number
+  reference: string
+  entries: Entry[]
+}
+export interface Draft {
+  kind: Kind
+  partner: string
+  email: string
+  reference: string
+  date: string
+  dueDate: string
+  lines: Line[]
+}
+export interface Document extends Draft {
+  id: string
+  number: string
+  version: number
+  currency: string
+  status: 'draft' | 'posted' | 'paid'
+  subtotal: number
+  tax: number
+  total: number
+  paid: number
+  entries: Entry[]
+  payments: Payment[]
+  createdAt: string
+  updatedAt: string
+  sourceId?: string
+}
+export interface Account {
+  code: string
+  name: string
+  type: string
+}
+export interface State {
+  company: string
+  currency: string
+  demo: boolean
+  development: boolean
+  accounts: Account[]
+  documents: Document[]
+  imports: BillImport[]
+  scannerReady: boolean
+  scannerError: string
+  contacts: Contact[]
+}
+export interface Session {
+  authMode: 'github' | 'token'
+  authenticated: boolean
+  organisation?: string
+  team?: string
+  csrfToken?: string
+  user?: { id: number; login: string; name: string }
+}
+export interface BillImport {
+  id: string
+  filename: string
+  contentType: string
+  size: number
+  sha256: string
+  status: 'pending' | 'scanning' | 'ready' | 'failed' | 'draft'
+  error: string
+  version: number
+  documentId?: string
+  createdAt: string
+  updatedAt: string
+  scan: {
+    method: string
+    pages: number
+    text: string
+    currency: string
+    subtotal: number
+    tax: number
+    taxKnown: boolean
+    total: number
+    draft: Draft
+    warnings: string[]
+  }
+}
+export interface ReviewOptions {
+  reviewed: boolean
+  acceptMismatch: boolean
+}
+export type APIRequest = <T>(path: string, body?: unknown, method?: string) => Promise<T>
+export interface Journal {
+  key: string
+  document: Document
+  date: string
+  reference: string
+  entries: Entry[]
+  payment: boolean
+}
+
+export interface ContactData {
+  name: string
+  isCompany: boolean
+  companyName: string
+  email: string
+  phone: string
+  mobile: string
+  website: string
+  vat: string
+  reference: string
+  type: 'contact' | 'invoice' | 'delivery' | 'other' | 'private'
+  address: {
+    street: string
+    street2: string
+    postalCode: string
+    city: string
+    state: string
+    country: string
+  }
+  tags: string[]
+  customer: boolean
+  vendor: boolean
+  active: boolean
+}
+export interface Contact extends ContactData {
+  id: string
+  version: number
+  createdAt: string
+  updatedAt: string
+  odoo?: {
+    originalWebsite?: string
+    origin: string
+    database: string
+    id: number
+    parentId: number
+    companyId: number
+    importedAt: string
+  }
+}
+export interface OdooContactImport {
+  source: string
+  database: string
+  contacts: (ContactData & { externalId: number; parentId: number; companyId: number })[]
+}
