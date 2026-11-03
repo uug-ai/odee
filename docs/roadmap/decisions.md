@@ -326,6 +326,131 @@ pending; no verified, merged or released outcome is asserted here. A completed
 subslice cannot mark the whole ODEE-004 contract accepted before its remaining
 criteria and required QA gates are met.
 
+## D013 — Preserve the direct-route gate and pin its previously ambiguous URL contract
+
+**Material finding:** PM assigns stable ID
+`F-004-DIRECT-ROUTE-20261103` to the coordinator-reported ODEE-004 integration
+BLOCKED verdict. Non-root direct-route browser acceptance lacks evidence;
+other reported browser/persistence and API/auth checks do not satisfy that
+separate criterion. The coordinator identifies its candidate as `de3`; a full
+SHA was not supplied or available in this PM worktree, so no exact-candidate
+source/test verification is claimed here.
+
+**Source assessment:** original `4b7b21d…` and inspected
+`21c4c43bada687eb7fb94898fa6115c2dfe2e491` both initialize view state to
+`apps` and navigate in memory. The extracted [registry](../../web/src/modules.ts)
+names the existing active views; [App](../../web/src/App.tsx) does not initialize
+from URL/history. [Go shell registration](../../cmd/odee/main.go) serves root and
+assets, not non-root view paths. This is not evidence that extraction broke an
+already-working URL router. Nevertheless, revision 1 explicitly requires
+direct routes: its unspecified URL details are ambiguous, not permission to
+delete or mark that valid criterion passed.
+
+**PM decision:** ODEE-004 revision **2** pins a small registry-backed native
+History API contract, with no router dependency or new business module:
+
+- `/` is launcher; `/accounting` is Dashboard; existing accounting views use
+  `/accounting/invoices`, `/accounting/bills`, `/accounting/journal`,
+  `/accounting/accounts`, `/accounting/reports`; `/contacts` is Contacts.
+- Direct GET/reload renders the requested view after authentication; no data
+  leaks before authentication. Restore only a validated same-origin registered
+  destination after sign-in; unsafe/external return destinations are rejected.
+- Navigation updates URL/history from the registry; Back/Forward restores the
+  view and closes transient state without writes or extra history entries.
+- Unknown/planned UI paths show an explicit not-found view and launcher link,
+  never enable a planned app. The chosen SPA shell may return HTTP 200; that
+  is not module activation or API success. Reserved API/auth/assets/health
+  namespaces preserve their existing non-SPA behavior.
+
+This is the explicit ownership/UX decision within the approved shell scope.
+Platform owns the shell/registry and minimal Go shell support, plus bounded
+authentication-return changes only where needed. Revision 2 adds those Go/auth
+paths to its lease; no permission-system implementation belongs in this repair.
+All previous valid behavior/keyboard/session criteria remain.
+
+**Priority/gates:** retain ODEE-004 priority 30 and dependency ODEE-001.
+Its dependent ODEE-005 at priority 31 must not dispatch until revision-2
+integration QA passes. Renew affected API/security/browser/integration verdicts
+on the fresh candidate; never promote the existing BLOCKED verdict or reuse an
+old-revision PASS. CAP-PLATFORM-DEEP-LINKS records an ODEE requirement/source gap,
+not an invented Odoo capability or proof of application delivery.
+
+**Candidate boundary:** these changes are prepared only in the separate
+`odee-pm-qa-contracts-25f10ffb` next-candidate worktree based on available
+`21c4c43…`. Frozen C and original dirty main are untouched. Parent integration
+must preserve any intervening changes and bind a new exact SHA before QA.
+
+## D014 — Repair ODEE-022 evidence/status gaps without changing its acceptance
+
+**Material findings:** PM assigns IDs
+`F-022-PLANNING-DRILL-20261103` (criterion 1: no executed linked/deduplicated
+finding-plus-capability planning drill) and `F-022-STATUS-PIN-20261103`
+(criterion 4: status omits persisted pinned Odoo/planning metadata).
+The coordinator reports ODEE-022 BLOCKED and the loop owner confirms the
+omissions. Source inspection corroborates the latter:
+`tools/agents/loop.mjs` stores `state.backlog` but `summary()` does not return
+its planning baseline. A generic schema-preservation test is not the missing
+feedback drill.
+
+**Classification/decision:** both are existing-contract integration/evidence
+defects. ODEE-022 stays revision **1**, priority **13**, with unchanged
+dependencies and all five acceptance criteria. The source owner repairs them;
+PM does not edit tools or scheduler state. Reported 67 passing tests, and
+unrelated production/browser checks, cannot mark these criteria satisfied.
+
+**Concrete PM input for the real drill:** [backlog](backlog.json) now contains
+three stable `planningChanges` records, linking these findings and D013, plus
+one documented capability discovery:
+
+1. `PM-20261103-004-ROUTES` links the real direct-route finding to
+   CAP-PLATFORM-DEEP-LINKS and ODEE-004 revision 1 → 2.
+2. `PM-20261103-CREDIT-PARTIAL` links discovery
+   `G-CREDIT-PARTIAL-20261103` to existing CAP-CREDIT-LOCKS and ODEE-011
+   revision 1 → 2. The already-verified [official Odoo 20.0 credit-note
+   guide](https://www.odoo.com/documentation/20.0/applications/finance/accounting/customer_invoices/credit_notes.html)
+   documents partial corrections. Do not invent a tester finding for this
+   separately sourced discovery or create a duplicate credit-note ticket.
+   The refinement adds one independent fixture: invoice 24200 cents, prior
+   payment 10000, reviewed one-unit credit 12100, remaining receivable **2100**;
+   retries cannot duplicate credit/allocation and no automatic cash refund or
+   historical edit is implied. Belgian professional review remains required.
+3. `PM-20261103-022-REPAIR` records the two unchanged-contract defects; it
+   carries no ticket revision or fictitious successful verdict.
+
+The [matrix](capabilities.json) links the corresponding capability deltas,
+sources/discovery IDs, planned revisions and these decisions. Repeated reports
+of the same issue must resolve to these IDs, not create another module ticket,
+another copy of the change, or a revision bump without a substantive delta.
+
+**Required executed drill, owned by coordinator/source owner and independent QA:**
+
+- Use owned isolated fixture state, never the active scheduler or shared data.
+  Bind the actual committed PM packet/specification and candidate SHA. Any
+  fixture workers/verdicts/SHAs are explicitly synthetic rehearsal data, never
+  evidence of delivered application features.
+- Start from revision-1 contracts, then apply/reconcile the approved finding
+  and capability deltas. Assert links resolve, ODEE-004/011 reach revision 2,
+  incompatible in-flight claims pause with handoffs preserved, and affected
+  candidate/gate/verdict eligibility is invalidated.
+- Reapply the same packet: stable change/finding/discovery IDs, ticket counts
+  and revisions remain unchanged. An ordinary repeated command-history record
+  is permissible; a second planning change or duplicate feature ticket is not.
+- Old-SHA/spec verdicts and a valid failing criterion cannot pass a new gate.
+  Preserve stop-before-dispatch/merge behavior throughout replan/recovery.
+- Restart/read `status`: expose persisted accepted `planningBaseline` (Odoo
+  **20.0**, September 2026, 2026-11-03 retrieval, confidence and official
+  sources), stable planning change/finding/capability links, ready/blocked
+  leaves and next safe work. Do not show a new un-reconciled file pin as
+  accepted state; report backlog divergence explicitly.
+- Independent QA records actual commands, expected/actual results and exact
+  candidate/revisions. Until run, these are required cases, not completed
+  evidence. Source repair alone is not the drill or a QA PASS.
+
+Priority remains dependency-driven: repair ODEE-022 at 13 and the ODEE-004
+gate at 30 before ODEE-005 proceeds. ODEE-019 still requires ODEE-022. No
+release, provider traffic, shared-browser writes or remote-CI success is
+authorized or asserted.
+
 ## Material feedback packet
 
 Use the following as a **template**, not a fabricated finding:
@@ -440,11 +565,14 @@ PM ran dependency-free Node checks on 2026-11-03:
 - Both JSON files parse and satisfy their declared shape.
 - **22 leaves + 47 non-dispatchable epics**; ODEE-001..022 dependencies match the
   approved plan exactly, all references exist and the complete graph is acyclic.
-- Owner/required-QA aliases resolve to the existing agent roster; **15 capability
+- Owner/required-QA aliases resolve to the existing agent roster; **16 capability
   entries and 13 source entries** have valid ticket/source/baseline-path links.
-- **16 local Markdown links** resolve; all four new files pass whitespace checks.
+- **21 local Markdown links** resolve; all four roadmap files pass whitespace checks.
 - Importing `validateBacklog` from `tools/agents/loop.mjs` accepts all **69**
   contracts without creating or changing scheduler state.
+- The next-candidate delta has three unique linked planning-change records;
+  ODEE-004/011 are revision 2, ODEE-022 is byte-for-byte unchanged at revision 1,
+  and every approved ODEE-001..022 dependency edge is preserved.
 
 No application tests, provider exchange, release, state transition or feature
 completion is asserted by these documentation checks. Files remain for parent

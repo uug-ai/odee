@@ -4,11 +4,55 @@
     "date": "2026-11-03",
     "applicationSha": "4b7b21d709b9d13795f16910a0591810727340ad",
     "referenceVersion": "Odoo 20.0",
+    "referenceReleaseMonth": "2026-09",
+    "referenceRetrievedOn": "2026-11-03",
+    "referenceConfidence": "high",
+    "referenceSources": [
+      "https://www.odoo.com/documentation/20.0/",
+      "https://www.odoo.com/documentation/20.0/administration/standard_extended_support.html",
+      "https://www.odoo.com/odoo-20-release-notes"
+    ],
     "priorityOrder": "lower-number-first-among-ready-leaves",
     "executionState": "ignored .odee/loop.json; no leaf status is asserted here",
     "defaultIntegrationMode": "synthetic-offline-or-mocked",
     "epicPolicy": "kind=epic is non-dispatchable; decompose and review before creating leaf work"
   },
+  "planningChanges": [
+    {
+      "id": "PM-20261103-004-ROUTES",
+      "recordedOn": "2026-11-03",
+      "decisionId": "D013",
+      "classification": "ambiguous-requirement-with-confirmed-source-gap",
+      "findingIds": ["F-004-DIRECT-ROUTE-20261103"],
+      "capabilityIds": ["CAP-PLATFORM-DEEP-LINKS"],
+      "ticketChanges": [{"ticket": "ODEE-004", "fromRevision": 1, "toRevision": 2}],
+      "rationale": "Retain the valid direct-route criterion and pin registry-backed path, history, authentication and unknown-route behavior; no router dependency or new business module.",
+      "candidateBoundary": "Next candidate only; frozen integration candidate and its verdicts are not rewritten."
+    },
+    {
+      "id": "PM-20261103-CREDIT-PARTIAL",
+      "recordedOn": "2026-11-03",
+      "decisionId": "D014",
+      "classification": "documented-capability-gap-refinement",
+      "findingIds": [],
+      "discoveryIds": ["G-CREDIT-PARTIAL-20261103"],
+      "capabilityIds": ["CAP-CREDIT-LOCKS"],
+      "sourceRefs": ["ODOO-CREDIT-NOTES"],
+      "referenceVersion": "20.0",
+      "ticketChanges": [{"ticket": "ODEE-011", "fromRevision": 1, "toRevision": 2}],
+      "rationale": "Deduplicate against existing credit-note work and add one independently expected partial-credit allocation fixture instead of a duplicate module ticket."
+    },
+    {
+      "id": "PM-20261103-022-REPAIR",
+      "recordedOn": "2026-11-03",
+      "decisionId": "D014",
+      "classification": "existing-contract-integration-defect",
+      "findingIds": ["F-022-PLANNING-DRILL-20261103", "F-022-STATUS-PIN-20261103"],
+      "capabilityIds": [],
+      "ticketChanges": [],
+      "rationale": "ODEE-022 acceptance 1 and 4 remain unchanged. Source repair and an executed finding-plus-capability reconciliation drill are required; generic passing tests cannot waive either gate."
+    }
+  ],
   "tickets": [
     {
       "id": "ODEE-001", "revision": 1,
@@ -54,17 +98,24 @@
       "epic": "ODEE-W0-2"
     },
     {
-      "id": "ODEE-004", "revision": 1,
+      "id": "ODEE-004", "revision": 2,
       "title": "Extract the current shell and authenticated API client without workflow changes",
       "owner": "feature-platform", "priority": 30, "dependsOn": ["ODEE-001"],
-      "paths": ["web/src/", "web/tests/", "docs/"],
+      "paths": ["web/src/", "web/tests/", "cmd/odee/", "internal/accounting/auth.go", "internal/accounting/auth_test.go", "docs/"],
       "acceptance": [
         "Existing accounting drafts, posting, manual payments, bill scanning and contacts remain usable through the extracted shell.",
         "A session-expiry or CSRF/origin failure produces an actionable UI state and does not retry unsafe writes silently.",
-        "Navigation, keyboard dialog behavior and direct routes pass isolated browser regressions; planned tiles do not expose incomplete API workflows."
+        "The module/view registry maps / to the launcher, /accounting to Dashboard, /accounting/invoices, /accounting/bills, /accounting/journal, /accounting/accounts and /accounting/reports to their existing views, and /contacts to Contacts. No planned module gains an active route.",
+        "A direct GET and reload of each registered non-root path serves the application shell and renders the requested view after authentication without changing records; an unauthenticated deep link reveals no protected data and restores only a validated same-origin registered destination after sign-in.",
+        "In-app navigation uses native History API and the registry as its view/path authority; Back/Forward restores the correct view, closes transient selections/dialogs without submitting writes, and does not create history entries during popstate or render.",
+        "Unknown or planned-only UI paths retain an explicit not-found view with a launcher link; an HTTP 200 SPA shell is not permission or successful module activation. Reserved /api, /auth, /assets and /healthz namespaces retain their existing non-SPA error/response behavior.",
+        "Isolated browser tests cover authenticated cold deep link, reload, token/GitHub authentication return, Back/Forward, unknown/planned paths, keyboard dialogs and session expiry; all required verdicts bind the new revision and fresh candidate. No router dependency or accounting-rule change is introduced."
       ],
       "requiredQa": ["qa-api-data", "qa-integration", "qa-browser", "qa-security"],
-      "epic": "ODEE-W0-3"
+      "epic": "ODEE-W0-3",
+      "capabilities": ["CAP-PLATFORM-DEEP-LINKS"],
+      "originatingFindingIds": ["F-004-DIRECT-ROUTE-20261103"],
+      "pmDecisionId": "D013"
     },
     {
       "id": "ODEE-005", "revision": 1,
@@ -150,7 +201,7 @@
       "epic": "ODEE-F3", "capabilities": ["CAP-NUMBERING"], "risk": "high"
     },
     {
-      "id": "ODEE-011", "revision": 1,
+      "id": "ODEE-011", "revision": 2,
       "title": "Correct one posted invoice through linked credit/reversal and fiscal-lock rules",
       "owner": "feature-finance", "priority": 44, "dependsOn": ["ODEE-009", "ODEE-010"],
       "paths": ["internal/accounting/", "web/src/", "web/tests/", "docs/"],
@@ -158,11 +209,15 @@
         "Full and partial credit-note journeys preserve the original posted snapshot and produce auditable reversal links and independently balanced entries.",
         "For a 24200-cent invoice paid 10000 cents, credit/refund/allocation fixtures reconcile the remaining 14200 cents without creating an accidental bank transfer or duplicate refund.",
         "A closed-period mutation is rejected server-side; only the declared capability can perform an audited reopen/correction transition.",
-        "Duplicate correction requests cannot over-credit; debit-note scenarios outside the accepted initial policy return an explicit unsupported outcome."
+        "Duplicate correction requests cannot over-credit; debit-note scenarios outside the accepted initial policy return an explicit unsupported outcome.",
+        "For an immutable posted invoice of two EUR100.00 units plus 21 percent VAT (24200 cents), after a 10000-cent payment, one reviewed credit note for one unit is 12100 cents and leaves 2100 cents receivable when allocated. Retrying correction/allocation cannot create another credit or repeat allocation; no automatic cash refund or edit of the original is implied."
       ],
       "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-belgian-peppol"],
       "epic": "ODEE-F3", "capabilities": ["CAP-CREDIT-LOCKS"], "risk": "high",
-      "sourceRefs": ["ODOO-CREDIT-NOTES"]
+      "sourceRefs": ["ODOO-CREDIT-NOTES"],
+      "referenceVersion": "20.0",
+      "originatingDiscoveryId": "G-CREDIT-PARTIAL-20261103",
+      "pmDecisionId": "D014"
     },
     {
       "id": "ODEE-012", "revision": 1,

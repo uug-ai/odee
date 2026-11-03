@@ -6,6 +6,19 @@ not evidence that its tickets have been implemented, tested or released.
 See [backlog](backlog.json), [capabilities and sources](capabilities.json),
 [decisions and feedback contract](decisions.md) and [operating guide](../agents.md).
 
+## Material QA checkpoint: next candidate only
+
+The coordinator reports ODEE-004 blocked on missing non-root direct-route
+evidence and ODEE-022 blocked on its linked planning drill and persisted-pin
+status output. These are not waived by other passing suites.
+Decisions D013/D014 retain all valid gates: ODEE-004 revision 2 pins explicit
+registry-backed URLs/history/unknown-route behavior; ODEE-022 keeps revision 1
+and requires source repair plus the actual drill. A documented partial-credit
+gap refines existing ODEE-011 to revision 2, not a duplicate feature ticket.
+The linked planning changes are inputs for that drill, not proof it ran.
+ODEE-005 waits for the ODEE-004 gate. This PM delta lives in a separate
+next-candidate worktree; frozen C and original dirty main are unchanged.
+
 ## Product direction
 
 Build an independent integrated business suite, extending Go/React/MongoDB.
