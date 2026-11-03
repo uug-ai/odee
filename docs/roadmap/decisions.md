@@ -633,13 +633,20 @@ dependent claim: tools/agents/loop-planning.test.mjs:138
 0 PASS, 1 FAIL, 3 skipped by the explicit name selector
 ```
 
-**Classification/decision:** a test-fixture portability/provenance defect, not
-new business scope and not a production scheduler defect. Add only **ODEE-023
-revision 1**, owner `coordinator` (designated source owner `b920…`), priority
-**14**, depending on **ODEE-022**. Its sole implementation lease is
-`tools/agents/loop-planning.test.mjs`; required independent roles are
-`qa-api-data` and `qa-integration`. The stable planning change is
-`PM-20261103-023-DRILL-PORTABILITY`.
+**Classification/decision:** one deduplicated test-fixture
+portability/provenance defect, not new business scope and not a production
+scheduler defect. **ODEE-023 revision 2**, owner `coordinator` (designated
+source owner `b920…`), retains priority **14**, dependency **ODEE-022**, and
+independent roles `qa-api-data` and `qa-integration`. Its only two implementation
+paths are `tools/agents/loop-planning.test.mjs` and
+`tools/agents/qa-loop.test.mjs`.
+
+Original revision 1 and planning change
+`PM-20261103-023-DRILL-PORTABILITY` were committed as
+`4ab9d438fafbca5ae9e70059e3b38345cdc11d85`. The pre-dispatch scope correction
+is a new follow-up commit, not an amendment. Linked planning change
+`PM-20261103-023-DRILL-PORTABILITY-R2` records revision 1 → 2 under the same
+finding and D016; the original planning record remains intact.
 
 Use the selected current fixture's actual dependent revisions/roles and derive
 counts/readiness from the manifest and intended invariants. Exercise legitimate
@@ -663,24 +670,37 @@ is unchanged. The later exact-P regression needs its new narrow follow-up
 before root checks can be declared green. No old PASS is retroactively revoked
 or generalized to P, and no existing valid failure becomes PASS by relabelling.
 
-**Additional scope warning:** source inspection found a separate fixed-69
-schema assertion in [qa-loop.test.mjs](../../tools/agents/qa-loop.test.mjs).
+**Additional evidence and approved scope correction:** source inspection found
+the same portability assumption in the fixed-69 schema assertion in
+[qa-loop.test.mjs](../../tools/agents/qa-loop.test.mjs).
 Adding a legitimate 70th contract exposes that separate count assumption.
 On the new docs-only candidate atop P, PM reproduced
 `node --test --test-name-pattern='real backlog schema' tools/agents/qa-loop.test.mjs`:
 **0 PASS, 1 FAIL, 12 skipped by selection**, `70 !== 69` at line 106.
 This additional failure is from the new manifest, not a second claimed failure
 in the historical exact-P 70/71 report.
-It is **outside ODEE-023's sole path allowance** and is not quietly included in
-this assignment. Coordinator must triage/lease any additional repair separately;
-even a passing ODEE-023 focused test cannot prove all root checks green while
-that assertion remains.
+It was outside revision 1's single-file allowance. Before dispatch, the user
+explicitly authorized extending **the same ODEE-023 to revision 2** for this
+second file; do not create an ODEE-024 for each brittle assertion.
+
+Both fixtures must derive expected current totals from validated fixture/current
+backlog input and retain count assertions, not delete them or merely replace 69
+with 70. Preserve independent schema validation, complete initialized ticket
+counts, zero fabricated merges/candidates/gates/workers/QA, non-dispatchable
+epics and exact accepted backlog metadata/extensions. Test legitimate added or
+revised unrelated leaves, while retaining every original D013/D014 invariant
+above. Both required independent roles must rerun
+`node --test tools/agents/loop-planning.test.mjs tools/agents/qa-loop.test.mjs`
+on the exact candidate/revision. Passing only one file does not close the defect;
+even passing both does not alone establish all root checks green.
 
 Only backlog/decision documents are changed in a new external PM worktree based
 on exact P. No existing ticket contract, scheduler validation, fixture/source,
 environment or authoritative execution state is changed. ODEE-013 docs-only
 discovery may proceed concurrently because its docs lease does not overlap the
-ODEE-023 test-file lease. No new dependency package, network/provider action,
+ODEE-023 two-test-file lease. ODEE-013 must align to the cumulative PM tip before
+its separately authorized README discovery-link addition; no README edit is
+made here. No new dependency package, network/provider action,
 permission activation, rollout, push or release is authorized.
 
 ## Material feedback packet
@@ -805,15 +825,19 @@ PM ran dependency-free Node checks on 2026-11-03:
 - Existing `node --test tools/agents/qa-contracts.test.mjs` checks pass
   **2/2, zero skipped**; this is role/configuration regression evidence, not
   independent approval of the unimplemented ODEE-005 feature.
-- The candidate has five unique linked planning-change records and one
+- The candidate has six unique linked planning-change records and one
   unchanged non-dispatchable proposed audit follow-up. Relative to exact P
   `fbe01cf6e9e2db4b56a0d90f832ea006650b38f5`, only ODEE-023 is added; all 69
   existing contracts are byte-for-byte unchanged, including ODEE-004/005/011
   revision 2 and ODEE-022 revision 1. Every approved dependency edge is preserved.
-- The exact-P focused planning fixture failure is deliberately disclosed in
-  D016, not waived or fixed by this documentation change. No all-root-green
-  claim is made; the separately reproduced fixed-count assertion in the new
-  docs-only candidate also requires explicit triage.
+- ODEE-023 revision 2 retains its original invariants and explicitly adds the
+  independent fixed-count fixture to the same two-file portability repair.
+- Both reproduced failures remain disclosed in D016, not waived or fixed by
+  this documentation change. No all-root-green claim is made.
+- On the revision-2 docs-only candidate, the complete two-file baseline
+  `node --test tools/agents/loop-planning.test.mjs tools/agents/qa-loop.test.mjs`
+  reports **15 PASS, 2 FAIL, zero skipped**: the same `STALE_REVISION` and
+  `70 !== 69` portability defects. No test implementation was changed here.
 
 No application tests, provider exchange, release, state transition or feature
 completion is asserted by these documentation checks. The proposal's roadmap

@@ -77,6 +77,19 @@
       "candidateSha": "fbe01cf6e9e2db4b56a0d90f832ea006650b38f5",
       "rationale": "A current-manifest D013/D014 rehearsal hardcodes dependent revision 1 and fails on legitimate ODEE-005 revision 2. Repair fixture portability without reverting requirements, weakening scheduler validation or invalidating historical ODEE-022 delivery.",
       "candidateBoundary": "Narrow test-only follow-up after ODEE-022. Known integration-P root failure remains disclosed; no execution-state or runtime activation change."
+    },
+    {
+      "id": "PM-20261103-023-DRILL-PORTABILITY-R2",
+      "recordedOn": "2026-11-03",
+      "decisionId": "D016",
+      "classification": "existing-test-fixture-portability-defect",
+      "findingIds": ["F-P-PLANNING-STALE-REVISION-20261103"],
+      "capabilityIds": [],
+      "relatedPlanningChangeId": "PM-20261103-023-DRILL-PORTABILITY",
+      "ticketChanges": [{"ticket": "ODEE-023", "fromRevision": 1, "toRevision": 2}],
+      "evidenceBaseSha": "4ab9d438fafbca5ae9e70059e3b38345cdc11d85",
+      "rationale": "The approved 70th contract also exposes qa-loop.test.mjs:106 expecting 69. Both fixed assumptions are one deduplicated portability defect; extend the same ticket to the two test files and retain validated current-total and no-fabricated-completion assertions.",
+      "candidateBoundary": "Pre-dispatch scope correction only. Preserve all original invariants, the other 69 contracts and production validation; no new leaf, rollback, waiver, execution-state change or activation."
     }
   ],
   "proposedFollowUps": [
@@ -463,16 +476,17 @@
       "epic": "ODEE-W0-6"
     },
     {
-      "id": "ODEE-023", "revision": 1,
+      "id": "ODEE-023", "revision": 2,
       "title": "Make the source-linked planning rehearsal portable across current contract revisions",
       "owner": "coordinator", "priority": 14, "dependsOn": ["ODEE-022"],
-      "paths": ["tools/agents/loop-planning.test.mjs"],
+      "paths": ["tools/agents/loop-planning.test.mjs", "tools/agents/qa-loop.test.mjs"],
       "acceptance": [
         "The D013/D014 finding/capability rehearsal remains linked to the real planning records, capability matrix and official-source credit-note discovery. Claims, submissions, required QA roles, gates and merge records use the selected current fixture ticket's actual revision/roles rather than assuming every dependent is revision 1.",
         "Preserve all existing valid failure, BLOCKED/no-waiver, candidate/specification invalidation, failure/checkpoint/lease retention, repeated-packet deduplication, stop/resume and stale-gate rejection assertions. Do not repair by relaxing production claim validation, dropping negative cases or reverting ODEE-005 revision 2.",
         "Regression cases exercise legitimate ODEE-005 revision 2 and later added/revised unrelated leaves, including changed required QA roles. Ticket/leaf/epic counts and readiness expectations derive from the fixture manifest and intended invariants rather than fixed 69/22/47 totals or incidental unrelated queue order.",
         "If current roadmap files are loaded, diagnostics identify a current-manifest synthetic rehearsal and its reconstructed target revisions, not an exact historical 6549b611 or 21c4c43 snapshot. Any exact historical-content claim must actually use that immutable content; all fixture worker/SHA/merge records remain explicitly synthetic.",
-        "Independent qa-api-data and qa-integration rerun node --test tools/agents/loop-planning.test.mjs on the exact new candidate/revision and verify the source-linked, metamorphic and unchanged negative assertions. Record broader root-check results and unrelated failures honestly; a passing focused rehearsal alone is not all-root-green evidence."
+        "Independent qa-api-data and qa-integration rerun node --test tools/agents/loop-planning.test.mjs tools/agents/qa-loop.test.mjs on the exact new candidate/revision and verify the source-linked, metamorphic and unchanged negative assertions. Record broader root-check results and unrelated failures honestly; a passing focused rehearsal alone is not all-root-green evidence.",
+        "In both test files derive expected current ticket/leaf/epic totals from the validated fixture/current backlog rather than hardcoding 69/22/47 or removing count assertions. The independent real-backlog initialization test retains schema validation, complete initialized ticket/count expectations, zero fabricated merges/candidates/gates/workers/QA, non-dispatchable epics and exact preservation of accepted backlog metadata/extensions. Verify these invariants still hold when an unrelated legitimate leaf is added or revised."
       ],
       "requiredQa": ["qa-api-data", "qa-integration"],
       "epic": "ODEE-W0-6", "risk": "medium",
@@ -481,7 +495,9 @@
       "reportedCandidateSha": "fbe01cf6e9e2db4b56a0d90f832ea006650b38f5",
       "reproducer": "node --test --test-name-pattern='D013/D014 actual finding/capability packet' tools/agents/loop-planning.test.mjs",
       "observedFailure": "STALE_REVISION: expected revision 2, received 1; dependent claim at loop-planning.test.mjs:138.",
-      "outOfScope": ["production scheduler/claim validation", "changing existing ticket contracts", "rollback of ODEE-005 revision 2", "runtime grants/activation", "tools/agents/qa-loop.test.mjs"]
+      "additionalReproducer": "node --test --test-name-pattern='real backlog schema' tools/agents/qa-loop.test.mjs",
+      "additionalObservedFailure": "70 !== 69 at qa-loop.test.mjs:106 after the legitimate ODEE-023 manifest addition; same portability defect, now covered by revision 2.",
+      "outOfScope": ["production scheduler/claim validation", "changing existing ticket contracts", "rollback of ODEE-005 revision 2", "runtime grants/activation"]
     },
     {
       "id": "ODEE-W0-1", "revision": 1, "kind": "epic", "status": "proposed",
