@@ -80,10 +80,8 @@ type MongoImports struct {
 }
 
 type storedImport struct {
-	ID             primitive.ObjectID `bson:"_id"`
-	Metadata       BillImport         `bson:"metadata"`
-	StorageBackend string             `bson:"storageBackend"`
-	StorageKey     string             `bson:"storageKey"`
+	ID       primitive.ObjectID `bson:"_id"`
+	Metadata BillImport         `bson:"metadata"`
 }
 
 func NewMongoImports(ctx context.Context, store *MongoStore) (*MongoImports, error) {
@@ -106,16 +104,6 @@ func newMongoImports(ctx context.Context, store *MongoStore, disk *diskOriginals
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create bill import duplicate index: %w", err)
-	}
-	if disk == nil {
-		count, err := m.native.Collection("bill_imports.files").CountDocuments(ctx,
-			m.filter(bson.M{"storageBackend": "filesystem"}), options.Count().SetLimit(1))
-		if err != nil {
-			return nil, fmt.Errorf("check original document storage configuration: %w", err)
-		}
-		if count != 0 {
-			return nil, fmt.Errorf("ODEE_DOCUMENTS_DIR is required for existing filesystem originals")
-		}
 	}
 	return m, nil
 }
@@ -141,19 +129,14 @@ func (m *MongoImports) ByHash(ctx context.Context, hash string) (BillImport, err
 }
 
 func (m *MongoImports) find(ctx context.Context, filter bson.M) (BillImport, error) {
-	file, err := m.findFile(ctx, filter)
-	return file.Metadata, err
-}
-
-func (m *MongoImports) findFile(ctx context.Context, filter bson.M) (storedImport, error) {
 	var file storedImport
 	err := m.native.Collection("bill_imports.files").FindOne(ctx, m.filter(filter)).Decode(&file)
 	if errors.Is(err, mongo.ErrNoDocuments) {
-		return storedImport{}, ErrNotFound
+		return BillImport{}, ErrNotFound
 	}
 	file.Metadata.normalize()
 	file.Metadata.ID = file.ID
-	return file, err
+	return file.Metadata, err
 }
 
 func (m *MongoImports) List(ctx context.Context) ([]BillImport, error) {
@@ -209,24 +192,14 @@ func (m *MongoImports) Upload(ctx context.Context, item BillImport, data []byte)
 	if existing != 0 {
 		return ErrConflict
 	}
+	bucket, err := m.bucket(ctx)
+	if err != nil {
+		return err
+	}
 	if m.disk != nil {
 		if err := m.disk.write(ctx, item, data); err != nil {
 			return err
 		}
-		_, err := m.native.Collection("bill_imports.files").InsertOne(ctx, bson.M{
-			"_id": item.ID, "filename": item.Filename, "length": item.Size,
-			"uploadDate": item.CreatedAt, "metadata": item,
-			"storageBackend": "filesystem", "storageKey": item.SHA256,
-		})
-		if err != nil && !mongo.IsDuplicateKeyError(err) {
-			// A failed acknowledgement may still have committed; never remove its original.
-			slog.Error("document metadata write failed; synced original retained for retry/recovery", "import", item.ID.Hex(), "error", err)
-		}
-		return err
-	}
-	bucket, err := m.bucket(ctx)
-	if err != nil {
-		return err
 	}
 	err = bucket.UploadFromStreamWithID(item.ID, item.Filename, bytes.NewReader(data), options.GridFSUpload().SetMetadata(item))
 	if err != nil {
@@ -239,24 +212,17 @@ func (m *MongoImports) Upload(ctx context.Context, item BillImport, data []byte)
 				slog.Error("clean uncommitted GridFS chunks", "error", cleanupErr)
 			}
 		}
+		if m.disk != nil && !mongo.IsDuplicateKeyError(err) {
+			// An ambiguous acknowledgement must never delete a published volume copy.
+			slog.Error("shared original write failed; volume copy retained for retry/recovery", "import", item.ID.Hex(), "error", err)
+		}
 	}
 	return err
 }
 
 func (m *MongoImports) Bytes(ctx context.Context, id primitive.ObjectID) ([]byte, error) {
-	file, err := m.findFile(ctx, bson.M{"_id": id})
-	if err != nil {
+	if _, err := m.Get(ctx, id); err != nil {
 		return nil, err
-	}
-	switch file.StorageBackend {
-	case "filesystem":
-		if m.disk == nil {
-			return nil, fmt.Errorf("filesystem originals require ODEE_DOCUMENTS_DIR; refusing GridFS fallback")
-		}
-		return m.disk.read(ctx, file.Metadata, file.StorageKey)
-	case "", "gridfs":
-	default:
-		return nil, fmt.Errorf("unsupported original document storage backend %q", file.StorageBackend)
 	}
 	bucket, err := m.bucket(ctx)
 	if err != nil {

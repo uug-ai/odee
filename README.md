@@ -134,8 +134,8 @@ The container serves both the Go API and built frontend on port 8098. It runs
 as UID/GID 10001 and includes Poppler, Tesseract and the English, Dutch and French
 language packs. Runtime application credentials are not built into the image.
 Provide a writable private `/tmp` for scanning when using a read-only filesystem;
-original documents default to MongoDB GridFS. To store new uploads on a mounted
-volume instead, set `ODEE_DOCUMENTS_DIR` to its absolute writable path.
+original documents use MongoDB GridFS. To also save new uploads on a mounted
+volume, set `ODEE_DOCUMENTS_DIR` to its absolute writable path.
 
 GitHub Actions runs backend race tests/vet, frontend tests/build, isolated MongoDB
 tests, native scanner tests and browser tests. Both Linux amd64 and arm64 runtime
@@ -183,8 +183,8 @@ Limits: 20 MiB/file, 20 files/batch, 10 PDF pages, and 20 million pixels/image
 (maximum 20,000 pixels per dimension). Batches process serially; the server
 accepts two concurrent uploads/scans. Scanning is bounded to 120 seconds and
 preview rendering to 20 seconds. Private temporary scan files are removed after
-processing; originals remain in company-scoped GridFS or the explicitly
-configured document volume.
+processing; originals remain in company-scoped GridFS, with additional copies on
+the explicitly configured document volume.
 
 Byte-identical duplicates reuse the existing original. A matching supplier and
 invoice number on an existing bill produces a warning, not an automatic
@@ -202,26 +202,29 @@ disable scanning, not original storage or manual draft creation.
 ### Persistent document volume
 
 Set `ODEE_DOCUMENTS_DIR=/data/documents` and mount a persistent filesystem at that
-path to store new original uploads on disk. The directory must already exist and
+path to also store new original uploads on disk. The directory must already exist and
 be writable by UID/GID 10001 in the container; missing, read-only or relative paths
 fail startup. The read-only container root remains enabled, and OCR scratch stays
 separate in `/tmp`. Do not point this setting at an `emptyDir` or the image layer.
 
-Accounting, contacts and import metadata still use the configured MongoDB
-database. Existing GridFS originals stay readable immediately without a
-migration; only new uploads use the volume. Import records retain an immutable
-`storageBackend`/`storageKey` locator outside the editable scan metadata in
-`bill_imports.files`. Disk originals are scoped by BSON organisation/project
-IDs and a SHA-256 content key, never by user-supplied filenames. Uploads are
-synced and atomically published without replacing existing originals; concurrent
-duplicates share one file. Reads verify the stored size and checksum.
+Accounting, contacts, import metadata and shared original downloads still use
+the configured MongoDB/GridFS database. This preserves access from a local
+workspace sharing the database without access to the staging PVC. Existing
+originals remain readable without migration; historical files and duplicates
+are not automatically backfilled onto the volume.
 
-Filesystem originals have no GridFS fallback: missing/corrupt files are explicit
-storage errors, and removing the directory setting fails startup once this
-company has filesystem records. After enabling disk storage, use a
-filesystem-aware image and the same volume for rollbacks. A failed MongoDB
-acknowledgement never deletes a published original: an unreferenced content file
-may remain for retry/recovery rather than risking a committed document.
+The configured volume is mandatory for each new upload on that deployment:
+Odee syncs and atomically publishes a disk copy before committing GridFS bytes
+and metadata. A missing/unwritable volume or inconsistent existing copy fails
+the upload, never silently skips the copy. Disk copies are scoped by BSON
+organisation/project IDs and a SHA-256 content key, never by user filenames;
+concurrent duplicates share one verified file. Scan/review metadata updates
+cannot change its path. A failed MongoDB acknowledgement never deletes a
+published copy: an unreferenced file may remain for retry/recovery.
+
+GridFS remains the authoritative source for downloads and scanning, not a
+fallback for disk reads. Keep the same PVC and a volume-aware image on rollback
+to continue making disk copies; an older image would leave them incomplete.
 
 Back up MongoDB and the volume together, quiescing uploads for a coordinated
 snapshot; retain GridFS backups for historical originals. A PVC is persistence,
@@ -305,7 +308,7 @@ Keep local development access private and back up the database.
 | `ODEE_COMPANY_ID` | Stable nonzero BSON ObjectID used for both ownership axes. |
 | `MONGODB_URI` | MongoDB connection string. Keep credentials out of Git. |
 | `MONGODB_DATABASE_ODEE` | Dedicated database; default `odee`. |
-| `ODEE_DOCUMENTS_DIR` | Optional absolute writable persistent directory for new originals; unset defaults to GridFS, existing GridFS uploads stay readable. |
+| `ODEE_DOCUMENTS_DIR` | Optional absolute writable persistent directory for additional original copies; GridFS remains shared and authoritative. |
 | `ODEE_DEV_MODE=true` | Explicit unauthenticated local mode; loopback bind only. |
 | `ODEE_DEMO=true` | Temporary memory store; requires development mode. |
 | `ODEE_AUTH_MODE` | `github` for team login; `token` (legacy default) for access-token/local development mode. |
@@ -404,7 +407,7 @@ live database URI. GridFS tests cover original bytes, reconnects, scoped reads,
 duplicate races, stale metadata writes, and runtime legacy ownership.
 It also restarts the disposable MongoDB daemon and verifies that a bill and its
 unchanged original survive on disk under the same stable company ID.
-Filesystem tests additionally verify actual volume bytes with no GridFS chunks,
+Filesystem tests additionally verify actual volume bytes alongside GridFS chunks,
 atomic concurrent deduplication, checksum/path guards, legacy GridFS reads,
 metadata updates, HTTP draft/download flows and separate-process restart
 persistence of both filesystem originals and their MongoDB metadata.

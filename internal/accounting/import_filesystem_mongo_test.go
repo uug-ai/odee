@@ -18,7 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func TestMongoFilesystemOriginalsAndLegacyGridFS(t *testing.T) {
+func TestMongoVolumeCopiesAndSharedGridFS(t *testing.T) {
 	uri := os.Getenv("ODEE_TEST_MONGODB_URI")
 	if uri == "" {
 		t.Skip("run npm run test:mongo")
@@ -52,9 +52,9 @@ func TestMongoFilesystemOriginalsAndLegacyGridFS(t *testing.T) {
 		t.Fatalf("filesystem HTTP upload failed: %d %s", response.Code, response.Body)
 	}
 	item, _ := importResponse(t, response)
-	stored, err := originals.findFile(ctx, bson.M{"_id": item.ID})
-	if err != nil || stored.StorageBackend != "filesystem" || stored.StorageKey != item.SHA256 {
-		t.Fatal("scan metadata updates lost the immutable filesystem locator", err)
+	stored, err := originals.Get(ctx, item.ID)
+	if err != nil || stored.SHA256 != item.SHA256 {
+		t.Fatal("scan metadata updates lost the original metadata", err)
 	}
 	name, err := originalDiskPath(company, company, item.SHA256)
 	if err != nil {
@@ -63,14 +63,15 @@ func TestMongoFilesystemOriginalsAndLegacyGridFS(t *testing.T) {
 	if saved, err := os.ReadFile(filepath.Join(directory, name)); err != nil || !bytes.Equal(saved, data) {
 		t.Fatal("uploaded original was not actually stored on disk", err)
 	}
-	if count, err := originals.native.Collection("bill_imports.chunks").CountDocuments(ctx, bson.M{"files_id": item.ID}); err != nil || count != 0 {
-		t.Fatal("filesystem upload wrote original bytes to GridFS", err)
+	if count, err := originals.native.Collection("bill_imports.chunks").CountDocuments(ctx, bson.M{"files_id": item.ID}); err != nil || count == 0 {
+		t.Fatal("volume upload must retain shared GridFS original bytes", err)
 	}
-	if _, err := NewMongoImports(ctx, store); err == nil {
-		t.Fatal("removing the volume configuration must fail startup for filesystem documents")
+	shared, err := NewMongoImports(ctx, store)
+	if err != nil {
+		t.Fatal("a second workspace must not require this deployment's volume", err)
 	}
-	if _, err := grid.Bytes(ctx, item.ID); err == nil {
-		t.Fatal("missing filesystem configuration must not fall back to GridFS")
+	if saved, err := shared.Bytes(ctx, item.ID); err != nil || !bytes.Equal(saved, data) {
+		t.Fatal("a workspace without the volume lost access to the shared original", err)
 	}
 	duplicate := uploadRequest(handler, data, "repeat.pdf", origin, "")
 	repeated, isDuplicate := importResponse(t, duplicate)
@@ -98,6 +99,9 @@ func TestMongoFilesystemOriginalsAndLegacyGridFS(t *testing.T) {
 	}
 	if saved, err := originals.Bytes(ctx, item.ID); err != nil || !bytes.Equal(saved, data) {
 		t.Fatal("original did not survive store reconstruction", err)
+	}
+	if saved, err := originals.disk.read(ctx, stored, stored.SHA256); err != nil || !bytes.Equal(saved, data) {
+		t.Fatal("volume copy did not survive scan/draft metadata updates and reconstruction", err)
 	}
 	if _, err := originals.native.Collection("bill_imports.files").UpdateOne(ctx, bson.M{"_id": item.ID}, bson.M{
 		"$unset": bson.M{"metadata.organisationId": "", "metadata.projectId": ""},
@@ -192,17 +196,17 @@ func TestMongoFilesystemOriginalsAndLegacyGridFS(t *testing.T) {
 	failedData := append(bytes.Clone(data), []byte("\n% unavailable volume fixture")...)
 	failureHandler := (&Server{Store: store, Imports: originals, Company: company, Dev: true, Origin: origin}).Handler()
 	if response := uploadRequest(failureHandler, failedData, "unavailable.pdf", origin, ""); response.Code != http.StatusInternalServerError {
-		t.Fatal("an unavailable volume must fail the upload, never switch backends", response.Code)
+		t.Fatal("a required volume copy must fail the upload when unavailable", response.Code)
 	}
 	if _, err := originals.ByHash(ctx, importMetadata(company, failedData).SHA256); !errors.Is(err, ErrNotFound) {
 		t.Fatal("failed filesystem upload committed metadata", err)
 	}
 	if count, err := originals.native.Collection("bill_imports.chunks").CountDocuments(ctx, bson.M{}); err != nil || count != chunks {
-		t.Fatal("unavailable filesystem fell back to GridFS chunks", err)
+		t.Fatal("failed volume copy must not commit GridFS chunks", err)
 	}
 }
 
-func TestMongoFilesystemDiskPersistence(t *testing.T) {
+func TestMongoDocumentVolumeDiskPersistence(t *testing.T) {
 	phase, directory := os.Getenv("ODEE_TEST_RESTART_PHASE"), os.Getenv("ODEE_TEST_DOCUMENTS_DIR")
 	if phase == "" {
 		t.Skip("run npm run test:mongo for filesystem/daemon-restart verification")
@@ -234,6 +238,9 @@ func TestMongoFilesystemDiskPersistence(t *testing.T) {
 		t.Fatal("unknown filesystem restart phase")
 	}
 	if saved, err := originals.Bytes(ctx, item.ID); err != nil || !bytes.Equal(saved, data) {
-		t.Fatal("filesystem original/metadata did not survive separate processes and MongoDB restart", err)
+		t.Fatal("shared original/metadata did not survive separate processes and MongoDB restart", err)
+	}
+	if saved, err := originals.disk.read(ctx, item, item.SHA256); err != nil || !bytes.Equal(saved, data) {
+		t.Fatal("volume copy did not survive separate processes and MongoDB restart", err)
 	}
 }

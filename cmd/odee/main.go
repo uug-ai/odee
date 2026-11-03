@@ -125,7 +125,7 @@ func run() error {
 			return err
 		}
 		if documentsDirectory != "" {
-			slog.Info("original document storage configured", "backend", "filesystem", "directory", documentsDirectory)
+			slog.Info("original document storage configured", "backend", "gridfs", "volumeCopyDirectory", documentsDirectory)
 		}
 	}
 	scanner := accounting.NewScanner(env("ODEE_OCR_LANGUAGES", "eng+nld+fra"))
