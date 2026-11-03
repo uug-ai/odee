@@ -19,6 +19,24 @@ The linked planning changes are inputs for that drill, not proof it ran.
 ODEE-005 waits for the ODEE-004 gate. This PM delta lives in a separate
 next-candidate worktree; frozen C and original dirty main are unchanged.
 
+## ODEE-005 revision-2 contract candidate, not activation
+
+Decision D015 pins stable GitHub numeric principals, shared token/dev attribution,
+explicit company grants and server/UI `read/write/post/admin` checks.
+Compatibility defaults preserve existing read/write/post access without implicit
+admin; explicitly enabled enforced mode forbids unmapped authenticated users
+without treating 403 as logout. Actor identity never becomes BSON ownership.
+Only posting/manual-payment events gain the proposed same-document atomic
+audit, with admin-gated redacted retrieval and the existing 201-event bound.
+Broader contact/draft/original/review audit remains visibly proposed as
+`PF-AUDIT-NONFINANCIAL-001` under existing epics, not delivered coverage.
+
+Human approval of initial admin/grants and enforced live rollout is required
+**before activation**, not before synthetic implementation/QA. Coordinator
+integrates the proposal after ODEE-022 repair, preserves the ODEE-004 revision-2
+gate, and alone reconciles execution state. No current grant/configuration,
+source, runtime or deployment is changed by this roadmap candidate.
+
 ## Product direction
 
 Build an independent integrated business suite, extending Go/React/MongoDB.

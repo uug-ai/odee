@@ -451,6 +451,168 @@ gate at 30 before ODEE-005 proceeds. ODEE-019 still requires ODEE-022. No
 release, provider traffic, shared-browser writes or remote-CI success is
 authorized or asserted.
 
+## D015 — Version ODEE-005's bounded permission and financial-audit contract
+
+**Input/authority:** the coordinator approved turning the earlier ODEE-005
+preflight into a versioned contract candidate, not runtime activation.
+Discovery `PREFLIGHT-005-IDENTITY-AUDIT-20261103` and planning change
+`PM-20261103-005-PERMISSIONS` link ODEE-005 revision **1 → 2** to
+CAP-COMPANY-CAPABILITIES and CAP-FINANCIAL-ACTOR-AUDIT. The new PM worktree is
+based exactly on `6549b61137b155e941dea29975f77bd35b10a2c9`; only roadmap files
+are changed. Existing ODEE-004/011 revision 2 and ODEE-022 revision 1,
+dependencies and known unmet gates are preserved.
+
+**Bounded outcome:** restrict the current company's existing HTTP/browser
+workflows with explicit capabilities, and attribute successful posting/manual
+payments atomically. No role-administration UI, invitation system, full IAM,
+new business module or accounting formula is required. Platform retains
+priority 31, dependency ODEE-004 and all existing valid QA criteria; add browser
+QA and future implementation allowances for `README.md`/`.env.example`.
+This contract preparation edits neither of those files nor runtime configuration.
+
+### Principal, company membership and compatibility
+
+| Existing authentication mode | Server-resolved principal | Attribution limitation |
+| --- | --- | --- |
+| GitHub | `github:<stable positive numeric user ID>` | Login name is display/provenance, never membership identity or BSON owner |
+| Company token | `token:company` | Shared credential/service attribution, not proof which human acted |
+| Explicit local development | `development:local` | Explicit dev-mode attribution only; existing loopback restrictions remain |
+
+Preserve the current signed session, expiry, GitHub active-team-at-login,
+bearer verification, origin/CSRF and content validation. A valid bearer or dev
+flag cannot bypass configured GitHub authentication. Identity is not inferred
+from request JSON, creator, payer, imported company or resource ownership.
+
+Proposed configuration names are `ODEE_AUTHZ_MODE` and
+`ODEE_CAPABILITY_GRANTS`; existing `ODEE_AUTH_MODE` still selects authentication.
+The startup-loaded grant structure is an explicit array of principal,
+company ObjectID and capability-set records. It contains no token/secret or
+automatic role hierarchy. Validate IDs, known capability names and conflicting
+duplicate grants; reject invalid configuration rather than guess.
+
+- **Compatibility default:** preserve currently authenticated `read/write/post`
+  business access when no explicit grant exists, with **no implicit admin**.
+  Expose/document the mode; do not describe it as per-person financial isolation.
+- **Explicit grant:** replaces fallback rights in either mode. A grant for
+  another company does not grant current-company access or fall back into it;
+  that authenticated principal is forbidden in this company.
+- **Enforced mode:** enabled deliberately; an unmapped authenticated principal
+  receives 403. Invalid/missing authentication remains 401. No first-login
+  administrator, GitHub-team superuser or automatic owner grant exists.
+- Session discovery reports current membership/capabilities without revealing
+  other grants. A capability/membership 403 is an actionable forbidden state,
+  not session expiry, implicit permission or a retry instruction. Preserve
+  usable sign-in and existing logout with their original auth/CSRF protections.
+- Resolve membership from server configuration, not stale client claims.
+  A restart/reload policy for applying configuration is explicit; dynamic
+  membership CRUD and external identity-provider integration are not required.
+
+### Exact route/capability boundary
+
+Capabilities imply **no other capability**:
+
+| Operation | Required set |
+| --- | --- |
+| Current state/contact/import/original/preview reads | `read` |
+| Draft create/edit; contact create/edit/archive/import; upload/scan/review-to-draft | `read`, `write` |
+| Post existing draft; record manual payment | `read`, `post` |
+| Proposed `GET /api/documents/{id}/audit` | `read`, `admin`, and target ownership |
+
+Thus a poster need not edit drafts, an editor cannot post/pay, and an audit
+administrator has no implicit financial mutation authority. Check direct API
+requests before protected data/file work or external contact-import requests;
+UI controls mirror, never replace, server enforcement. Existing public shell,
+health and authentication/session discovery behavior is not accidentally gated
+as business data. Tests cover every existing route, not just invoice buttons.
+
+Keep BSON `organisationId`/`projectId` canonical precedence and per-axis valid
+`ownerId` fallback at runtime without backfill. Actor strings are never cast
+into ownership ObjectIDs. Wrong-scope resources remain inaccessible even to an
+explicitly granted audit administrator.
+
+### Financial-only durable audit
+
+Record only `document.post` and `manual-payment.record` in this slice. An event
+contains bounded server-generated event ID, UTC time, actor type/stable
+principal, action, target ID/version and committed outcome. Include neither
+raw request bodies nor tokens/hashes/secrets/CSRF/contact or OCR PII.
+
+The financial mutation, version increment and event append are **one
+owner/version-filtered document write**, preserving standalone MongoDB.
+Never save the business change and then separately claim audit insertion made
+them atomic. Rejected, stale, duplicate or definitively failed writes cannot
+manufacture a successful event. For an uncertain result, preserve the
+uncertainty and reconcile; a network failure proves neither "both absent" nor
+exactly-once execution.
+
+Events are API-append-only and absent from ordinary state/document JSON.
+Admin retrieval is scoped and redacted. One posting plus the existing maximum
+200 manual payments bounds the financial history to **201 events/document**;
+do not silently trim or add an unbounded activity array. Preserve prior events
+and equivalent memory-store semantics. A legacy document with no history is
+valid: record only new successful actions, never invent historical people.
+
+### Proposed audit expansion, visibly not covered
+
+`PF-AUDIT-NONFINANCIAL-001` is one deduplicated **non-dispatchable proposed
+follow-up**, not another executable ticket. It lives under existing
+ODEE-W0-3, related to document controls ODEE-C1 and reliability/admin ODEE-C7.
+It covers contact mutations/import, draft creation/edits, originals upload/scan
+and cross-record review-to-draft links. Those workflows remain capability-gated
+in ODEE-005 but are **not claimed as durable audit coverage**.
+
+Before any later leaf dispatch, define bounded consumer-specific events,
+retention/privacy/size requirements and explicit recovery/atomicity semantics.
+GridFS and linked business-document writes cannot acquire standalone
+cross-document atomicity by adding a separate audit collection. Choose a
+reviewed intent/reconciliation or explicitly capability-gated transaction
+design without breaking the existing original-file/review flow.
+
+### QA and human rollout are different gates
+
+Independent API/browser QA must challenge reader/editor/poster/audit-admin
+sets, all three authentication modes, unmapped/wrong-company/invalid principals,
+session expiry, authenticated 403 versus 401, CSRF/origin, direct-HTTP bypass,
+UI affordances and canonical/legacy ownership. Use mock GitHub and isolated
+synthetic servers, never shared Odoo/ODEE writes or real provider traffic.
+
+Real disposable **standalone MongoDB** tests must prove mutation/event atomicity,
+post/payment races, stale/duplicate requests, uncertain-result reconciliation,
+prior event preservation, redaction and missing-history compatibility.
+Required independent aliases are `qa-api-data`, `qa-integration`,
+`qa-security`, `qa-browser`, bound to exact candidate/revision. No previous
+valid criterion is waived or passing suite generalized beyond its coverage.
+
+**Human decision before activation:** identify the initial admin principal(s),
+approve explicit grants and authorize enforced rollout for a shared/live
+deployment. No guessed admin, implicit team superuser or real grant/activation
+is authorized here. This is **not a blocker to synthetic implementation and
+testing** with explicit fake principals/grants.
+
+Coordinator integrates this contract only after the ODEE-022 repair gate and
+reconciles the authoritative ledger. ODEE-004 revision 2 then runs from an aligned
+base; ODEE-005 implementation still waits for its dependency's valid gate.
+PM does not update execution state or claim any implementation, remote-CI,
+deployment, provider exchange or release success.
+
+### Source basis, not an external IAM policy
+
+The approved user/coordinator scope determines the permission defaults and
+human boundary. Current [authentication](../../internal/accounting/auth.go),
+[HTTP routes](../../internal/accounting/http.go),
+[startup wiring](../../cmd/odee/main.go),
+[financial bounds](../../internal/accounting/model.go) and
+[scope/version filters](../../internal/accounting/store.go) establish the
+compatibility constraints. [Review-to-draft](../../internal/accounting/import_http.go)
+shows why broad cross-record audit is explicitly separate.
+
+The [official MongoDB atomicity
+manual](https://www.mongodb.com/docs/manual/core/write-operations-atomicity/)
+(retrieved 2026-11-03 during preflight) establishes single-document atomicity
+and expected-current-value filtering, not proof ODEE has implemented or tested
+this design. Odoo's pinned stable 20.0 product references are unchanged; they
+are not authority to grant ODEE users permissions.
+
 ## Material feedback packet
 
 Use the following as a **template**, not a fabricated finding:
@@ -565,15 +727,21 @@ PM ran dependency-free Node checks on 2026-11-03:
 - Both JSON files parse and satisfy their declared shape.
 - **22 leaves + 47 non-dispatchable epics**; ODEE-001..022 dependencies match the
   approved plan exactly, all references exist and the complete graph is acyclic.
-- Owner/required-QA aliases resolve to the existing agent roster; **16 capability
-  entries and 13 source entries** have valid ticket/source/baseline-path links.
-- **21 local Markdown links** resolve; all four roadmap files pass whitespace checks.
+- Owner/required-QA aliases resolve to the existing agent roster; **18 capability
+  entries and 14 source entries** have valid ticket/source/baseline-path links.
+- **27 local Markdown links** resolve; all four roadmap files pass whitespace checks.
 - Importing `validateBacklog` from `tools/agents/loop.mjs` accepts all **69**
   contracts without creating or changing scheduler state.
-- The next-candidate delta has three unique linked planning-change records;
-  ODEE-004/011 are revision 2, ODEE-022 is byte-for-byte unchanged at revision 1,
-  and every approved ODEE-001..022 dependency edge is preserved.
+- Existing `node --test tools/agents/qa-contracts.test.mjs` checks pass
+  **2/2, zero skipped**; this is role/configuration regression evidence, not
+  independent approval of the unimplemented ODEE-005 feature.
+- The candidate has four unique linked planning-change records and one
+  non-dispatchable proposed audit follow-up. Relative to exact base `6549b611…`,
+  only ODEE-005 changes to revision 2; every other ticket is byte-for-byte
+  unchanged, including ODEE-004/011 revision 2 and ODEE-022 revision 1. Every
+  approved ODEE-001..022 dependency edge is preserved.
 
 No application tests, provider exchange, release, state transition or feature
-completion is asserted by these documentation checks. Files remain for parent
-integration; this PM task did not stage or commit.
+completion is asserted by these documentation checks. The proposal's roadmap
+commit is for parent integration, not approval of runtime grants/activation.
+Only the coordinator reconciles authoritative execution state.

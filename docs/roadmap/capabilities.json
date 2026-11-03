@@ -177,9 +177,68 @@
       "verification": "verified",
       "confidence": "high-for-country-profile",
       "summary": "OpenPeppol describes nearly all in-scope Belgian B2B transactions becoming subject to structured e-invoicing on 1 January 2026, separate from private-use B2C supplies."
+    },
+    {
+      "id": "MONGODB-ATOMICITY",
+      "url": "https://www.mongodb.com/docs/manual/core/write-operations-atomicity/",
+      "version": "official manual retrieved 2026-11-03",
+      "edition": "not-applicable; database behavior rather than Odoo edition",
+      "retrievedOn": "2026-11-03",
+      "method": "web_fetch during ODEE-005 specification preflight",
+      "verification": "verified",
+      "confidence": "high-for-single-document-atomicity",
+      "summary": "Single-document writes are atomic across modified fields; expected current values in the update filter prevent conflicting updates. Separate document operations are not collectively atomic.",
+      "limitations": "This supports the proposed same-document post/payment event design, not an executed ODEE test, cross-document standalone transaction claim or production audit certification."
     }
   ],
   "capabilities": [
+    {
+      "id": "CAP-COMPANY-CAPABILITIES", "module": "platform",
+      "businessOutcome": "Explicitly restrict existing company workflows while preserving intentional authentication compatibility.",
+      "referenceVersion": null, "edition": "not-applicable; ODEE user-approved access contract",
+      "sourceRefs": [], "verifiedOn": "2026-11-03",
+      "status": "gap",
+      "baseline": "The inspected baseline authenticates GitHub sessions/team-at-login, a shared company token or explicit local development. Current HTTP routing has no per-principal read/write/post/admin membership matrix; authentication alone is not accounting approval authority.",
+      "assessmentSha": "6549b61137b155e941dea29975f77bd35b10a2c9",
+      "baselinePaths": ["internal/accounting/auth.go", "internal/accounting/http.go", "cmd/odee/main.go", "internal/accounting/store.go"],
+      "tickets": ["ODEE-005", "ODEE-W0-3"],
+      "plannedTicketRevision": 2,
+      "originatingDiscoveryId": "PREFLIGHT-005-IDENTITY-AUDIT-20261103",
+      "pmDecisionId": "D015",
+      "workflowCases": ["stable GitHub numeric principal", "shared token/development service attribution", "explicit company grant", "compatibility fallback without admin", "enforced unmapped 403", "401 versus authenticated 403", "UI and direct HTTP matrix", "legacy BSON ownership"],
+      "acceptance": [
+        "Current reads, write workflows, financial actions and audit retrieval require their explicit server-checked capability sets without actor-to-owner conversion or implicit superusers.",
+        "Human-approved live admin/grant/enforced rollout is separate from permitted synthetic implementation and QA."
+      ],
+      "prerequisites": ["ODEE-004"], "risk": "high",
+      "priorityRationale": "Bounded ODEE-005 refinement follows the ODEE-004 revision-2 gate; preserve all existing auth/ownership protections instead of introducing a full IAM framework.",
+      "deliveredSha": null, "qaEvidence": []
+    },
+    {
+      "id": "CAP-FINANCIAL-ACTOR-AUDIT", "module": "platform-finance",
+      "businessOutcome": "Attribute successful posting and manual payments without orphaned audit success or a replica-set prerequisite.",
+      "referenceVersion": null, "edition": "not-applicable; ODEE contract with MongoDB atomicity reference",
+      "sourceRefs": ["MONGODB-ATOMICITY"], "verifiedOn": "2026-11-03",
+      "status": "gap",
+      "baseline": "The financial model/store perform version-filtered document updates and enforce one posting plus at most 200 payments, but do not persist a server-resolved actor event alongside those mutations.",
+      "assessmentSha": "6549b61137b155e941dea29975f77bd35b10a2c9",
+      "baselinePaths": ["internal/accounting/model.go", "internal/accounting/store.go", "internal/accounting/http.go", "internal/accounting/import_http.go"],
+      "tickets": ["ODEE-005", "ODEE-W0-3"],
+      "plannedTicketRevision": 2,
+      "originatingDiscoveryId": "PREFLIGHT-005-IDENTITY-AUDIT-20261103",
+      "pmDecisionId": "D015",
+      "workflowCases": ["same-document mutation/event CAS", "standalone MongoDB", "post/payment race and retry", "audit redaction and read-plus-admin scope", "legacy missing events", "shared credential attribution", "201-event maximum"],
+      "acceptance": [
+        "Financial mutation and append-only event commit together or remain an explicit uncertain result; no denied/conflicting request creates a fabricated success event.",
+        "Audit retrieval is scoped/admin-gated; ordinary responses omit events and no historical actors are invented.",
+        "Nonfinancial contact/draft/upload/scan/review-to-draft audit remains visibly proposed, not delivered or implied by this financial slice."
+      ],
+      "excludedCoverage": ["contact mutations/import", "draft creation/edits", "GridFS upload/scan", "review-to-draft cross-record links"],
+      "proposedFollowUpIds": ["PF-AUDIT-NONFINANCIAL-001"],
+      "prerequisites": ["ODEE-004"], "risk": "high",
+      "priorityRationale": "Preserve standalone atomic accounting behavior with bounded financial events; deduplicate broader audit design under existing epics.",
+      "deliveredSha": null, "qaEvidence": []
+    },
     {
       "id": "CAP-PLATFORM-DEEP-LINKS", "module": "platform",
       "businessOutcome": "Open, refresh and traverse existing active views through explicit safe URLs.",

@@ -51,6 +51,41 @@
       "capabilityIds": [],
       "ticketChanges": [],
       "rationale": "ODEE-022 acceptance 1 and 4 remain unchanged. Source repair and an executed finding-plus-capability reconciliation drill are required; generic passing tests cannot waive either gate."
+    },
+    {
+      "id": "PM-20261103-005-PERMISSIONS",
+      "recordedOn": "2026-11-03",
+      "decisionId": "D015",
+      "classification": "approved-scope-contract-refinement",
+      "findingIds": [],
+      "discoveryIds": ["PREFLIGHT-005-IDENTITY-AUDIT-20261103"],
+      "capabilityIds": ["CAP-COMPANY-CAPABILITIES", "CAP-FINANCIAL-ACTOR-AUDIT"],
+      "proposedFollowUpIds": ["PF-AUDIT-NONFINANCIAL-001"],
+      "sourceRefs": ["MONGODB-ATOMICITY"],
+      "ticketChanges": [{"ticket": "ODEE-005", "fromRevision": 1, "toRevision": 2}],
+      "rationale": "Bound the existing server permission/actor contract to explicit principal/company capability mapping and atomic post/payment audit; preserve current authentication compatibility and separate human-approved live rollout from synthetic implementation.",
+      "candidateBoundary": "Contract proposal only. Coordinator integrates after ODEE-022 repair gate; ODEE-004 revision 2 remains the dispatch prerequisite. No runtime configuration or execution state is changed."
+    }
+  ],
+  "proposedFollowUps": [
+    {
+      "id": "PF-AUDIT-NONFINANCIAL-001",
+      "kind": "proposed-follow-up",
+      "dispatchable": false,
+      "deduplicationKey": "platform/nonfinancial-mutation-audit",
+      "title": "Design bounded audit for contact, draft and original-file workflows",
+      "owner": "feature-platform",
+      "parentEpic": "ODEE-W0-3",
+      "relatedEpics": ["ODEE-C1", "ODEE-C7"],
+      "originatingTicket": "ODEE-005",
+      "pmDecisionId": "D015",
+      "scope": ["contact create/edit/archive/import", "draft creation and edits", "original upload/scan", "review-to-draft links"],
+      "acceptanceBeforeDispatch": [
+        "Split by one real consumer/workflow and pin actor, retention, privacy, size and recovery requirements before creating a leaf contract.",
+        "For GridFS and review-to-draft multi-record changes, explicitly choose and test durable intent/reconciliation or a capability-gated transaction strategy; never claim standalone cross-document atomic audit.",
+        "Preserve existing original-file integrity, legacy ownership, review and retry behavior; do not broaden ODEE-005 financial coverage by implication."
+      ],
+      "rationale": "Deduplicate later audit expansion under existing platform/documents/reliability epics. This metadata entry is not a schedulable ticket or evidence of delivered coverage."
     }
   ],
   "tickets": [
@@ -118,18 +153,53 @@
       "pmDecisionId": "D013"
     },
     {
-      "id": "ODEE-005", "revision": 1,
-      "title": "Enforce current company capabilities and record actor audit events",
+      "id": "ODEE-005", "revision": 2,
+      "title": "Gate existing company workflows and atomically audit posting/manual payments",
       "owner": "feature-platform", "priority": 31, "dependsOn": ["ODEE-004"],
-      "paths": ["internal/accounting/", "cmd/odee/", "web/src/", "web/tests/", "docs/"],
+      "paths": ["internal/accounting/", "cmd/odee/", "web/src/", "web/tests/", "README.md", ".env.example", "docs/"],
       "acceptance": [
-        "An independently tested read/write/post/admin matrix rejects unauthorized HTTP actions server-side, including direct API calls without UI controls.",
-        "GitHub actor identity maps to explicit allowed company membership and is never substituted for BSON tenant/project ownership.",
+        "Server-created principals are github:<stable positive numeric user ID>, token:company or development:local for their respective existing modes. GitHub session/team-at-login checks, token verification, loopback/dev restrictions, origin/CSRF and content validation remain effective; another mode cannot bypass them.",
+        "A validated startup-loaded mapping explicitly grants a principal membership in the configured company ObjectID and a subset of read/write/post/admin. Duplicate conflicting grants, invalid company/principal IDs and unknown capabilities fail configuration validation. Login names, request bodies and actor IDs never supply or overwrite BSON ownership.",
+        "Default compatibility mode preserves existing authenticated read/write/post workflows without implicit admin. An explicit matching grant replaces that fallback; an explicit foreign-company grant cannot fall back into company access. Explicitly enabled enforced mode gives unmapped authenticated principals 403; missing/invalid authentication remains 401. No first-login or GitHub-team superuser is created.",
+        "All existing business reads require read; draft/contact/import/upload/scan/review-to-draft mutations require read plus write; posting and manual-payment endpoints require read plus post. Proposed GET /api/documents/{id}/audit requires read plus admin and target ownership. Capabilities do not implicitly confer one another; admin alone is not financial mutation authority.",
+        "Session discovery reports the authenticated principal's current mode, membership and capabilities without exposing other grants; existing sign-in, session expiry and available logout behavior remain usable. A membership/capability 403 presents an actionable forbidden state without logging out a valid session, granting access or silently retrying an unsafe request. UI controls mirror server decisions but direct HTTP bypasses are rejected before protected work.",
         "Legacy owner-only records remain visible/writable only in the deterministic owner scope without backfill; nonempty canonical axes and conflicting foreign axes retain precedence.",
-        "An audit event records actor/action/target/outcome without leaking secrets; rejected actions cannot manufacture a successful financial event."
+        "Each successful posting/manual-payment mutation and its actor/action/target/version/time/committed-outcome event persist together in the same version- and owner-filtered document write on standalone MongoDB. Concurrency, stale writes and duplicate payment keys cannot create a second mutation or success event; uncertain writes require reconciliation rather than an invented exactly-once or neither-written claim.",
+        "Financial events are API-append-only, bounded by one posting plus the existing 200-payment limit, never silently truncated, and excluded from ordinary state/document JSON. The scoped admin audit endpoint returns only required event attribution, not tokens/hashes/secrets/CSRF, raw bodies or contact/OCR PII. Denied/failed requests never manufacture successful financial events.",
+        "Legacy documents without events remain usable and acquire attribution only for new successful actions; no historical actor is invented. Shared token/development actors identify a credential/mode, not a human. Contact/draft/upload/scan/review-to-draft audit remains explicitly proposed in PF-AUDIT-NONFINANCIAL-001, not falsely covered here.",
+        "Independent API tests cover reader, editor, poster and audit-admin sets across every existing route, all three auth modes, unmapped/wrong-company/invalid principals, expired sessions, origin/CSRF failures and canonical/legacy ownership. Isolated browser tests cover allowed/forbidden controls and direct requests, authenticated 403 versus 401 and unchanged normal workflows; mocked GitHub and synthetic data replace live services.",
+        "Real disposable standalone-Mongo tests prove post/payment and audit atomicity, race/conflict/retry behavior, existing event preservation, redaction and missing-history compatibility; memory behavior preserves the same invariants. All required verdicts bind the exact candidate and revision, with no valid existing QA criterion waived.",
+        "Human approval identifies initial admin principal(s)/explicit grants and authorizes enforced rollout before activation on any shared/live deployment. Synthetic implementation and testing use explicit fixtures and need not await live rollout approval. No real grants, configuration, migration, provider action or production activation occurs under this contract-preparation change."
       ],
-      "requiredQa": ["qa-api-data", "qa-integration", "qa-security"],
-      "epic": "ODEE-W0-3", "risk": "high"
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-security", "qa-browser"],
+      "epic": "ODEE-W0-3", "risk": "high",
+      "capabilities": ["CAP-COMPANY-CAPABILITIES", "CAP-FINANCIAL-ACTOR-AUDIT"],
+      "originatingDiscoveryId": "PREFLIGHT-005-IDENTITY-AUDIT-20261103",
+      "pmDecisionId": "D015",
+      "proposedFollowUpIds": ["PF-AUDIT-NONFINANCIAL-001"],
+      "sourceRefs": ["MONGODB-ATOMICITY"],
+      "authorizationContract": {
+        "modeSetting": "ODEE_AUTHZ_MODE",
+        "grantsSetting": "ODEE_CAPABILITY_GRANTS",
+        "defaultMode": "compatibility",
+        "supportedModes": ["compatibility", "enforced"],
+        "fallbackCapabilities": ["read", "write", "post"],
+        "implicitAdmin": false,
+        "membershipSource": "Validated startup-loaded principal/company/capability configuration; not mutable IAM or client claims.",
+        "explicitGrantPolicy": "A valid grant replaces fallback rights in either mode; explicit wrong-company membership denies access instead of falling back.",
+        "capabilityImplication": "none",
+        "humanGateScope": "Shared/live initial-admin grants and enforced activation only; synthetic implementation/QA is permitted."
+      },
+      "auditContract": {
+        "actions": ["document.post", "manual-payment.record"],
+        "atomicity": "Single-document financial mutation plus event under current ownership/version filters; standalone MongoDB supported.",
+        "maximumEventsPerDocument": 201,
+        "ordinaryResponseExposure": "none",
+        "retrieval": "GET /api/documents/{id}/audit requires read plus admin and scope validation.",
+        "excludedCoverage": ["contact mutations/import", "draft create/edit", "GridFS upload/scan", "review-to-draft cross-record links"]
+      },
+      "humanGates": ["initial-admin-and-explicit-grants", "shared-live-enforced-rollout"],
+      "outOfScope": ["Full IAM/role administration", "first-login or team-derived superusers", "new legal-company tenancy", "accounting formula changes", "cross-module exhaustive audit", "live permission rollout"]
     },
     {
       "id": "ODEE-006", "revision": 1,
