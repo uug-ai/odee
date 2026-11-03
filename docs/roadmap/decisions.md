@@ -703,6 +703,59 @@ its separately authorized README discovery-link addition; no README edit is
 made here. No new dependency package, network/provider action,
 permission activation, rollout, push or release is authorized.
 
+## D017 — Narrow disjoint documentation leases without changing acceptance
+
+After the separate ODEE-023 revision-2 commit
+`4e9164d5eaff475e289abccc8f77e42fa6588ce5`, the user authorized one
+metadata-only lease-precision change, recorded as
+`PM-20261103-004-013-LEASES`:
+
+- **ODEE-013 revision 1 → 2:** replace `docs/` with only
+  `docs/roadmap/peppol-provider-contract.md` and `docs/roadmap/README.md`.
+- **ODEE-004 revision 2 → 3:** replace only its `docs/` allowance with
+  `docs/routing.md`. Keep every existing frontend/backend path unchanged.
+- **ODEE-023 remains revision 2**, with only its two approved test files.
+
+The three feature leases are pairwise disjoint, allowing the already-approved
+three-feature capacity while retaining two QA slots; this does not increase
+capacity or bypass dependency/readiness/QA/human gates. Every acceptance
+criterion, dependency, priority, owner, required QA role and human boundary on
+ODEE-004/013 is unchanged. **Acceptance is not waived**: direct routing,
+auth-return/history/not-found behavior and provider research/offline-contract
+requirements remain intact. There is no new leaf, product capability, runtime
+provider action or implementation in this metadata change.
+
+The revision increments are deliberate: path allowances are conservatively
+fingerprinted and require coordinator reconciliation, not silent lease edits or
+approval reuse. Coordinator reports ODEE-013's active claim is checkpointed with
+its uncommitted provider document preserved; coordinator must safely
+pause/requeue/renew against revision 2 and the aligned cumulative PM base.
+Do not discard that work. Coordinator reports ODEE-004 is not active and has no
+current approval. These are reported handoff conditions, not execution-state
+updates or independently verified completion claims by PM.
+
+ODEE-013 retains only the previously authorized one-link exception to PM-owned
+README: after cumulative-tip alignment, add
+the label `Peppol provider discovery` with relative target
+`peppol-provider-contract.md` under the safe-parallel-research lane, in the same
+commit as the document, and verify the link. No product-contract, capability,
+parity or status edits are
+authorized by that exception. No README edit or broken link is added here.
+
+The unrepaired current-manifest rehearsals must consume the actual
+ODEE-004v3/013v2/023v2 contracts as required by ODEE-023's existing portability
+contract; historical target-revision constants cannot stand in for the current
+validated manifest. All valid invalidation/failure/no-waiver assertions remain.
+On the cumulative D017 docs-only candidate, the complete two-file baseline
+reports **14 PASS, 3 FAIL, zero skipped**: the prior stale dependent revision
+and fixed-69 defects, plus the D013 route-handoff test asserting `3 !== 2`
+after legitimate ODEE-004v3 reconciliation. This is another fixed current-target
+revision assumption in the already-leased planning test, covered by the same
+ODEE-023v2 portability contract, not a new ticket or permission to remove the
+valid invalidation/handoff assertion.
+Only backlog/decision documents change; no source, state, capacity configuration,
+rollback, push, merge, activation or release is performed.
+
 ## Material feedback packet
 
 Use the following as a **template**, not a fabricated finding:
@@ -825,19 +878,26 @@ PM ran dependency-free Node checks on 2026-11-03:
 - Existing `node --test tools/agents/qa-contracts.test.mjs` checks pass
   **2/2, zero skipped**; this is role/configuration regression evidence, not
   independent approval of the unimplemented ODEE-005 feature.
-- The candidate has six unique linked planning-change records and one
-  unchanged non-dispatchable proposed audit follow-up. Relative to exact P
-  `fbe01cf6e9e2db4b56a0d90f832ea006650b38f5`, only ODEE-023 is added; all 69
-  existing contracts are byte-for-byte unchanged, including ODEE-004/005/011
-  revision 2 and ODEE-022 revision 1. Every approved dependency edge is preserved.
+- The candidate has seven unique linked planning-change records and one
+  unchanged non-dispatchable proposed audit follow-up. ODEE-023v2 commit
+  `4e9164d5eaff475e289abccc8f77e42fa6588ce5` preserved all 69 existing
+  contracts. The subsequent D017 change modifies only revision/path metadata
+  on ODEE-004/013, preserving their complete acceptance and other fields.
+  Relative to exact P `fbe01cf6e9e2db4b56a0d90f832ea006650b38f5`,
+  ODEE-023 is added, those two leases are narrowed, and the other 67 contracts
+  are byte-for-byte unchanged, including ODEE-005/011 revision 2 and
+  ODEE-022 revision 1. Every approved dependency edge is preserved.
 - ODEE-023 revision 2 retains its original invariants and explicitly adds the
   independent fixed-count fixture to the same two-file portability repair.
 - Both reproduced failures remain disclosed in D016, not waived or fixed by
   this documentation change. No all-root-green claim is made.
-- On the revision-2 docs-only candidate, the complete two-file baseline
+- On the separate ODEE-023 revision-2 docs-only checkpoint, the complete two-file baseline
   `node --test tools/agents/loop-planning.test.mjs tools/agents/qa-loop.test.mjs`
   reports **15 PASS, 2 FAIL, zero skipped**: the same `STALE_REVISION` and
   `70 !== 69` portability defects. No test implementation was changed here.
+- After D017's approved current revisions, the same command reports
+  **14 PASS, 3 FAIL, zero skipped**; the additional `3 !== 2` target-revision
+  assumption is recorded above and remains part of ODEE-023's existing repair.
 
 No application tests, provider exchange, release, state transition or feature
 completion is asserted by these documentation checks. The proposal's roadmap

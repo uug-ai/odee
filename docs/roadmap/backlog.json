@@ -90,6 +90,21 @@
       "evidenceBaseSha": "4ab9d438fafbca5ae9e70059e3b38345cdc11d85",
       "rationale": "The approved 70th contract also exposes qa-loop.test.mjs:106 expecting 69. Both fixed assumptions are one deduplicated portability defect; extend the same ticket to the two test files and retain validated current-total and no-fabricated-completion assertions.",
       "candidateBoundary": "Pre-dispatch scope correction only. Preserve all original invariants, the other 69 contracts and production validation; no new leaf, rollback, waiver, execution-state change or activation."
+    },
+    {
+      "id": "PM-20261103-004-013-LEASES",
+      "recordedOn": "2026-11-03",
+      "decisionId": "D017",
+      "classification": "lease-precision-only",
+      "findingIds": [],
+      "capabilityIds": [],
+      "ticketChanges": [
+        {"ticket": "ODEE-004", "fromRevision": 2, "toRevision": 3},
+        {"ticket": "ODEE-013", "fromRevision": 1, "toRevision": 2}
+      ],
+      "candidateBaseSha": "4e9164d5eaff475e289abccc8f77e42fa6588ce5",
+      "rationale": "Replace overlapping docs/ leases with the actual disjoint routing and provider-document files so ODEE-004, ODEE-013 and ODEE-023 may use the approved three-feature capacity without broad shared-prefix serialization.",
+      "candidateBoundary": "Only revision/path metadata changes for ODEE-004/013; all acceptance, dependency, priority, ownership, QA and human gates remain unchanged. Coordinator preserves the checkpointed ODEE-013 work and reconciles pause/requeue/renew before dispatch; no state or source changes here."
     }
   ],
   "proposedFollowUps": [
@@ -158,10 +173,10 @@
       "epic": "ODEE-W0-2"
     },
     {
-      "id": "ODEE-004", "revision": 2,
+      "id": "ODEE-004", "revision": 3,
       "title": "Extract the current shell and authenticated API client without workflow changes",
       "owner": "feature-platform", "priority": 30, "dependsOn": ["ODEE-001"],
-      "paths": ["web/src/", "web/tests/", "cmd/odee/", "internal/accounting/auth.go", "internal/accounting/auth_test.go", "docs/"],
+      "paths": ["web/src/", "web/tests/", "cmd/odee/", "internal/accounting/auth.go", "internal/accounting/auth_test.go", "docs/routing.md"],
       "acceptance": [
         "Existing accounting drafts, posting, manual payments, bill scanning and contacts remain usable through the extracted shell.",
         "A session-expiry or CSRF/origin failure produces an actionable UI state and does not retry unsafe writes silently.",
@@ -329,10 +344,10 @@
       "epic": "ODEE-F4", "capabilities": ["CAP-DOCUMENT-LANGUAGES"]
     },
     {
-      "id": "ODEE-013", "revision": 1,
+      "id": "ODEE-013", "revision": 2,
       "title": "Evaluate certified Access Points and define one mocked adapter contract",
       "owner": "feature-belgian-peppol", "priority": 25, "dependsOn": ["ODEE-001"],
-      "paths": ["docs/"],
+      "paths": ["docs/roadmap/peppol-provider-contract.md", "docs/roadmap/README.md"],
       "acceptance": [
         "A public primary-source checklist compares certified-provider sandbox, inbound access, payload formats, authentication, idempotency, status/unknown-send semantics and commercial prerequisites.",
         "One offline adapter contract defines participant IDs, send/poll/callback states, raw payload retention and synthetic request/response examples without assuming a paid provider is approved.",
