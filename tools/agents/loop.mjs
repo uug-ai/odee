@@ -542,6 +542,33 @@ function reconcile(state, backlog) {
   event(state, "reconcile", { changes });
   return { changes };
 }
+function leafSummary(state, backlogCurrent) {
+  const leaves = Object.values(state.tickets).filter((entry) => !entry.retired && entry.spec.kind !== "epic")
+    .sort((a, b) => a.spec.priority - b.spec.priority || a.spec.id.localeCompare(b.spec.id));
+  const ready = [];
+  const blocked = [];
+  const capacityReached = counts(state).feature >= 3;
+  for (const entry of leaves.filter((entry) => ["ready", "changes-requested", "paused", "blocked"].includes(entry.status))) {
+    const blockers = [];
+    if (!backlogCurrent) blockers.push("backlog-reconciliation");
+    if (state.mode !== "running") blockers.push(`control-${state.mode}`);
+    if (capacityReached) blockers.push("feature-capacity");
+    if (entry.status === "paused" || entry.status === "blocked") blockers.push(`ticket-${entry.status}`);
+    if (entry.failureCount >= 3) blockers.push("failure-limit");
+    if (activeClaims(entry).length) blockers.push("active-claims");
+    const dependencies = entry.spec.dependsOn.filter((id) => state.tickets[id]?.status !== "merged" || state.tickets[id].retired);
+    if (dependencies.length) blockers.push("dependencies");
+    const overlap = collision(state, entry);
+    if (overlap) blockers.push("path-lease");
+    const item = { ticket: entry.spec.id, revision: entry.spec.revision, status: entry.status };
+    if (!blockers.length && featureEligible(state, entry)) ready.push(item);
+    else blocked.push({ ...item, blockers, dependencies, leaseTicket: overlap?.spec.id ?? null,
+      failureCount: entry.failureCount, pauseReason: entry.pauseReason ?? null });
+  }
+  return { total: leaves.length,
+    counts: Object.fromEntries(STATUSES.map((status) => [status, leaves.filter((entry) => entry.status === status).length])),
+    ready, blocked };
+}
 function summary(state, context) {
   let backlogError = null;
   let backlogChanged = false;
@@ -551,10 +578,14 @@ function summary(state, context) {
   const lockPath = `${context.statePath}.lock`;
   const locks = [lockPath, ...recoveryFiles(lockPath).map((name) => path.join(path.dirname(lockPath), name))]
     .filter((filename) => fs.existsSync(filename)).map((filename) => ({ path: filename, owner: readOwner(filename) }));
+  const backlogCurrent = !backlogChanged && !backlogError;
   return { version: state.version, mode: state.mode, repository: state.repository, sequence: state.sequence,
     backlogChanged, backlogError, active: counts(state), locks,
+    planningBaseline: clone(state.backlog.planningBaseline ?? null),
+    planningChanges: clone(state.backlog.planningChanges ?? []),
+    leaves: leafSummary(state, backlogCurrent),
     counts: Object.fromEntries(STATUSES.map((status) => [status, tickets.filter((entry) => entry.status === status).length])),
-    next: state.mode === "running" && !backlogChanged && !backlogError ? nextWork(state, {}) : null,
+    next: state.mode === "running" && backlogCurrent ? nextWork(state, {}) : null,
     tickets: clone(state.tickets), history: clone(state.history) };
 }
 function recoverLock(context, options) {
@@ -742,6 +773,7 @@ export function runCommand(options, command, args = {}) {
       if (!["pause", "stop", "checkpoint", "recover", "requeue"].includes(command)) synchronized(state, loadBacklog(context));
       if (command === "next") return { next: nextWork(state, args), note: "Selection only; claim before invoking actual VS Code task tools." };
       result = mutate(state, command, args);
+      if (command === "resume") result = { ...result, ...summary(state, context) };
     }
     lock.assert();
     atomicJson(context.statePath, state);
@@ -766,7 +798,8 @@ Defaults: root=current directory; backlog=docs/roadmap/backlog.json; state=.odee
 Backlog/state overrides must be repository-relative. Output is JSON; errors go to stderr with exit 1.
 
 init                            Initialize once from a validated backlog; never resets existing state.
-status                          Show control, claims, leases, evidence/history and lock ownership.
+status                          Show control, claims, leases, evidence/history and lock ownership,
+                                persisted planningBaseline/planningChanges, leaf readiness and next.
 next [--kind feature|qa] [--role ROLE] [--worker ID]
                                 Advisory selection only, not a reservation or agent dispatch.
 claim --ticket ID --worker ID --revision N [--kind feature|qa]
@@ -778,6 +811,7 @@ gate --ticket ID --revision N --sha SHA
 merged --ticket ID --revision N --sha SHA --merged-sha SHA --evidence TEXT
 pause | stop | resume           Pause/stop disable next, claims, gates AND merged records.
                                 Running tools checkpoint cooperatively; nothing is killed.
+                                Resume returns the same planning/readiness report as status.
 checkpoint --ticket ID --worker ID [--kind feature|qa] [--role ROLE] --evidence TEXT
 recover --ticket ID --worker ID [--kind feature|qa] [--role ROLE] --evidence TEXT
                                 Explicitly abandon one interrupted claim; never relaunch it.
@@ -798,6 +832,10 @@ All required QA roles must PASS the exact SHA AND revision. Epics are never disp
 SHA means a full lowercase 40- or 64-character hash. Evidence is required nonempty text:
 include commands/results, synthetic environment, reproducer/criterion and handoff identifiers.
 Only one state file should be used per repository. State must be ignored, not committed.
+Planning output comes from the accepted persisted backlog, never a new un-reconciled file pin.
+Absent legacy planning metadata is null/[]; no reference version or PM work is invented.
+leaves.counts are execution states excluding epics/retired records; leaves.ready are currently
+claimable feature leaves, leaves.blocked list queued feature blockers, and next is advisory.
 Resume is explicit and never launches agents. CLI performs NO Git merge/push/deploy,
 proves no remote branch protections, and certifies no release or external-service sandbox.
 It records supplied evidence; it does not execute or independently verify test commands.

@@ -52,6 +52,22 @@ an independent ledger in each worker tree. The dependency-free atomic JSON
 ledger replaces the plan's illustrative SQLite path without adding a database
 dependency; versioned ticket specifications remain separate from execution state.
 
+Both `status` and explicit `resume` return the **accepted, persisted**
+`planningBaseline` and `planningChanges`, including the pinned reference version,
+retrieval date/confidence, source URLs and stable PM finding/discovery/capability
+links. They do not infer a newer Odoo release or silently accept a changed
+roadmap file. `backlogChanged`/`backlogError` expose divergence; reconcile the
+reviewed packet before resume or another claim. Older ledgers without planning
+metadata report `null`/`[]`, not a fabricated baseline.
+
+`leaves.counts` reports execution states without epics or retired tickets.
+`leaves.ready` lists currently claimable **feature** leaves; `leaves.blocked`
+lists queued feature blockers (control, dependency, lease, capacity, failure or
+checkpoint). Raw `ready` state alone does not mean dependencies or leases permit
+dispatch. `next` remains advisory feature selection, not an assignment; use
+`next --kind qa` for the QA lane. Resume preserves unfinished claims and never
+launches tools, clears failures or turns roadmap/capability labels into QA PASS.
+
 On candidate submission, independently claim the required QA roles. Record
 verdicts against the exact SHA and ticket revision. `gate` checks eligibility;
 `merged` records a merge already performed by the coordinator. Neither command
@@ -180,18 +196,48 @@ requirements, backup/restore results and rollback notes.
 The dependency-free operating-system contracts run from the repository root:
 
 ```sh
-node --test tools/agents/*.test.mjs web/tests/test-environment.test.mjs
+NODE_ENV=test node --test tools/agents/*.test.mjs web/tests/test-environment.test.mjs
 ```
+
+The focused `NODE_ENV=test node --test tools/agents/loop-planning.test.mjs`
+drill consumes the committed D013/D014 planning packet and source links. It
+rehearses revision-1 → revision-2 reconciliation for existing ODEE-004/011 in
+disposable local fixtures, including failure/handoff retention, stale approval
+rejection and idempotent repeated deltas. Its synthetic workers, hashes and
+merge records are **not delivered application features or production QA**.
 
 The existing frontend/browser prerequisites still apply. The authenticated,
-disposable-MongoDB persistence rehearsal is separate from the demo suite:
+disposable-MongoDB persistence rehearsal is separate from the demo suite. Run
+from the repository root with the allowlisted test environment, overriding
+`NODE_ENV` only for the production bundle, never for the tests:
 
 ```sh
-cd web
-npm run build
-npm run test:e2e
-node tests/persistence.mjs
+node --input-type=module <<'NODE'
+import { spawnSync } from 'node:child_process'
+import { rmSync } from 'node:fs'
+import { safeTestEnvironment } from './tools/agents/workspace.mjs'
+const env = safeTestEnvironment({ NODE_ENV: 'test' })
+try {
+  for (const [command, args, mode] of [
+    ['npm', ['run', 'build'], 'production'],
+    ['npm', ['run', 'test:e2e'], 'test'],
+    [process.execPath, ['tests/persistence.mjs'], 'test'],
+  ]) {
+    const result = spawnSync(command, args, {
+      cwd: 'web', env: { ...env, NODE_ENV: mode }, stdio: 'inherit',
+    })
+    if (result.error) throw result.error
+    if (result.status !== 0) { process.exitCode = result.status ?? 1; break }
+  }
+} finally {
+  rmSync(env.ODEE_TEST_SCRATCH_DIR, { recursive: true, force: true })
+}
+NODE
 ```
+
+The build is `NODE_ENV=production npm run build` **inside that sanitized
+environment**; browser/persistence tests remain `NODE_ENV=test`. Do not copy
+live `.env` files, inherit provider credentials or point tests at shared 8098.
 
 The persistence runner owns its synthetic database and app process; it must
 prove actual browser behavior before and after app restart, not mock state
