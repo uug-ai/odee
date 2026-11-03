@@ -613,6 +613,76 @@ and expected-current-value filtering, not proof ODEE has implemented or tested
 this design. Odoo's pinned stable 20.0 product references are unchanged; they
 are not authority to grant ODEE users permissions.
 
+## D016 — Follow up integration P's brittle planning-fixture assumptions
+
+**Material finding:** `F-P-PLANNING-STALE-REVISION-20261103`, reported after
+the ODEE-005 revision-2 proposal was integrated as exact P
+`fbe01cf6e9e2db4b56a0d90f832ea006650b38f5`. Coordinator reports root checks
+**70/71**, not green. The [D013/D014 planning
+fixture](../../tools/agents/loop-planning.test.mjs) loads current roadmap files,
+reconstructs the two target revision-1 contracts, then claims prerequisite
+tickets using a helper default of revision 1. Its ODEE-005 prerequisite is
+legitimately revision 2, so the claim correctly rejects `STALE_REVISION`.
+
+**PM independently reproduced on exact P before editing the roadmap:**
+
+```text
+node --test --test-name-pattern='D013/D014 actual finding/capability packet' tools/agents/loop-planning.test.mjs
+FAIL: STALE_REVISION: expected revision 2, received 1
+dependent claim: tools/agents/loop-planning.test.mjs:138
+0 PASS, 1 FAIL, 3 skipped by the explicit name selector
+```
+
+**Classification/decision:** a test-fixture portability/provenance defect, not
+new business scope and not a production scheduler defect. Add only **ODEE-023
+revision 1**, owner `coordinator` (designated source owner `b920…`), priority
+**14**, depending on **ODEE-022**. Its sole implementation lease is
+`tools/agents/loop-planning.test.mjs`; required independent roles are
+`qa-api-data` and `qa-integration`. The stable planning change is
+`PM-20261103-023-DRILL-PORTABILITY`.
+
+Use the selected current fixture's actual dependent revisions/roles and derive
+counts/readiness from the manifest and intended invariants. Exercise legitimate
+ODEE-005 revision 2 plus later added/revised unrelated leaves, including role
+changes. Keep real D013/D014 finding/capability/source links and all failure,
+BLOCKED/no-waiver, invalidation, retained handoff/failure/lease, deduplication,
+stop/resume and stale-gate rejection assertions. Do not repair by resetting
+unrelated contracts, reverting ODEE-005, deleting tests or relaxing claim
+validation.
+
+The current-manifest rehearsal must be labelled honestly. It is not an exact
+historical `6549b611…` or `21c4c43…` snapshot just because constants name those
+commits. A true immutable historical test may load immutable content; a
+reconstruction must describe its synthetic target variants and current input.
+All fixture worker/SHA/merge records remain synthetic, not delivered features.
+
+**Historical delivery versus new integration regression:** coordinator reports
+ODEE-022 at W `184334d…` independently PASS for all three required roles and
+locally integrated. Preserve that historical acceptance; ODEE-022 revision 1
+is unchanged. The later exact-P regression needs its new narrow follow-up
+before root checks can be declared green. No old PASS is retroactively revoked
+or generalized to P, and no existing valid failure becomes PASS by relabelling.
+
+**Additional scope warning:** source inspection found a separate fixed-69
+schema assertion in [qa-loop.test.mjs](../../tools/agents/qa-loop.test.mjs).
+Adding a legitimate 70th contract exposes that separate count assumption.
+On the new docs-only candidate atop P, PM reproduced
+`node --test --test-name-pattern='real backlog schema' tools/agents/qa-loop.test.mjs`:
+**0 PASS, 1 FAIL, 12 skipped by selection**, `70 !== 69` at line 106.
+This additional failure is from the new manifest, not a second claimed failure
+in the historical exact-P 70/71 report.
+It is **outside ODEE-023's sole path allowance** and is not quietly included in
+this assignment. Coordinator must triage/lease any additional repair separately;
+even a passing ODEE-023 focused test cannot prove all root checks green while
+that assertion remains.
+
+Only backlog/decision documents are changed in a new external PM worktree based
+on exact P. No existing ticket contract, scheduler validation, fixture/source,
+environment or authoritative execution state is changed. ODEE-013 docs-only
+discovery may proceed concurrently because its docs lease does not overlap the
+ODEE-023 test-file lease. No new dependency package, network/provider action,
+permission activation, rollout, push or release is authorized.
+
 ## Material feedback packet
 
 Use the following as a **template**, not a fabricated finding:
@@ -725,21 +795,25 @@ direct public-page retrieval supplied the verified 20.0 baseline.
 PM ran dependency-free Node checks on 2026-11-03:
 
 - Both JSON files parse and satisfy their declared shape.
-- **22 leaves + 47 non-dispatchable epics**; ODEE-001..022 dependencies match the
+- **23 leaves + 47 non-dispatchable epics**; ODEE-001..022 dependencies match the
   approved plan exactly, all references exist and the complete graph is acyclic.
 - Owner/required-QA aliases resolve to the existing agent roster; **18 capability
   entries and 14 source entries** have valid ticket/source/baseline-path links.
-- **27 local Markdown links** resolve; all four roadmap files pass whitespace checks.
-- Importing `validateBacklog` from `tools/agents/loop.mjs` accepts all **69**
+- **29 local Markdown links** resolve; the two changed roadmap files pass whitespace checks.
+- Importing `validateBacklog` from `tools/agents/loop.mjs` accepts all **70**
   contracts without creating or changing scheduler state.
 - Existing `node --test tools/agents/qa-contracts.test.mjs` checks pass
   **2/2, zero skipped**; this is role/configuration regression evidence, not
   independent approval of the unimplemented ODEE-005 feature.
-- The candidate has four unique linked planning-change records and one
-  non-dispatchable proposed audit follow-up. Relative to exact base `6549b611…`,
-  only ODEE-005 changes to revision 2; every other ticket is byte-for-byte
-  unchanged, including ODEE-004/011 revision 2 and ODEE-022 revision 1. Every
-  approved ODEE-001..022 dependency edge is preserved.
+- The candidate has five unique linked planning-change records and one
+  unchanged non-dispatchable proposed audit follow-up. Relative to exact P
+  `fbe01cf6e9e2db4b56a0d90f832ea006650b38f5`, only ODEE-023 is added; all 69
+  existing contracts are byte-for-byte unchanged, including ODEE-004/005/011
+  revision 2 and ODEE-022 revision 1. Every approved dependency edge is preserved.
+- The exact-P focused planning fixture failure is deliberately disclosed in
+  D016, not waived or fixed by this documentation change. No all-root-green
+  claim is made; the separately reproduced fixed-count assertion in the new
+  docs-only candidate also requires explicit triage.
 
 No application tests, provider exchange, release, state transition or feature
 completion is asserted by these documentation checks. The proposal's roadmap
