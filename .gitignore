@@ -8,3 +8,4 @@ web/playwright-report/
 bin/
 *.log
 .local-data/
+.odee/

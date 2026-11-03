@@ -1,0 +1,658 @@
+{
+  "version": 1,
+  "planningBaseline": {
+    "date": "2026-11-03",
+    "applicationSha": "4b7b21d709b9d13795f16910a0591810727340ad",
+    "referenceVersion": "Odoo 20.0",
+    "priorityOrder": "lower-number-first-among-ready-leaves",
+    "executionState": "ignored .odee/loop.json; no leaf status is asserted here",
+    "defaultIntegrationMode": "synthetic-offline-or-mocked",
+    "epicPolicy": "kind=epic is non-dispatchable; decompose and review before creating leaf work"
+  },
+  "tickets": [
+    {
+      "id": "ODEE-001", "revision": 1,
+      "title": "Reconcile the committed baseline and preserve user-owned dirty work",
+      "owner": "coordinator", "priority": 1, "dependsOn": [],
+      "paths": ["docs/", ".github/workflows/"],
+      "acceptance": [
+        "Record candidate/base SHA and classify original workspace dirty paths without resetting, stashing, overwriting or committing them implicitly.",
+        "Record exact existing check commands and PASS/FAIL/BLOCKED results; skipped Mongo/browser prerequisites are explicit, not inferred green.",
+        "Document file ownership and protected-branch/release triggers; unprotected main blocks unattended main merges until enforceable server controls are approved.",
+        "Confirm the clean worktree excludes uncommitted source changes and identify any behavior difference before claiming it as the execution baseline."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration"],
+      "epic": "ODEE-W0-1", "risk": "high"
+    },
+    {
+      "id": "ODEE-002", "revision": 1,
+      "title": "Isolate one worker's worktree, ports, database and original files",
+      "owner": "feature-platform", "priority": 10, "dependsOn": ["ODEE-001"],
+      "paths": ["tools/", "docs/", ".gitignore"],
+      "acceptance": [
+        "Create ticket worktrees only under /home/vscode/worktrees with verified parent repository, unique branch and explicit ownership.",
+        "Two synthetic workers receive noncolliding ports, databases and original-file roots; neither inherits live URI/provider secrets or .env.local.",
+        "A cleanup/status drill identifies only owned resources, preserves unmerged work and cannot remove another worker's environment.",
+        "A refused unsafe path or unavailable resource returns an explicit failure, never an apparent ready environment."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-resilience"],
+      "epic": "ODEE-W0-5"
+    },
+    {
+      "id": "ODEE-003", "revision": 1,
+      "title": "Persist the bounded scheduler, revisions and start/resume/stop controls",
+      "owner": "coordinator", "priority": 10, "dependsOn": ["ODEE-001"],
+      "paths": ["tools/", ".github/agents/", ".github/prompts/", "docs/", ".gitignore"],
+      "acceptance": [
+        "Reject missing IDs, dependency cycles and invalid contracts; never dispatch epic-kind entries or a leaf with unmerged prerequisites.",
+        "Persist assignments, leases, candidate/specification fingerprints, attempts and verdicts in ignored atomic JSON state with one coordinator writer.",
+        "Restart/reconcile preserves unfinished work; stale assignments and changed specifications require recovery and invalidate affected approvals.",
+        "Stop prevents new dispatch and merge even when a result arrives late; explicit resume is required after pause/stop.",
+        "A deterministic fail/fix/retest rehearsal blocks after three unsuccessful repair rounds; the CLI describes state/control rather than claiming to run autonomous agents."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-resilience"],
+      "epic": "ODEE-W0-2"
+    },
+    {
+      "id": "ODEE-004", "revision": 1,
+      "title": "Extract the current shell and authenticated API client without workflow changes",
+      "owner": "feature-platform", "priority": 30, "dependsOn": ["ODEE-001"],
+      "paths": ["web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "Existing accounting drafts, posting, manual payments, bill scanning and contacts remain usable through the extracted shell.",
+        "A session-expiry or CSRF/origin failure produces an actionable UI state and does not retry unsafe writes silently.",
+        "Navigation, keyboard dialog behavior and direct routes pass isolated browser regressions; planned tiles do not expose incomplete API workflows."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-browser", "qa-security"],
+      "epic": "ODEE-W0-3"
+    },
+    {
+      "id": "ODEE-005", "revision": 1,
+      "title": "Enforce current company capabilities and record actor audit events",
+      "owner": "feature-platform", "priority": 31, "dependsOn": ["ODEE-004"],
+      "paths": ["internal/accounting/", "cmd/odee/", "web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "An independently tested read/write/post/admin matrix rejects unauthorized HTTP actions server-side, including direct API calls without UI controls.",
+        "GitHub actor identity maps to explicit allowed company membership and is never substituted for BSON tenant/project ownership.",
+        "Legacy owner-only records remain visible/writable only in the deterministic owner scope without backfill; nonempty canonical axes and conflicting foreign axes retain precedence.",
+        "An audit event records actor/action/target/outcome without leaking secrets; rejected actions cannot manufacture a successful financial event."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-security"],
+      "epic": "ODEE-W0-3", "risk": "high"
+    },
+    {
+      "id": "ODEE-006", "revision": 1,
+      "title": "Localize the current accounting and contact journeys in English and Dutch",
+      "owner": "feature-platform", "priority": 32, "dependsOn": ["ODEE-004"],
+      "paths": ["web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "Current visible accounting/contact labels, validation and conflict/error states resolve from EN/NL catalogs with no missing-key fallback presented as finished translation.",
+        "Switching locales preserves exact stored cents, quantities and ISO dates; local decimal/date display round-trips without changing request values.",
+        "Both locales pass an isolated create/review/post/payment journey with accessible names, keyboard focus and responsive layouts."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-browser", "qa-localization"],
+      "epic": "ODEE-W0-4"
+    },
+    {
+      "id": "ODEE-007", "revision": 1,
+      "title": "Add the single legal-company profile and stable partner snapshots",
+      "owner": "feature-contacts-catalog", "priority": 40, "dependsOn": ["ODEE-005"],
+      "paths": ["internal/accounting/", "cmd/odee/", "web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "Validate and expose one legal company's name, address, enterprise/VAT identifiers and payment/bank metadata with explicit unsupported applicability values.",
+        "Selecting a saved contact copies a versioned accounting snapshot with stable contact reference; later contact edit/archive cannot change a posted document.",
+        "Customer/vendor payment/tax metadata is permission-scoped; imported Odoo IDs remain provenance, never ownership.",
+        "Invalid identifiers and stale writes produce explicit errors in both locales without dropping the existing contact profile."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-browser", "qa-localization"],
+      "epic": "ODEE-F1", "capabilities": ["CAP-CONTACTS", "CAP-COMPANY"]
+    },
+    {
+      "id": "ODEE-008", "revision": 1,
+      "title": "Configure one chart, journals and fiscal year while preserving starter accounts",
+      "owner": "feature-finance", "priority": 41, "dependsOn": ["ODEE-005"],
+      "paths": ["internal/accounting/", "web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "One company can review and maintain validated account/journal/fiscal-year configuration; invalid account types or overlapping periods cannot be activated.",
+        "Historical starter-chart entries retain codes, amounts and interpretation when a new Belgian mapping is selected.",
+        "Posting rejects missing/inactive configured mappings instead of guessing accounts; independently calculated balanced fixtures remain correct.",
+        "Belgian PCMN/MAR mapping references and unresolved accountant decisions are recorded; activation for statutory use is not inferred from passing software tests."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-belgian-peppol"],
+      "epic": "ODEE-F2", "capabilities": ["CAP-CHART"], "risk": "high"
+    },
+    {
+      "id": "ODEE-009", "revision": 1,
+      "title": "Introduce an exact versioned quantity, discount and tax calculation policy",
+      "owner": "feature-finance", "priority": 42, "dependsOn": ["ODEE-008"],
+      "paths": ["internal/accounting/", "web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "A documented fixed-scale quantity/price/discount policy rejects overflow and invalid precision and never computes ledger money with binary floating point.",
+        "Independent fixtures cover fractional quantities, discount boundaries, mixed rates and explicit line/document rounding adjustments.",
+        "The synthetic 2 x EUR100.00 plus 21 percent case yields net 20000, VAT 4200, total 24200 cents consistently in API and UI.",
+        "Existing posted totals and prior rounding policy are preserved; changing policy cannot recalculate historical records."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-localization"],
+      "epic": "ODEE-F3", "capabilities": ["CAP-EXACT-AMOUNTS"], "risk": "high"
+    },
+    {
+      "id": "ODEE-010", "revision": 1,
+      "title": "Allocate legal invoice numbers with concurrency and recovery safety",
+      "owner": "feature-finance", "priority": 43, "dependsOn": ["ODEE-007", "ODEE-008"],
+      "paths": ["internal/accounting/", "cmd/odee/", "web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "A source-linked, reviewable sequence policy defines journal/year scope, reservation, cancellation and uncertain-write recovery without assuming ObjectID references are legal numbers.",
+        "Concurrent or retried posting gives one authoritative posted document and number, balanced entries and explicit conflict/replay semantics; numbers are not reused.",
+        "Crash/unknown-result tests reconcile durable reservation/posting state with no unexplained silent gap or false success.",
+        "Any required replica-set transaction capability is explicitly gated and cannot silently break existing standalone-compatible flows."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-belgian-peppol", "qa-resilience"],
+      "epic": "ODEE-F3", "capabilities": ["CAP-NUMBERING"], "risk": "high"
+    },
+    {
+      "id": "ODEE-011", "revision": 1,
+      "title": "Correct one posted invoice through linked credit/reversal and fiscal-lock rules",
+      "owner": "feature-finance", "priority": 44, "dependsOn": ["ODEE-009", "ODEE-010"],
+      "paths": ["internal/accounting/", "web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "Full and partial credit-note journeys preserve the original posted snapshot and produce auditable reversal links and independently balanced entries.",
+        "For a 24200-cent invoice paid 10000 cents, credit/refund/allocation fixtures reconcile the remaining 14200 cents without creating an accidental bank transfer or duplicate refund.",
+        "A closed-period mutation is rejected server-side; only the declared capability can perform an audited reopen/correction transition.",
+        "Duplicate correction requests cannot over-credit; debit-note scenarios outside the accepted initial policy return an explicit unsupported outcome."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-belgian-peppol"],
+      "epic": "ODEE-F3", "capabilities": ["CAP-CREDIT-LOCKS"], "risk": "high",
+      "sourceRefs": ["ODOO-CREDIT-NOTES"]
+    },
+    {
+      "id": "ODEE-012", "revision": 1,
+      "title": "Preview an English or Dutch invoice PDF and local delivery intent",
+      "owner": "feature-finance", "priority": 45, "dependsOn": ["ODEE-006", "ODEE-007", "ODEE-009", "ODEE-010"],
+      "paths": ["internal/accounting/", "web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "An EN and NL PDF fixture includes the reviewed legal company/partner snapshot, invoice number/dates, terms, item/tax breakdown and totals matching the stored ledger.",
+        "Locale changes affect presentation only; escaped untrusted text cannot alter document structure or expose another scope's original file.",
+        "A local preview/queue records delivery intent and error/retry states but cannot send real email or imply Peppol delivery.",
+        "Required legal fields and outstanding professional review are visible; a PDF is not represented as satisfying structured B2B e-invoicing."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-localization", "qa-browser"],
+      "epic": "ODEE-F4", "capabilities": ["CAP-DOCUMENT-LANGUAGES"]
+    },
+    {
+      "id": "ODEE-013", "revision": 1,
+      "title": "Evaluate certified Access Points and define one mocked adapter contract",
+      "owner": "feature-belgian-peppol", "priority": 25, "dependsOn": ["ODEE-001"],
+      "paths": ["docs/"],
+      "acceptance": [
+        "A public primary-source checklist compares certified-provider sandbox, inbound access, payload formats, authentication, idempotency, status/unknown-send semantics and commercial prerequisites.",
+        "One offline adapter contract defines participant IDs, send/poll/callback states, raw payload retention and synthetic request/response examples without assuming a paid provider is approved.",
+        "Provider signup, secrets, registration, spend and sandbox/production network calls remain blocked pending explicit human authorization.",
+        "Unavailable provider evidence is marked unverified and does not block unrelated safe finance work."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-belgian-peppol"],
+      "epic": "ODEE-F7", "capabilities": ["CAP-PEPPOL-OUT", "CAP-PEPPOL-IN"],
+      "humanGates": ["provider-contract-and-spend", "registration-and-network-authorization"]
+    },
+    {
+      "id": "ODEE-014", "revision": 1,
+      "title": "Serialize and validate synthetic outbound UBL invoice and credit note offline",
+      "owner": "feature-belgian-peppol", "priority": 46, "dependsOn": ["ODEE-007", "ODEE-009", "ODEE-010", "ODEE-011", "ODEE-013"],
+      "paths": ["internal/accounting/", "web/tests/", "docs/"],
+      "acceptance": [
+        "Pin applicable UBL/BIS schemas, rules, code lists, release identifiers and validator artifact checksums; the observed May 2026 BIS landing-page label alone is insufficient conformance evidence.",
+        "Independent valid and invalid invoice/credit-note fixtures verify totals, taxes, participant identifiers, original-invoice references and actionable rule diagnostics without network transport.",
+        "Serialize only supported versioned tax/quantity policies; unsupported exemption/reverse-charge cases fail explicitly instead of emitting guessed compliant XML.",
+        "Generated XML reconciles to immutable accounting snapshots and its original artifact is preserved with scoped access."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-belgian-peppol", "qa-ledger"],
+      "epic": "ODEE-F7", "capabilities": ["CAP-PEPPOL-OUT"], "risk": "high",
+      "sourceRefs": ["ODOO-EDI", "PEPPOL-BIS", "BE-APPLICABILITY"]
+    },
+    {
+      "id": "ODEE-015", "revision": 1,
+      "title": "Recover one mocked outbound transport intent with explicit delivery diagnostics",
+      "owner": "feature-belgian-peppol", "priority": 47, "dependsOn": ["ODEE-014"],
+      "paths": ["internal/accounting/", "cmd/odee/", "web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "A durable intent/outbox and stable provider key survive restart/retry without an untracked duplicate send.",
+        "Mock accepted/rejected/duplicate/unknown-result responses have distinct diagnostics and a reconciliation path; HTTP acceptance is never labelled final delivery.",
+        "Accounting posting, payment and transport statuses remain separate and visible in both locales.",
+        "Default tests perform no production transport; any authorized sandbox receipt is separately recorded and its absence cannot be described as a completed exchange."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-belgian-peppol", "qa-resilience", "qa-browser"],
+      "epic": "ODEE-F7", "capabilities": ["CAP-PEPPOL-OUT"], "risk": "high",
+      "humanGates": ["sandbox-network-authorization", "production-enablement"]
+    },
+    {
+      "id": "ODEE-016", "revision": 1,
+      "title": "Quarantine and review one replay-safe inbound invoice or credit-note payload",
+      "owner": "feature-belgian-peppol", "priority": 47, "dependsOn": ["ODEE-007", "ODEE-011", "ODEE-013"],
+      "paths": ["internal/accounting/", "cmd/odee/", "web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "Authenticate synthetic callbacks/polling results, preserve one scoped raw XML original and record transport/business identifiers and provenance.",
+        "Malformed, oversized, unsafe XML or invalid participant/tax data is quarantined with diagnostics and cannot create an authorized payable.",
+        "Duplicate/out-of-order delivery including after restart creates at most one linked review-to-bill or credit-note draft.",
+        "Supplier resolution requires explicit review on ambiguity; receipt never auto-posts, auto-pays or reassigns ownership from external IDs.",
+        "Validation artifacts/rules are pinned independently even though the approved graph permits this slice before outbound serialization."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-belgian-peppol", "qa-security", "qa-browser"],
+      "epic": "ODEE-F8", "capabilities": ["CAP-PEPPOL-IN"], "risk": "high"
+    },
+    {
+      "id": "ODEE-017", "revision": 1,
+      "title": "Reconcile one opening-balance and date-filtered reporting journey",
+      "owner": "feature-finance", "priority": 48, "dependsOn": ["ODEE-008", "ODEE-011"],
+      "paths": ["internal/accounting/", "web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "A balanced opening journal plus dated invoice/payment/credit fixtures yields independently expected opening, activity and closing amounts.",
+        "Date-filtered ledger, trial balance, P&L, balance sheet and receivable/payable aging reconcile to the same scoped posted records.",
+        "Report boundaries, due-date aging, fiscal close and reversal cases are explicit; drafts cannot silently enter posted totals.",
+        "Existing cumulative report behavior remains compatible or is explicitly versioned; queries and exported ranges have documented bounded limits."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-browser"],
+      "epic": "ODEE-F6", "capabilities": ["CAP-REPORTS"], "risk": "high"
+    },
+    {
+      "id": "ODEE-018", "revision": 1,
+      "title": "Match one synthetic bank statement and preview reviewed domestic VAT grids",
+      "owner": "feature-finance", "priority": 49, "dependsOn": ["ODEE-009", "ODEE-011", "ODEE-017"],
+      "paths": ["internal/accounting/", "web/src/", "web/tests/", "docs/"],
+      "acceptance": [
+        "A single-bank-journal documented import format with synthetic opening/closing balances rejects duplicate statement/line keys and malformed rows without partial hidden success.",
+        "Manual matching and undo for invoice/payment fixtures reconcile statement and ledger totals across retry; this records accounting movement and never initiates a transfer.",
+        "A separately reviewable domestic 21-percent invoice/bill VAT mapping and export-preview fixture has source-linked grid expectations and accountant-review gating.",
+        "Unsupported statement formats, tax regimes and statutory filings are explicitly refused; broader CODA/ISO20022 and VAT cases remain parent-epic slices, not implicit scope."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-belgian-peppol"],
+      "epic": "ODEE-F5", "capabilities": ["CAP-BANKING", "CAP-BELGIAN-TAX"], "risk": "high"
+    },
+    {
+      "id": "ODEE-019", "revision": 1,
+      "title": "Rehearse the first integrated accounting/Peppol candidate without releasing",
+      "owner": "coordinator", "priority": 60,
+      "dependsOn": ["ODEE-002", "ODEE-003", "ODEE-005", "ODEE-006", "ODEE-012", "ODEE-015", "ODEE-016", "ODEE-017", "ODEE-018", "ODEE-022"],
+      "paths": ["docs/", "web/tests/", ".github/workflows/"],
+      "acceptance": [
+        "Run fresh merged-candidate checks and a persistent authenticated EN/NL contact-to-invoice/correction/payment/report and mocked Peppol journey on isolated resources.",
+        "Restore a disposable backup and reconcile ledger, ownership, original files, sequence and transport intent; missing restore evidence blocks the candidate.",
+        "Demonstrate the feedback/revision loop, duplicate finding coalescing, invalidated QA and stop/resume behavior on the current candidate.",
+        "Hand the human candidate SHA, exact verdicts, known gaps, accountant/provider decisions, runtime requirements and rollback notes; do not create release tags, images, filings or production sends."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-belgian-peppol", "qa-localization", "qa-resilience"],
+      "epic": "ODEE-F9", "risk": "high",
+      "humanGates": ["accountant-acceptance", "release-and-deployment"]
+    },
+    {
+      "id": "ODEE-020", "revision": 1,
+      "title": "Define PM authority, roadmap revisions and source-linked feedback decisions",
+      "owner": "project-manager", "priority": 11, "dependsOn": ["ODEE-001"],
+      "paths": ["docs/roadmap/", ".github/agents/"],
+      "acceptance": [
+        "The roadmap distinguishes PM product priority/revision authority from coordinator execution-state/merge authority and independent tester verdicts.",
+        "A feedback packet identifies finding, ticket revision, exact SHA, reproducer, expected/actual behavior, sources, decision, changed dependencies and invalidated verdicts.",
+        "Illustrated in-scope feature addition and out-of-scope/spend escalation preserve accounting-first, Belgium, EN/NL, one-company and human-release boundaries.",
+        "The versioned backlog has concrete nonempty acceptance, valid dependencies and non-dispatchable full-suite parent epics; it makes no execution-completion claim."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration"],
+      "epic": "ODEE-W0-6"
+    },
+    {
+      "id": "ODEE-021", "revision": 1,
+      "title": "Verify stable official Odoo references and accounting/contact capability gaps",
+      "owner": "project-manager", "priority": 12, "dependsOn": ["ODEE-020"],
+      "paths": ["docs/roadmap/"],
+      "acceptance": [
+        "Official documentation entry, support/release evidence and edition comparison identify the verified stable release with exact URLs, retrieval date/method and confidence; master and annual guesses are excluded.",
+        "The matrix distinguishes Community Invoicing, public Enterprise Comprehensive Accounting and edition-unspecified guide details, including Community Peppol registration where explicitly documented.",
+        "Accounting/contact gaps reference the inspected committed source baseline and linked tickets without treating dirty workspace changes or unrun tests as verified parity.",
+        "Unavailable/new sources remain unverified and block only dependent claims; Belgian authority/standards and professional review override simplified Odoo wording."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-belgian-peppol"],
+      "epic": "ODEE-W0-6"
+    },
+    {
+      "id": "ODEE-022", "revision": 1,
+      "title": "Bind PM feedback revisions and capability gaps to bounded scheduling and resume",
+      "owner": "coordinator", "priority": 13, "dependsOn": ["ODEE-003", "ODEE-020", "ODEE-021"],
+      "paths": ["tools/", "docs/", ".github/prompts/"],
+      "acceptance": [
+        "A tester finding and one documented in-scope capability gap produce a deduplicated planning delta with source/finding links and explicit ticket revision.",
+        "A changed acceptance/dependency contract pauses incompatible work, preserves its handoff and invalidates affected exact-SHA/spec verdicts before redispatch.",
+        "A valid failing test cannot be waived by PM reprioritization, relabelled capability status or an unchanged candidate approval.",
+        "Status/resume reports pinned Odoo reference, PM changes, ready/blocked leaves and next safe work; epics and missing evidence never count as completed work.",
+        "No new work or merge is permitted after stop; execution-state updates remain coordinator-only."
+      ],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-resilience"],
+      "epic": "ODEE-W0-6"
+    },
+    {
+      "id": "ODEE-W0-1", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Baseline and integration safety", "owner": "coordinator", "priority": 1,
+      "dependsOn": [], "paths": ["docs/"],
+      "acceptance": ["Decompose and reconcile baseline/controls into bounded leaves; retain dirty work and exact-SHA check evidence before parallel implementation."],
+      "requiredQa": ["qa-api-data", "qa-integration"]
+    },
+    {
+      "id": "ODEE-W0-2", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Agent operating system", "owner": "coordinator", "priority": 10,
+      "dependsOn": ["ODEE-W0-1"], "paths": ["tools/", ".github/", "docs/"],
+      "acceptance": ["Split durable control/dispatch/merge work into bounded leaves and demonstrate fail/fix/retest, explicit resume and stop-before-merge drills."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-resilience"]
+    },
+    {
+      "id": "ODEE-W0-3", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Platform access and modular shell", "owner": "feature-platform", "priority": 30,
+      "dependsOn": ["ODEE-W0-1"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Decompose role enforcement, membership, navigation/client extraction and actor audit; unauthorized actions fail server-side while current journeys remain usable."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-security"]
+    },
+    {
+      "id": "ODEE-W0-4", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "English/Dutch and accessible controls", "owner": "feature-platform", "priority": 32,
+      "dependsOn": ["ODEE-W0-3"], "paths": ["web/src/", "web/tests/", "docs/"],
+      "acceptance": ["Split locale/catalog/document work into bounded journeys; both locales preserve exact contracts and pass keyboard/accessibility checks."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-localization"]
+    },
+    {
+      "id": "ODEE-W0-5", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Isolated reproducible testing", "owner": "feature-platform", "priority": 10,
+      "dependsOn": ["ODEE-W0-1"], "paths": ["tools/", "web/tests/", "docs/"],
+      "acceptance": ["Decompose isolated persistent/OAuth/browser fixtures and exact-SHA CI evidence; concurrent workers cannot reset each other's data and require no live credentials."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-resilience"]
+    },
+    {
+      "id": "ODEE-W0-6", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Adaptive product management", "owner": "project-manager", "priority": 11,
+      "dependsOn": ["ODEE-W0-1", "ODEE-W0-2"], "paths": ["docs/roadmap/"],
+      "acceptance": ["Split PM research/revision integration into leaves and show a source-linked tester/gap decision without bypassing QA, authority or execution-state ownership."],
+      "requiredQa": ["qa-api-data", "qa-integration"]
+    },
+    {
+      "id": "ODEE-F1", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Legal company and contacts", "owner": "feature-contacts-catalog", "priority": 40,
+      "dependsOn": ["ODEE-W0-3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Decompose legal metadata, bank/terms/relationships, duplicates, pagination and import reports; stable references and posted snapshots survive contact edit/archive without provenance-based ownership."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-browser"]
+    },
+    {
+      "id": "ODEE-F2", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Ledger, Belgian chart and configuration", "owner": "feature-finance", "priority": 41,
+      "dependsOn": ["ODEE-W0-3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split validated charts/journals, fiscal years, opening balances and manual journals; historical accounts remain interpretable and every posting reconciles independently."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger"]
+    },
+    {
+      "id": "ODEE-F3", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Invoice, correction and fiscal-lock lifecycle", "owner": "feature-finance", "priority": 42,
+      "dependsOn": ["ODEE-F1", "ODEE-F2"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split precision/discount policy, legal numbering, credit/debit corrections, reversals, payment terms and locks; races/retries preserve one immutable accounting result with reviewed sequence policy."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-belgian-peppol"]
+    },
+    {
+      "id": "ODEE-F4", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Business documents, receivables and payables", "owner": "feature-finance", "priority": 45,
+      "dependsOn": ["ODEE-F3", "ODEE-W0-4"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Decompose EN/NL PDF, attachments, delivery intents, dunning/aging and credit/refund allocations; documents reconcile to ledger and messages stay local until authorized."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-localization"]
+    },
+    {
+      "id": "ODEE-F5", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Banking, reconciliation and expenses", "owner": "feature-finance", "priority": 49,
+      "dependsOn": ["ODEE-F2", "ODEE-F3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split bank journals, CODA/appropriate ISO20022 imports, deduplication, matching/write-offs and expense approvals into reviewed format/workflow leaves; statements reconcile without initiating transfers."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger"]
+    },
+    {
+      "id": "ODEE-F6", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Belgian tax, reporting and close", "owner": "feature-belgian-peppol", "priority": 48,
+      "dependsOn": ["ODEE-F2", "ODEE-F3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Decompose effective-dated VAT, exemptions/reverse-charge/intra-EU/deductibility, reviewed grids/listings, financial reports and close/reopen permissions; professional review is separate from preview/export and no filing is implicit."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-belgian-peppol"]
+    },
+    {
+      "id": "ODEE-F7", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Peppol outbound", "owner": "feature-belgian-peppol", "priority": 46,
+      "dependsOn": ["ODEE-F1", "ODEE-F3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split Access Point contract, participant rules, UBL invoice/credit note validation and recoverable queue/diagnostics; tax policy and offline conformance precede authorized sandbox exchange, never automatic live registration."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-belgian-peppol", "qa-resilience"]
+    },
+    {
+      "id": "ODEE-F8", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Peppol inbound", "owner": "feature-belgian-peppol", "priority": 47,
+      "dependsOn": ["ODEE-F1", "ODEE-F3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split authenticated receive, preserved XML, quarantine, supplier review and transport diagnostics; adapter contract and replay tests guarantee one reviewed draft with no auto-post/payment."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-belgian-peppol", "qa-security"]
+    },
+    {
+      "id": "ODEE-F9", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Accounting operational readiness", "owner": "coordinator", "priority": 60,
+      "dependsOn": ["ODEE-F1", "ODEE-F2", "ODEE-F3", "ODEE-F4", "ODEE-F5", "ODEE-F6", "ODEE-F7", "ODEE-F8"], "paths": ["docs/", "web/tests/"],
+      "acceptance": ["Decompose exports, retention, restore, permissions, Odoo import reconciliation and cutover checks; accountant/provider acceptance and human release remain explicit independent gates."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-resilience"]
+    },
+    {
+      "id": "ODEE-R1", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Shared product and service catalog", "owner": "feature-contacts-catalog", "priority": 100,
+      "dependsOn": ["ODEE-F9"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Research and split products/services, categories, units, tax defaults, prices, variants, archiving and supplier/customer references; sales/purchase/stock share stable definitions without changing historical snapshots."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-supply"]
+    },
+    {
+      "id": "ODEE-R2", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "CRM leads and opportunities", "owner": "feature-sales", "priority": 101,
+      "dependsOn": ["ODEE-F1", "ODEE-F9"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split leads, stages, activities/teams, notes and won/lost reasons; one lead-to-customer journey enforces access and deduplicated contact conversion."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-browser"]
+    },
+    {
+      "id": "ODEE-R3", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Quotations, orders and invoicing policies", "owner": "feature-sales", "priority": 102,
+      "dependsOn": ["ODEE-R1", "ODEE-R2", "ODEE-F3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split quotes, prices/discounts, terms, deposits, orders, cancellation/returns and portal acceptance; retry-safe order invoicing uses finance services and delivered-stock policies wait for S2."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-supply"]
+    },
+    {
+      "id": "ODEE-R4", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Recurring subscriptions", "owner": "feature-sales", "priority": 120,
+      "dependsOn": ["ODEE-R3", "ODEE-F3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split recurring agreements, schedules/proration, renewals, cancellation and arrears; fixed-clock/restart tests produce one invoice per accepted billing occurrence."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-services-people"]
+    },
+    {
+      "id": "ODEE-R5", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Rental reservations and returns", "owner": "feature-sales", "priority": 121,
+      "dependsOn": ["ODEE-R1", "ODEE-R3", "ODEE-S2"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split availability/reservations, checkout/return, deposits, late charges and damages; concurrent bookings cannot double-reserve and invoice/return totals reconcile."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-supply", "qa-ledger"]
+    },
+    {
+      "id": "ODEE-R6", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Helpdesk and repairs", "owner": "feature-services", "priority": 122,
+      "dependsOn": ["ODEE-F1", "ODEE-R1", "ODEE-R3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split queues/SLAs, knowledge, portal intake and repair/service billing; role-safe support-to-resolution passes and parts-consuming leaves add S2 as a prerequisite."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-services-people", "qa-browser"]
+    },
+    {
+      "id": "ODEE-R7", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Point of sale", "owner": "feature-sales", "priority": 123,
+      "dependsOn": ["ODEE-F3", "ODEE-S2"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split till sessions, cash/card recording, receipts, returns and stock/ledger linkage; fiscal applicability is reviewed and hardware/payments remain gated rather than assuming Belgian certification."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-supply", "qa-ledger"]
+    },
+    {
+      "id": "ODEE-S1", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Purchasing and vendor fulfillment", "owner": "feature-supply", "priority": 103,
+      "dependsOn": ["ODEE-R1", "ODEE-F3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split vendor prices, RFQ/PO approval, partial fulfillment, three-way match and returns; order/receipt/bill discrepancies remain visible and receipt-integrated leaves depend on S2."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-supply", "qa-ledger"]
+    },
+    {
+      "id": "ODEE-S2", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Inventory and barcode", "owner": "feature-supply", "priority": 104,
+      "dependsOn": ["ODEE-R1"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split locations, moves, reservations, receipts/deliveries, lots/serials, units, transfers, counts, traceability and barcode; concurrent reservations and corrections preserve independently reconciled quantities."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-supply"]
+    },
+    {
+      "id": "ODEE-S3", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Valuation and replenishment", "owner": "feature-supply", "priority": 130,
+      "dependsOn": ["ODEE-S1", "ODEE-S2", "ODEE-F2"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split reviewed valuation policy, landed costs, replenishment/demand, returns/scrap and stock-ledger reconciliation; partial receipts/corrections reconcile quantity and value without duplicate postings."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-supply", "qa-ledger"]
+    },
+    {
+      "id": "ODEE-M1", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Manufacturing", "owner": "feature-manufacturing", "priority": 140,
+      "dependsOn": ["ODEE-S2", "ODEE-S3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split BOMs, work centers, production/work orders, consumption, finished goods, scrap/by-products and cost rollups; one reviewed production journey reconciles components, outputs and value."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-supply", "qa-ledger"]
+    },
+    {
+      "id": "ODEE-M2", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Quality, maintenance and PLM", "owner": "feature-manufacturing", "priority": 141,
+      "dependsOn": ["ODEE-M1"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split quality/nonconformance, equipment/maintenance and engineering-change/BOM effectivity; configured quality holds block transitions and historical orders retain their accepted BOM revision."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-supply"]
+    },
+    {
+      "id": "ODEE-P1", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Projects and tasks", "owner": "feature-services", "priority": 150,
+      "dependsOn": ["ODEE-F1", "ODEE-W0-3", "ODEE-F9"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split projects/milestones, task boards/dependencies, assignments, file/activity links and customer visibility; cross-project and portal authorization are independently tested."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-services-people"]
+    },
+    {
+      "id": "ODEE-P2", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Timesheets and resource planning", "owner": "feature-services", "priority": 151,
+      "dependsOn": ["ODEE-P1"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split time capture/approval, capacity/schedules, billable policy and leave integration; approved time is billed once, allocation conflicts are visible, and leave-dependent leaves wait for H3."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-services-people", "qa-ledger"]
+    },
+    {
+      "id": "ODEE-P3", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Service billing and profitability", "owner": "feature-services", "priority": 152,
+      "dependsOn": ["ODEE-P2", "ODEE-R3", "ODEE-F3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split fixed/milestone/time-material billing and analytic dimensions/budgets/margins; independent fixtures reconcile invoice, approved time, expenses and costs."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-services-people", "qa-ledger"]
+    },
+    {
+      "id": "ODEE-P4", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Field service and appointments", "owner": "feature-services", "priority": 153,
+      "dependsOn": ["ODEE-P1", "ODEE-P2"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split bookable services, technician schedules, worksheets, travel/parts and completion/billing; prevent booking conflicts and preserve acceptance audit, with S2 added to parts-consuming leaves."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-services-people"]
+    },
+    {
+      "id": "ODEE-H1", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Employees and organization", "owner": "feature-people", "priority": 160,
+      "dependsOn": ["ODEE-W0-3", "ODEE-C1", "ODEE-F9"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split directory/departments, contract metadata, onboarding/offboarding and private HR files; employee/private data cannot leak through contacts, portal or general attachment access."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-services-people", "qa-security"]
+    },
+    {
+      "id": "ODEE-H2", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Recruitment", "owner": "feature-people", "priority": 161,
+      "dependsOn": ["ODEE-H1", "ODEE-F1"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split jobs/applicants, interviews/evaluations/offers and retention/consent; applicant conversion retains provenance and requires explicit private-data permissions."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-services-people"]
+    },
+    {
+      "id": "ODEE-H3", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Attendance, leave, appraisals and skills", "owner": "feature-people", "priority": 162,
+      "dependsOn": ["ODEE-H1"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split calendars/attendance correction, leave entitlement/approval, appraisals, skills and referrals; fixed-clock/time-zone fixtures reconcile balances and approved leave can inform planning."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-services-people"]
+    },
+    {
+      "id": "ODEE-H4", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Belgian payroll-provider integration", "owner": "feature-people", "priority": 163,
+      "dependsOn": ["ODEE-H1", "ODEE-H3", "ODEE-F2"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split approved-provider export/import, pay-run review, private payslips and journal linkage after professional contract/rule validation; do not implement or claim a certified home-grown payroll engine."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-services-people", "qa-ledger", "qa-belgian-peppol"]
+    },
+    {
+      "id": "ODEE-H5", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Fleet and workplace", "owner": "feature-people", "priority": 164,
+      "dependsOn": ["ODEE-H1", "ODEE-F5"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split vehicles/contracts/costs, maintenance links, visits and workplace requests where useful; personal details stay restricted and cost flows remain auditable."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-services-people"]
+    },
+    {
+      "id": "ODEE-E1", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Website and customer portal", "owner": "feature-commerce", "priority": 170,
+      "dependsOn": ["ODEE-W0-3", "ODEE-F1", "ODEE-R3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split public content/navigation/SEO, forms/languages and authorized document/order/ticket portal journeys; public/portal identity is separate from internal GitHub membership."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-browser", "qa-security"]
+    },
+    {
+      "id": "ODEE-E2", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Ecommerce", "owner": "feature-commerce", "priority": 171,
+      "dependsOn": ["ODEE-E1", "ODEE-R1", "ODEE-R3", "ODEE-S2", "ODEE-F3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split catalog publication, cart/checkout, tax/shipping, sandbox payments, orders and refunds/returns; duplicate callbacks create neither duplicate orders, stock movement nor revenue."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-browser", "qa-supply", "qa-ledger"]
+    },
+    {
+      "id": "ODEE-E3", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Marketing and feedback", "owner": "feature-engagement", "priority": 172,
+      "dependsOn": ["ODEE-F1", "ODEE-E1"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split segmentation/campaigns, consent/unsubscribe, automation and surveys; synthetic local delivery respects consent, and SMS/social/WhatsApp adapters wait for approved providers."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-browser", "qa-security"]
+    },
+    {
+      "id": "ODEE-E4", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Events, learning and appointments", "owner": "feature-commerce", "priority": 173,
+      "dependsOn": ["ODEE-E1", "ODEE-R3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split event registration/tickets/capacity, courses/enrollment/progress and booking links; authorization/refunds reconcile and appointment leaves add P4 before scheduling."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-services-people", "qa-browser"]
+    },
+    {
+      "id": "ODEE-C1", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Documents and knowledge", "owner": "feature-engagement", "priority": 80,
+      "dependsOn": ["ODEE-W0-3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Extract shared attachments only with a second real consumer; split folders/tags/versioning/previews/knowledge search while preserving original bills, authorization, retention and restore."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-security", "qa-resilience"]
+    },
+    {
+      "id": "ODEE-C2", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Activities and collaboration", "owner": "feature-engagement", "priority": 81,
+      "dependsOn": ["ODEE-W0-3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split inbox/notifications, mentions, shared calendar, discuss/comments and assignments when consumed; read/delivery states are tested and cross-scope visibility is denied."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-browser"]
+    },
+    {
+      "id": "ODEE-C3", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Approvals and signatures", "owner": "feature-engagement", "priority": 82,
+      "dependsOn": ["ODEE-W0-3", "ODEE-C1"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split explicit approval/delegation and auditable acceptance with real consumers; prohibit self-approval where required and gate signature-provider use without qualified-signature claims."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-security"]
+    },
+    {
+      "id": "ODEE-C4", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Reporting and dashboards", "owner": "feature-data", "priority": 83,
+      "dependsOn": ["ODEE-W0-3", "ODEE-F2"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split scoped aggregates, saved reports, drill-down, dashboards and exports per consumer; bounded queries reconcile to source records without arbitrary spreadsheet execution."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-resilience"]
+    },
+    {
+      "id": "ODEE-C5", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "APIs, imports and integrations", "owner": "feature-data", "priority": 84,
+      "dependsOn": ["ODEE-W0-3"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["Split versioned APIs, CSV/Odoo mapping previews, jobs/outbox and webhook retry/dead-letter tools; dry-run/error reports reconcile scope and replay-safe changes without modifying original sources."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-resilience"]
+    },
+    {
+      "id": "ODEE-C6", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Controlled customization", "owner": "feature-platform", "priority": 190,
+      "dependsOn": ["ODEE-F9", "ODEE-C5"], "paths": ["internal/", "web/src/", "docs/"],
+      "acceptance": ["After core contracts stabilize, split validated custom fields/views and bounded automation; every customization retains accounting/access validation and cannot execute arbitrary code."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-security"]
+    },
+    {
+      "id": "ODEE-C7", "revision": 1, "kind": "epic", "status": "proposed",
+      "title": "Reliability and administration", "owner": "feature-platform", "priority": 85,
+      "dependsOn": ["ODEE-W0-3", "ODEE-W0-5"], "paths": ["internal/", "tools/", "web/src/", "docs/"],
+      "acceptance": ["Split health/metrics/audit diagnostics, backups/recovery, job control, dependencies and measured performance budgets; recovery drills pass and incomplete work never appears successful."],
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-resilience"]
+    }
+  ]
+}

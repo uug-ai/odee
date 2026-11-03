@@ -108,9 +108,10 @@ test('mobile launcher, navigation, draft dialog and keyboard dismissal', async (
   await expect(page.getByRole('heading', { level: 1, name: 'Chart of accounts' })).toBeVisible()
 })
 
-test('editing an API-created draft preserves a custom VAT rate', async ({ page }) => {
+test('editing an API-created draft preserves a custom VAT rate', async ({ page, baseURL }) => {
+  if (!baseURL) throw new Error('The accounting browser suite requires an isolated baseURL.')
   const response = await page.request.post('/api/documents', {
-    headers: { Origin: 'http://127.0.0.1:8099' },
+    headers: { Origin: new URL(baseURL).origin },
     data: {
       kind: 'invoice',
       partner: 'Custom VAT example',

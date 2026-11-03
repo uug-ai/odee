@@ -1,0 +1,22 @@
+name: Check agent workflow
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  agents:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare the controlled worktree fixture root
+        run: sudo install -d -o "$(id -u)" -g "$(id -g)" /home/vscode/worktrees
+      - name: Validate coordinator, worker isolation and role contracts
+        run: node --test tools/agents/*.test.mjs web/tests/test-environment.test.mjs
