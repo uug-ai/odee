@@ -47,9 +47,9 @@ jobs:
             tesseract-ocr-eng tesseract-ocr-nld tesseract-ocr-fra
       - run: npm ci
       - run: npm run build && npm test
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:scans
       - run: npm run test:mongo
-      - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
