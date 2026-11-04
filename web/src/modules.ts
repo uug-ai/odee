@@ -10,6 +10,7 @@ import {
   Wallet,
 } from 'iconoir-react'
 import { Contacts } from './Contacts'
+import { Company } from './Company'
 import type { APIRequest, State } from './types'
 import type { StaticKey } from './i18n'
 
@@ -19,6 +20,7 @@ export interface ModuleProps {
   onRefresh: () => Promise<void>
   onStateChange: Dispatch<SetStateAction<State | null>>
   canWrite?: boolean
+  canAdmin?: boolean
 }
 
 function ContactsView({ state, request, onRefresh, onStateChange, canWrite = false }: ModuleProps) {
@@ -53,6 +55,7 @@ const registeredViews = {
   accounts: { title: 'Chart of accounts', path: '/accounting/accounts' },
   reports: { title: 'Trial balance', path: '/accounting/reports' },
   contacts: { title: 'Contacts', path: '/contacts', component: ContactsView },
+  settings: { title: 'Legal company profile', path: '/accounting/settings', component: Company },
 } satisfies Record<string, ViewDefinition>
 
 export type ModuleView = keyof typeof registeredViews
@@ -110,6 +113,7 @@ export const modules: readonly WorkspaceModule[] = [
       { view: 'journal', icon: Book, label: 'Journal entries', group: 'ACCOUNTING' },
       { view: 'accounts', icon: Building, label: 'Chart of accounts' },
       { view: 'reports', icon: GraphUp, label: 'Trial balance', group: 'REPORTING' },
+      { view: 'settings', icon: Building, label: 'Legal company profile', group: 'WORKSPACE' },
     ],
   },
   {

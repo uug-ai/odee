@@ -3,6 +3,15 @@ import { execFileSync } from 'node:child_process'
 import { rm } from 'node:fs/promises'
 import test from 'node:test'
 import { browserEnvironment, isolatedCommand, testPort } from './test-environment.mjs'
+import {
+  mongoSelector,
+  mongoDiskSelector,
+  requiredMongoDiskCases,
+  requiredMongoCases,
+  requireMongoResults,
+  requireCompanyResults,
+} from './company-test-results.mjs'
+import { command } from './owned-fixture.mjs'
 
 test('test ports are canonical, unprivileged, and never shared app 8098', () => {
   for (const value of ['8099', '1024', '65535', '31234']) {
@@ -26,6 +35,105 @@ test('test ports are canonical, unprivileged, and never shared app 8098', () => 
     '1.2',
   ]) {
     assert.throws(() => testPort(value), /ODEE_TEST_PORT/)
+  }
+})
+
+test('company child reports reject zero execution, fixture skips and child assertion failures', () => {
+  const lifecycle = ['en', 'nl'].map((locale) => ({
+    file: 'company.fixture.ts',
+    title: `protected ${locale}: complete saved-contact and legal-company snapshot lifecycle`,
+    tests: [{ results: [{ status: 'passed' }] }],
+  }))
+  const guards = Array.from({ length: 10 }, (_, index) => ({
+    file: 'local-transport.spec.ts',
+    title: `destination guard ${index}`,
+    tests: [{ results: [{ status: 'passed' }] }],
+  }))
+  const report = {
+    suites: [{ suites: [{ specs: [...lifecycle, ...guards] }] }],
+    stats: { expected: 12, skipped: 0, unexpected: 0, flaky: 0 },
+  }
+  assert.equal(requireCompanyResults(report).length, 12)
+  const readonly = {
+    suites: [{ specs: [{ ...lifecycle[0], title: 'read-only: both locales' }] }],
+    stats: { expected: 1, skipped: 0, unexpected: 0, flaky: 0 },
+  }
+  assert.equal(requireCompanyResults(readonly, true).length, 1)
+  for (const stats of [
+    { expected: 0, skipped: 12, unexpected: 0, flaky: 0 },
+    { expected: 11, skipped: 1, unexpected: 0, flaky: 0 },
+    { expected: 11, skipped: 0, unexpected: 1, flaky: 0 },
+  ])
+    assert.throws(() => requireCompanyResults({ ...report, stats }))
+  const failed = structuredClone(report)
+  failed.suites[0].suites[0].specs[0].tests[0].results[0].status = 'failed'
+  assert.throws(() => requireCompanyResults(failed), /Child did not pass/)
+  const missingLocale = structuredClone(report)
+  missingLocale.suites[0].suites[0].specs[0].title = 'wrong selection'
+  assert.throws(() => requireCompanyResults(missingLocale), /Missing en lifecycle/)
+})
+
+test('normal Mongo result gate requires every persistent branch and the two real restart phases', () => {
+  const events = requiredMongoCases.map((Test) => ({ Test, Action: 'pass' }))
+  events.push(...requiredMongoDiskCases.map((Test) => ({ Test, Action: 'skip' })))
+  assert.equal(requireMongoResults(events).requiredPassed.length, requiredMongoCases.length)
+  for (const name of requiredMongoCases) assert.match(name, new RegExp(mongoSelector))
+  assert.throws(() => requireMongoResults(events.slice(1)), /Required Mongo case/)
+  const skippedPersistent = structuredClone(events)
+  skippedPersistent.find(
+    (event) => event.Test === 'TestReviewDraftCapturesCompanyAndPartner/true',
+  ).Action = 'skip'
+  assert.throws(() => requireMongoResults(skippedPersistent), /Required Mongo case/)
+  assert.throws(
+    () =>
+      requireMongoResults([
+        ...events,
+        { Test: 'TestCompanyProfileLegacyScopeAndConflicts/true/null', Action: 'skip' },
+      ]),
+    /Unexpected Mongo fixture skip/,
+  )
+  for (const phase of ['write', 'read']) {
+    const diskEvents = requiredMongoDiskCases.map((Test) => ({ Test, Action: 'pass' }))
+    assert.equal(requireMongoResults(diskEvents, phase).phase, phase)
+    for (const name of requiredMongoDiskCases) {
+      assert.match(name, new RegExp(mongoDiskSelector))
+      assert.throws(
+        () =>
+          requireMongoResults(
+            diskEvents.filter((event) => event.Test !== name),
+            phase,
+          ),
+        /Required Mongo case/,
+      )
+      assert.throws(
+        () =>
+          requireMongoResults(
+            diskEvents.map((event) => (event.Test === name ? { ...event, Action: 'skip' } : event)),
+            phase,
+          ),
+        /Required Mongo case/,
+      )
+    }
+  }
+})
+
+test('a fixture child process failure propagates even when it emits success-shaped output', async () => {
+  const environment = browserEnvironment(31002)
+  try {
+    await assert.rejects(
+      command(
+        process.execPath,
+        ['-e', 'console.log("synthetic successful-looking output"); process.exitCode = 7'],
+        environment,
+      ),
+      /\(7\).*synthetic successful-looking output/s,
+    )
+    await assert.rejects(
+      command(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], environment, undefined, 50),
+      /timed out/,
+    )
+  } finally {
+    await rm(environment.ODEE_TEST_SCRATCH_DIR, { recursive: true, force: true })
   }
 })
 

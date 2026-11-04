@@ -5,25 +5,9 @@ import type { APIRequest, Contact, ContactData, OdooContactImport } from './type
 import { getLocale, messageText, requestMessage, statusText, t } from './i18n'
 import { responseStatus } from './api'
 import { localizedValidation } from './form-validation'
+import { AccountingFields, blankContact } from './Company'
 
 const errorMessage = (error: unknown) => requestMessage(error, responseStatus(error))
-const blank = (): ContactData => ({
-  name: '',
-  isCompany: true,
-  companyName: '',
-  email: '',
-  phone: '',
-  mobile: '',
-  website: '',
-  vat: '',
-  reference: '',
-  type: 'contact',
-  address: { street: '', street2: '', postalCode: '', city: '', state: '', country: '' },
-  tags: [],
-  customer: false,
-  vendor: false,
-  active: true,
-})
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -302,6 +286,20 @@ export function Contacts({
               <dd>{selected.vat || t('Not set')}</dd>
               <dt>{t('Reference')}</dt>
               <dd>{selected.reference || t('Not set')}</dd>
+              <dt>{t('Enterprise identifier')}</dt>
+              <dd>{selected.enterpriseId || t('Incomplete / unknown')}</dd>
+              <dt>{t('Bank account / IBAN')}</dt>
+              <dd>{selected.bankAccount || t('Incomplete / unknown')}</dd>
+              <dt>{t('BIC')}</dt>
+              <dd>{selected.bic || t('Incomplete / unknown')}</dd>
+              <dt>{t('Payment terms')}</dt>
+              <dd>{selected.paymentTerms || t('Incomplete / unknown')}</dd>
+              <dt>{t('Tax applicability')}</dt>
+              <dd>
+                {selected.taxApplicability === 'unsupported'
+                  ? t('Unsupported')
+                  : t('Unknown / not assessed')}
+              </dd>
               <dt>{t('Relationships')}</dt>
               <dd>
                 {[selected.customer && t('Customer'), selected.vendor && t('Vendor')]
@@ -421,7 +419,7 @@ function ContactEditor({
 }) {
   const [data, setData] = useState<ContactData>(() =>
     initial === 'new'
-      ? blank()
+      ? blankContact()
       : {
           name: initial.name,
           isCompany: initial.isCompany,
@@ -431,6 +429,11 @@ function ContactEditor({
           mobile: initial.mobile,
           website: initial.website,
           vat: initial.vat,
+          enterpriseId: initial.enterpriseId,
+          bankAccount: initial.bankAccount,
+          bic: initial.bic,
+          paymentTerms: initial.paymentTerms,
+          taxApplicability: initial.taxApplicability,
           reference: initial.reference,
           type: initial.type,
           address: { ...initial.address },
@@ -560,6 +563,7 @@ function ContactEditor({
                   onChange={(event) => field('reference', event.target.value)}
                 />
               </label>
+              <AccountingFields data={data} onChange={setData} />
               <label>
                 {t('Address type')}
                 <select

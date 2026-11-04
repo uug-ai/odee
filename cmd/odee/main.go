@@ -89,10 +89,12 @@ func run() error {
 	var store accounting.Store
 	var imports accounting.ImportStore
 	var contacts accounting.ContactStore
+	var profiles accounting.CompanyStore
 	if demo {
 		store = accounting.NewMemoryStore()
 		imports = accounting.NewMemoryImports(company)
 		contacts = accounting.NewMemoryContacts(company)
+		profiles = accounting.NewMemoryCompany(company)
 		slog.Warn("DEMO MODE: temporary empty storage; all data is lost on restart")
 	} else {
 		uri := os.Getenv("MONGODB_URI")
@@ -119,6 +121,7 @@ func run() error {
 			return err
 		}
 		store = mongoStore
+		profiles = accounting.NewMongoCompany(mongoStore)
 		if documentsDirectory == "" {
 			imports, err = accounting.NewMongoImports(ctx, mongoStore)
 		} else {
@@ -136,7 +139,7 @@ func run() error {
 		slog.Warn("local bill scanning is unavailable", "error", err)
 	}
 	service := &accounting.Server{Store: store, Company: company, Name: env("ODEE_COMPANY_NAME", "My company"),
-		Token: token, Origin: origin, Demo: demo, Dev: dev, Auth: auth, Authorization: authorization, Imports: imports, Scanner: scanner, Contacts: contacts}
+		Token: token, Origin: origin, Demo: demo, Dev: dev, Auth: auth, Authorization: authorization, Imports: imports, Scanner: scanner, Contacts: contacts, Profiles: profiles}
 	api := service.Handler()
 	mux := http.NewServeMux()
 	mux.Handle("/api/", api)

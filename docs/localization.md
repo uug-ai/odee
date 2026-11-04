@@ -4,6 +4,10 @@ The current shell, accounting, contacts, bill inbox/review and permission
 surfaces support English (`en`) and Dutch (`nl`). The language control is
 available before authentication, in the workspace header and inside dialogs.
 Changing it does not navigate, refetch, resubmit or change financial policy.
+Legal-company settings, accounting metadata, saved-contact/own-company capture
+summaries and explicit refresh/manual-conversion controls use the same catalogs.
+Unassessed applicability and missing historical identity are labeled explicitly;
+captured/imported names, addresses, identifiers and payment terms remain data.
 
 ## Selection contract
 
