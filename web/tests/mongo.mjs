@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { repositoryRoot, safeTestEnvironment } from './test-environment.mjs'
-import { mongoSelector, requireMongoResults } from './company-test-results.mjs'
+import { mongoSelector, mongoDiskSelector, requireMongoResults } from './company-test-results.mjs'
 import {
   bounded,
   command,
@@ -17,6 +17,7 @@ async function isolated() {
   const { MongoMemoryServer } = await import('mongodb-memory-server')
   const scratch = process.env.ODEE_TEST_SCRATCH_DIR
   const dbPath = join(scratch, 'mongo')
+  const documentsDirectory = join(dbPath, 'document-originals')
   await mkdir(dbPath)
   const server = await MongoMemoryServer.create({
     binary: {
@@ -39,6 +40,7 @@ async function isolated() {
         ...process.env,
         ODEE_TEST_MONGODB_URI: uri,
         ODEE_TEST_RESTART_PHASE: phase,
+        ODEE_TEST_DOCUMENTS_DIR: documentsDirectory,
       },
       join(scratch, `${phase || 'matrix'}-results.jsonl`),
     )
@@ -51,11 +53,12 @@ async function isolated() {
     return result
   }
   try {
+    await mkdir(documentsDirectory)
     const matrix = await verify(mongoSelector)
-    const write = await verify('^TestMongoDiskPersistence$', 'write')
+    const write = await verify(mongoDiskSelector, 'write')
     await bounded(server.stop({ doCleanup: false }), 20000, 'MongoDB disk restart stop')
     await bounded(server.start(), 20000, 'MongoDB disk restart start')
-    const read = await verify('^TestMongoDiskPersistence$', 'read')
+    const read = await verify(mongoDiskSelector, 'read')
     await writeFile(
       join(scratch, 'summary.json'),
       JSON.stringify(
@@ -68,7 +71,6 @@ async function isolated() {
     await bounded(server.stop(), 20000, 'MongoDB shutdown')
   }
 }
-
 if (process.argv.includes('--isolated')) {
   await isolated()
 } else {

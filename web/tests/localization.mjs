@@ -117,8 +117,10 @@ const labels = {
     close: 'Close',
     launcher: 'Odee app launcher',
     openAccounting: 'Open accounting',
+    overview: 'Overview',
     invoices: 'Invoices',
     bills: 'Bills',
+    billsCard: 'Vendor bills',
     newInvoice: 'New invoice',
     newBill: 'New bill',
     customer: 'Customer name',
@@ -172,8 +174,10 @@ const labels = {
     close: 'Sluiten',
     launcher: 'Odee appoverzicht',
     openAccounting: 'Boekhouding openen',
+    overview: 'Overzicht',
     invoices: 'Klantfacturen',
     bills: 'Leveranciersfacturen',
+    billsCard: 'Leveranciersfacturen',
     newInvoice: 'Nieuwe klantfactuur',
     newBill: 'Nieuwe leveranciersfactuur',
     customer: 'Naam klant',
@@ -616,7 +620,13 @@ async function isolated() {
             await page.reload()
             await expect(page.locator('html')).toHaveAttribute('lang', other)
             await page.getByLabel(labels[other].language).selectOption(locale)
-            await page.getByRole('button', { name: l.bills, exact: true }).click()
+            await expect(page.locator('html')).toHaveAttribute('lang', locale)
+            const navigation = page.getByRole('navigation')
+            await navigation.getByRole('button', { name: l.overview, exact: true }).click()
+            await expect(
+              page.getByRole('main').getByRole('button', { name: l.billsCard, exact: true }),
+            ).toBeVisible()
+            await navigation.getByRole('button', { name: l.bills, exact: true }).click()
             const originalsBeforeInvalid = (await state()).imports.length
             await page.getByLabel(l.choose).setInputFiles({
               name: 'synthetic-invalid.txt',
@@ -711,7 +721,10 @@ async function isolated() {
             const persisted = await state()
             expect(persisted.documents.find((d) => d.id === invoice.id)).toEqual(invoice)
             expect(persisted.documents.find((d) => d.id === bill.id)).toEqual(bill)
-            await page.getByRole('button', { name: l.contacts, exact: true }).click()
+            await page
+              .getByRole('navigation')
+              .getByRole('button', { name: l.contacts, exact: true })
+              .click()
             await page.goBack()
             await expect(page).toHaveURL(`${origin}/accounting/invoices`)
             await page.reload()
