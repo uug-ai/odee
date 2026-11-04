@@ -30,11 +30,13 @@ export function Configuration({
   request,
   onRefresh,
   canAdmin,
+  refreshing,
 }: {
   view: ConfigurationView
   request: APIRequest
   onRefresh: () => Promise<void>
   canAdmin: boolean
+  refreshing: boolean
 }) {
   useLocale()
   const [data, setData] = useState<ConfigurationData>(() => structuredClone(view.stage.data))
@@ -85,7 +87,7 @@ export function Configuration({
       setBusy(false)
     }
   }
-  const disabled = !canAdmin || busy
+  const disabled = !canAdmin || busy || refreshing
   return (
     <section className="panel configuration">
       <h2>{t('Accounting configuration')}</h2>
