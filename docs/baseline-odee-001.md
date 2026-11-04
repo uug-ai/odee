@@ -41,6 +41,78 @@ that root and run read-only `status` there; if sessions run on different hosts,
 a supported shared coordinator service is needed before ledger-controlled
 dispatch. No private ledger was initialized or execution state fabricated here.
 
+### Control recovery and adoption proposal (draft; inactive)
+
+No exact root path was found in the available PR #3, #4, #5 or #13 evidence, and
+the prior coordinator reports that a bounded session-history search did not
+recover it. This is a recovery gap, not evidence that the earlier ledger or its
+accepted work never existed. Do not initialize a replacement ledger in this
+worktree or another worker checkout.
+
+1. **Recover read-only first.** The coordinator asks the prior root owner for the
+   exact absolute path and host. On that host, verify the real path and
+   repository identity, then run
+   `node tools/agents/loop.mjs --root /absolute/path/to/recovered/root status`
+   without `init`, `resume`, or state-writing commands. Capture only sanitized
+   status, schema/backlog identity and file digest. If the root is inaccessible,
+   on an untrusted/shared filesystem, or has an ambiguous live lock, stop; do
+   not copy, delete or reconstruct it.
+2. **Preserve historical evidence as evidence, not synthetic state.** Keep each
+   merged PR's actual tested candidate SHA, independent verdicts, required CI
+   results and merge SHA linked to that PR. For example, PR #3 records
+   independent API/data and integration PASS plus five CI checks on
+   `5b15b2dcbe57bd0fa4d10c2bd699419c9dd74b8a`, followed by its actual merge at
+   `416a4e5d1beb4ccb6116b31745bbdf1ed5a314b9`. Do not invent past claims,
+   acceptance events or a reconstructed ledger chronology. A missing ledger
+   cannot erase valid merged evidence or automatically accept a different
+   ticket revision/candidate.
+3. **Proposed fallback if recovery fails.** The following is the proposed
+   `docs/agents.md` amendment; it is not active until reviewed and adopted:
+
+   > **App-managed session execution (recovery fallback; explicit adoption
+   > required).** If the previously adopted shared control root is unavailable,
+   > do not initialize another worker or coordinator ledger. After a PM-reviewed
+   > amendment and an explicit coordinator handoff, one persistent parent
+   > coordinator session may act as the temporary authority for current
+   > assignments, ownership, stop/pause and handoffs only. Every assignment
+   > records the ticket/revision, exact base SHA, allowed paths, isolated branch
+   > and worktree, child session ID, dependencies, required independent QA
+   > roles and stop condition. The coordinator checks open PRs and active
+   > sessions before assigning paths; because this mode has no atomic file
+   > leases, overlapping path assignments are forbidden. Workers report
+   > candidate SHAs and evidence to the parent and do not infer other workers'
+   > states. Existing merged PRs remain historical evidence at their actual
+   > tested and merged SHAs; no missing ledger events or ticket statuses are
+   > reconstructed. Ticket acceptance still requires its specified independent
+   > roles at the exact candidate/specification, required CI, and a normal
+   > protected merge. If the parent session, ownership, stop state or candidate
+   > cannot be verified, pause new claims and integration. Existing worker and
+   > tester caps remain in force.
+
+   In this mode, the parent coordinator session would be the single authority
+   for current assignments, not a second persistent ticket ledger. It would
+   record each handoff and candidate SHA; workers do not create ledgers or
+   infer each other's status. The mode cannot replace exact-SHA independent QA,
+   CI or normal protected merge.
+4. **Reconcile before assigning overlapping work.** Query live app-managed
+   project sessions and open PRs for active owners and path overlap. Preserve
+   interrupted or uncommitted work with its current owner; do not copy it into
+   another branch. If ownership, candidate SHA or a required verdict cannot be
+   established, mark that assignment blocked and leave its files untouched.
+5. **Require explicit adoption.** The fallback is only a proposal until the
+   PM-reviewed guide amendment is merged through normal repository controls
+   and the coordinator records the chosen authority in the parent session.
+   Until then, this document authorizes neither a replacement ledger nor new
+   downstream claims, integration, or product activation.
+
+The separate `CONFIG-SAVE-REPAIR` r1 author work is not part of this ODEE-001
+candidate. Preserve its uncommitted source and tests in the owner's isolated
+worktree; do not cherry-pick, commit or edit them here. Once that owner supplies
+an exact candidate SHA, independent QA must use the repair contract's declared
+roles (including browser verification for the configuration-save behavior) and
+report PASS/FAIL/BLOCKED against that SHA. No author verdict or uncommitted
+working-tree result substitutes for those roles.
+
 The host assigned this app-managed worktree rather than the operating guide's
 `/home/vscode/worktrees` worker root. It is not the main checkout and was not
 relocated or represented as a successful ODEE-002 workspace-isolation drill.
