@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
+import { createHash } from 'node:crypto';
 import { acquireLock, runCommand } from './loop.mjs';
 import { safeTestEnvironment } from './workspace.mjs';
 import { formatEvent, validateEvent, sendEvent, receiptStatus } from './slack.mjs';
@@ -122,6 +123,44 @@ test('rejects unknown fields, invalid statuses and inconsistent QA/merge claims'
   }));
 });
 
+test('updateId accepts bounded stable identifiers and rejects unsafe values without echoing them', () => {
+  for (const updateId of ['ci-pending', 'ci-pass', 'a', `a${'b'.repeat(47)}`]) {
+    assert.doesNotThrow(() => validateEvent({ ...candidate, updateId }));
+    assert.ok(formatEvent({ ...candidate, updateId }).includes(`Update: ${updateId}`));
+  }
+  for (const updateId of [
+    '', null, 1, {}, [], 'a'.repeat(49), 'CI-PASS', ' space', 'space ', 'two words',
+    '../escape', 'a/b', 'a\\b', '@everyone', '<!channel>', 'line\nbreak', 'unicode-\u202e',
+    'https://example.invalid', 'xoxb-synthetic-token', 'ghp_synthetic', '__proto__',
+  ]) {
+    assert.throws(() => validateEvent({ ...candidate, updateId }), codes('INVALID_EVENT'));
+  }
+});
+
+test('QA fail or blocked cannot claim overall PASS or all required roles passed', () => {
+  for (const outcome of ['fail', 'blocked']) {
+    for (const status of ['pass', 'fail', 'blocked']) {
+      const event = {
+        ...candidate, event: 'qa', role: 'api', outcome,
+        qa: { passed: 2, required: 2, status },
+      };
+      assert.throws(() => validateEvent(event), codes('INVALID_EVENT'));
+      assert.throws(() => formatEvent(event), codes('INVALID_EVENT'));
+    }
+    assert.doesNotThrow(() => validateEvent({
+      ...candidate, event: 'qa', role: 'api', outcome,
+      qa: { passed: 1, required: 2, status: 'fail' },
+    }));
+  }
+  for (const status of ['fail', 'blocked']) {
+    const text = formatEvent({
+      ...candidate, event: 'qa', role: 'api', outcome: 'pass',
+      qa: { passed: 1, required: 2, status },
+    });
+    assert.ok(text.includes(`overall ${status}; role api: pass`));
+  }
+});
+
 test('rejects rather than echoes secrets, mentions, links, multiline dumps and injection', () => {
   for (const value of [
     'xoxb-synthetic-token-value', 'github_pat_synthetic', 'ghp_synthetic',
@@ -168,6 +207,78 @@ test('normal send persists only nonsecret receipts, durable dedupe and payload m
     '--root', f.root, '--control-root', f.controlRoot], { cwd: root, env: safeEnv, encoding: 'utf8' });
   assert.equal(restarted.status, 0, restarted.stderr);
   assert.equal(JSON.parse(restarted.stdout).events[result.id].status, 'delivered');
+});
+
+test('same-head progress updates track CI transition in one PR thread with durable per-update dedupe', async t => {
+  const f = fixture(t);
+  const m = mock();
+  const pending = {
+    ...candidate, event: 'progress', role: 'coordinator', outcome: 'in-progress', updateId: 'ci-pending',
+    findings: 'CI is pending and independent QA has not completed.',
+    decision: 'Keep the gate pending.',
+    currentAction: 'Awaiting CI and independent QA.',
+    nextSteps: 'Inspect CI and retain the independent QA requirement.',
+  };
+  const green = {
+    ...pending, updateId: 'ci-pass', ci: 'pass',
+    findings: 'CI passed but independent QA remains pending.',
+    decision: 'Do not equate green CI with independent acceptance.',
+    currentAction: 'Awaiting independent QA.',
+    nextSteps: 'Review the exact-head independent verdicts before integration.',
+  };
+  const first = await sendEvent({ ...f, ...m, event: pending });
+  const second = await sendEvent({ ...f, ...m, event: green });
+  assert.equal(first.status, 'delivered');
+  assert.equal(second.status, 'delivered');
+  assert.notEqual(first.id, second.id);
+  assert.equal(second.identity.sha, first.identity.sha);
+  assert.equal(second.identity.revision, first.identity.revision);
+  assert.equal(second.identity.role, first.identity.role);
+  assert.equal(second.parent, false);
+  assert.equal(m.calls[1].body.thread_ts, first.ts);
+  assert.ok(m.calls[1].body.text.includes('CI: pass'));
+  assert.ok(m.calls[1].body.text.includes('0/2 roles PASS; overall pending'));
+  for (const event of [pending, green]) {
+    const replay = await sendEvent({ ...f, ...m, event });
+    assert.equal(replay.duplicate, true);
+    assert.equal(replay.status, 'delivered');
+  }
+  await assert.rejects(sendEvent({
+    ...f, ...m, event: { ...pending, ci: 'pass' },
+  }), codes('PAYLOAD_MISMATCH'));
+  await assert.rejects(sendEvent({
+    ...f, ...m, event: { ...green, nextSteps: 'A different plan under the same identifier.' },
+  }), codes('PAYLOAD_MISMATCH'));
+  assert.equal(m.calls.length, 2);
+  const receipts = f.status().events;
+  assert.equal(receipts[first.id].identity.updateId, 'ci-pending');
+  assert.equal(receipts[second.id].identity.updateId, 'ci-pass');
+});
+
+test('absent updateId preserves original identity hashes and delivered receipts without rewriting', async t => {
+  const f = fixture(t);
+  const m = mock();
+  const oldIdentity = {
+    repo: candidate.repo, subject: `pr:${candidate.pr}`, revision: candidate.revision,
+    sha: candidate.sha, event: candidate.event, role: null,
+  };
+  const oldId = createHash('sha256').update(JSON.stringify(
+    Object.fromEntries(Object.entries(oldIdentity).sort(([a], [b]) => a.localeCompare(b))),
+  )).digest('hex');
+  const original = await sendEvent({ ...f, ...m });
+  assert.equal(original.id, oldId);
+  assert.deepEqual(original.identity, oldIdentity);
+  const before = fs.readFileSync(f.receiptFile, 'utf8');
+  const replay = await sendEvent({ ...f, ...m, event: { ...candidate, updateId: undefined } });
+  assert.equal(replay.id, oldId);
+  assert.equal(replay.duplicate, true);
+  assert.equal(fs.readFileSync(f.receiptFile, 'utf8'), before);
+  const identified = await sendEvent({ ...f, ...m, event: { ...candidate, updateId: 'candidate-followup' } });
+  assert.notEqual(identified.id, oldId);
+  assert.equal(identified.threadTs, original.ts);
+  assert.deepEqual({ id: oldId, ...f.status().events[oldId] }, original,
+    'old receipt must retain its exact identity and delivery');
+  assert.equal(m.calls.length, 2);
 });
 
 test('one parent per repository PR with exact head, revision and role event identities', async t => {
@@ -503,6 +614,9 @@ test('corrupt receipts and foreign control roots fail closed without leaking con
     value => { value.events[sent.id].channel = [config.ODEE_SLACK_CHANNEL_ID]; },
     value => { value.events[sent.id].at = 'Jan 1 2020'; },
     value => { value.events[sent.id].identity.sha = 'bad'; },
+    value => { value.events[sent.id].identity.updateId = '../unsafe'; },
+    value => { value.events[sent.id].identity.updateId = null; },
+    value => { value.events[sent.id].identity.updateId = 'changed-without-rekeying'; },
     value => { value.events[sent.id].code = 'private response'; },
     value => { value.private = 'private response'; },
   ]) {

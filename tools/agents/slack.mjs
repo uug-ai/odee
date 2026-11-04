@@ -29,6 +29,8 @@ const timestamp = value => typeof value === 'string' &&
   /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/.test(value) &&
   Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 const slackTimestamp = value => typeof value === 'string' && TS.test(value);
+const updateIdentifier = value => typeof value === 'string' &&
+  /^[a-z][a-z0-9-]{0,47}$/.test(value) && !SECRET.test(value);
 function check(condition, code = 'INVALID_EVENT') {
   if (!condition) {
     const error = new Error(code);
@@ -43,16 +45,18 @@ function identityFor(event) {
   return {
     repo: event.repo, subject: event.pr ? `pr:${event.pr}` : `ticket:${event.ticket}`,
     revision: event.revision, sha: event.sha, event: event.event, role: event.role ?? null,
+    ...(event.updateId === undefined ? {} : { updateId: event.updateId }),
   };
 }
 function validIdentity(value) {
-  keys(value, ['repo', 'subject', 'revision', 'sha', 'event', 'role'], 'CORRUPT_RECEIPTS');
+  keys(value, ['repo', 'subject', 'revision', 'sha', 'event', 'role', 'updateId'], 'CORRUPT_RECEIPTS');
   check(typeof value.repo === 'string' && /^[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9][a-z0-9_.-]{0,99}$/.test(value.repo) &&
     typeof value.subject === 'string' && /^(?:pr:[1-9][0-9]{0,8}|ticket:[A-Z][A-Z0-9]{1,15}-[0-9]{1,8})$/.test(value.subject) &&
     Number.isSafeInteger(value.revision) && value.revision > 0 && typeof value.sha === 'string' && SHA.test(value.sha) &&
     EVENTS.includes(value.event) && (value.role === null ||
       (typeof value.role === 'string' && /^[a-z][a-z0-9-]{0,47}$/.test(value.role))) &&
-    !SECRET.test(value.repo) && !SECRET.test(value.subject) && !SECRET.test(value.role ?? ''), 'CORRUPT_RECEIPTS');
+    !SECRET.test(value.repo) && !SECRET.test(value.subject) && !SECRET.test(value.role ?? '') &&
+    (!Object.hasOwn(value, 'updateId') || updateIdentifier(value.updateId)), 'CORRUPT_RECEIPTS');
 }
 function summary(value) {
   check(typeof value === 'string' && value === value.trim() && value.length > 0 && value.length <= 220 &&
@@ -62,11 +66,13 @@ function summary(value) {
   return value;
 }
 export function validateEvent(input) {
-  keys(input, ['repo', 'ticket', 'revision', 'sha', 'pr', 'event', 'role', 'outcome', 'qa', 'ci', ...SUMMARY_FIELDS]);
+  keys(input, ['repo', 'ticket', 'revision', 'sha', 'pr', 'event', 'role', 'updateId', 'outcome', 'qa', 'ci', ...SUMMARY_FIELDS]);
   check(typeof input.ticket === 'string' && /^[A-Z][A-Z0-9]{1,15}-[0-9]{1,8}$/.test(input.ticket));
   check(input.pr === undefined || (Number.isSafeInteger(input.pr) && input.pr > 0 && input.pr <= 999999999));
   check(input.role === undefined || typeof input.role === 'string');
   const event = { ...input, qa: { ...input.qa } };
+  // Absence retains the original identity/digest shape; never re-key old receipts.
+  if (event.updateId === undefined) delete event.updateId;
   // Use one identity grammar for supplied events and receipts; never echo bad input.
   try { validIdentity(identityFor(event)); } catch { check(false); }
   check(OUTCOMES.includes(event.outcome) && CI.includes(event.ci));
@@ -81,6 +87,8 @@ export function validateEvent(input) {
   check((event.event === 'integration') === (event.outcome === 'local-integration'));
   check(event.outcome !== 'pass' || (event.event === 'qa' && event.role !== undefined && event.qa.passed > 0));
   check(event.event !== 'qa' || event.role !== undefined);
+  check(event.event !== 'qa' || !['fail', 'blocked'].includes(event.outcome) ||
+    (event.qa.status !== 'pass' && event.qa.passed < event.qa.required));
   for (const field of SUMMARY_FIELDS) if (input[field] !== undefined) event[field] = summary(input[field]);
   return event;
 }
@@ -94,6 +102,7 @@ export function formatEvent(input) {
       (event.role ? `; role ${event.role}: ${event.outcome}` : ''),
     `CI: ${event.ci} (reported remote status; local tests are not CI)`,
   ];
+  if (event.updateId !== undefined) lines.push(`Update: ${event.updateId}`);
   for (let i = 0; i < SUMMARY_FIELDS.length; i++) {
     if (event[SUMMARY_FIELDS[i]]) lines.push(`${LABELS[i]}: ${event[SUMMARY_FIELDS[i]]}`);
   }

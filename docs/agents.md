@@ -199,6 +199,7 @@ Example with entirely synthetic provenance:
   "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "pr": 12,
   "event": "progress",
+  "updateId": "ci-pending",
   "outcome": "in-progress",
   "role": "api",
   "qa": { "passed": 1, "required": 2, "status": "partial" },
@@ -213,8 +214,17 @@ Example with entirely synthetic provenance:
 
 - Required: lowercase `owner/repo`, ticket ID, positive integer `revision`, full
   lowercase 40/64-character `sha`, `event`, `outcome`, `qa` and `ci`.
-  Optional: positive integer `pr`, safe lowercase role identifier and the five
-  summary fields shown above. A PR URL is constructed, never supplied.
+  Optional: positive integer `pr`, safe lowercase role identifier, stable
+  `updateId` and the five summary fields shown above. A PR URL is constructed,
+  never supplied.
+- `updateId` identifies a distinct observation/decision on the **same**
+  SHA/revision/event/role. Use 1–48 lowercase ASCII letters, digits or hyphens,
+  beginning with a letter; credential patterns, markup and unsafe identifiers
+  are rejected. Keep it unchanged on retries of that observation. For example,
+  after the `ci-pending` update above, a later event may use `updateId: "ci-pass"`
+  and `ci: "pass"` with revised findings/decision/next steps while independent
+  QA remains `1/2` and `partial`. Both updates use the same PR thread. New facts
+  need their own stable identifier, not a random identifier on each invocation.
 - Events: `progress`, `candidate`, `qa`, `repair`, `integration`, `merge`,
   `checkpoint`. Outcomes: `in-progress`, `ready-for-qa`, `pass`, `fail`, `blocked`,
   `local-integration`, `merged`, `paused`, `stopped`. Only `merge` may report
@@ -222,7 +232,10 @@ Example with entirely synthetic provenance:
   requires a `qa` event and role; every `qa` event requires a role.
 - QA has integer `passed`/`required` counts (at most 100 roles) and overall status
   `pending`, `partial`, `pass`, `fail` or `blocked`. Overall PASS requires all
-  nonzero required roles; partial PASS remains explicitly partial.
+  nonzero required roles; partial PASS remains explicitly partial. A `qa` event
+  with a failing/blocked role cannot claim overall PASS or that every required
+  role passed. A passing role may still accompany overall FAIL/BLOCKED when
+  other roles fail or block.
   CI is `not-run`, `pending`, `pass`, `fail`, `blocked` or `unavailable`, and means
   supplied **remote** CI status, not feature-author local test results.
 - Summaries are optional single-line ASCII prose, at most 220 characters each.
@@ -238,7 +251,8 @@ Example with entirely synthetic provenance:
 
 The reporter must honor the same user stop/control state, without a separate
 polling daemon. Persist nonsecret event/delivery receipts and deduplicate by
-repository, PR/ticket, revision, SHA and event/role. Claim delivery only after
+repository, PR/ticket, revision, SHA, event/role and optional update identifier.
+Claim delivery only after
 Slack acknowledges the intended channel/message; HTTP success alone does not
 make an `ok: false` response successful. Surface missing configuration,
 permission failures and delivery errors explicitly, without exposing tokens.
@@ -257,11 +271,17 @@ Nonsecret, mode-0600 atomic receipts live in `.odee/slack/receipts.json`.
 They retain event identity, payload digest, channel/message/thread identifiers,
 timestamps, sanitized failure codes and bounded prior-attempt history, **not**
 tokens, raw message text or response bodies. Identity is repository, PR/ticket,
-revision, full SHA and event/role. Identical replay returns its receipt without
-sending; changed content or destination under that identity fails
-`PAYLOAD_MISMATCH`. Use a new truthful event/role, revision or head for new facts,
-not changes intended to evade deduplication. Channel changes for an existing PR
-scope fail closed as well.
+revision, full SHA, event/role and optional `updateId`. Identical replay returns
+its receipt without sending; changed content or destination under that identity fails
+`PAYLOAD_MISMATCH`, including changed content under the same `updateId`. Use a
+new stable `updateId` for a genuinely distinct intermediate update; do not
+change identifiers to evade an uncertain send's safeguards. Omitted `updateId`
+retains the original identity/hash shape and a single event per
+SHA/revision/event/role; library `undefined` is equivalent to omission, whereas
+`null` and empty strings are invalid. Existing delivered receipts without the
+field are neither re-keyed nor rewritten. Supplying an identifier creates a
+distinct event, not an alias or automatic migration of an earlier unidentified
+event. Channel changes for an existing PR scope fail closed as well.
 
 An exclusive **reporter** lock covers durable pre-send intent through receipt
 commit, including the bounded request (10 seconds by default; library maximum
