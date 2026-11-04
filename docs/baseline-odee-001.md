@@ -1,7 +1,8 @@
 # ODEE-001 revision 1: clean baseline and reconciliation evidence
 
-Recorded 2026-11-04. This is a bounded documentation candidate, **not acceptance
-of ODEE-001, a release, or permission to start dependent features**.
+Recorded 2026-11-04 and updated after the coordinator's clean-branch report.
+This is a bounded documentation candidate, **not acceptance of ODEE-001, a
+release, or permission to start dependent features**.
 The authoritative contract is [backlog ODEE-001 revision 1](roadmap/backlog.json).
 The versioned backlog, decisions and capability claims are unchanged.
 
@@ -11,7 +12,9 @@ The versioned backlog, decisions and capability claims are unchanged.
 | --- | --- |
 | Repository | `https://github.com/uug-ai/odee` |
 | Application base SHA | `21de316085ec877498300c9408c481553725da11` |
-| Application candidate SHA | `21de316085ec877498300c9408c481553725da11` (no product changes) |
+| Application source baseline | `main` at `21de316085ec877498300c9408c481553725da11` |
+| Separate clean user-work candidate | `feature/accounting` at `378008e07ed8352f373c8b9485c057b72f617fdb` (parent-reported clean; PR #15 open, not merged) |
+| ODEE-001 documentation candidate | PR #14, initially `20fa4d0505dbac8c7106c5dac5974e9836761e70`; any later evidence edit requires new exact-SHA QA |
 | Assigned branch | `cedricve-supreme-robot` |
 | Isolated checkout | `/workspaces/odee/copilot-worktrees/odee/cedricve-supreme-robot` |
 | Initial `git status --short` | Empty: no tracked modifications or untracked paths |
@@ -19,17 +22,24 @@ The versioned backlog, decisions and capability claims are unchanged.
 | `git ls-remote origin refs/heads/main` | Same SHA, observed 2026-11-04 |
 | Planning baseline | `4b7b21d709b9d13795f16910a0591810727340ad`, historical specification anchor, not this checkout |
 
-The documentation candidate's distinct commit SHA is supplied in the independent
-QA handoff. Tests below ran against the application SHA above; a documentation
-commit does not retroactively change that test identity. Independent acceptance
-must identify both the exact documentation candidate SHA and ticket revision 1.
+Tests in the initial evidence table ran against the application SHA above; a
+documentation commit does not retroactively change that test identity. PR #14's
+checks and QA are separate evidence and must identify the exact current
+documentation candidate SHA and ticket revision 1.
 
-The parent coordinator explicitly confirmed on 2026-11-04 that no shared
-`.odee` ledger/root has been established for this execution. Its conversation is
-the temporary single control authority, with no user STOP/PAUSE reported and
-authorization limited to this gate. No private ledger was initialized, no
-scheduler execution state was rewritten, and no downstream worker was dispatched.
-Historical roadmap completion statements are not current execution state.
+The initial fresh-checkout probe found no `.odee/loop.json`; this is **not**
+evidence that the project has no canonical control ledger. Merged PR #13 records
+that the coordinator previously read and validated an existing version-1
+canonical ledger against the same root, verified its unchanged SHA-256, and did
+not initialize a second ledger. `tools/agents/loop.mjs` supports an explicit
+`--root DIR`, and [the operating guide](agents.md) requires all workers to pass
+the same absolute root. Its local process lock is host/PID-bound: use this
+approach only when all sessions can access the same trusted local filesystem;
+do not assume a shared/NFS path is safe across hosts. The exact previously
+adopted root was not available to this PM session. The coordinator must recover
+that root and run read-only `status` there; if sessions run on different hosts,
+a supported shared coordinator service is needed before ledger-controlled
+dispatch. No private ledger was initialized or execution state fabricated here.
 
 The host assigned this app-managed worktree rather than the operating guide's
 `/home/vscode/worktrees` worker root. It is not the main checkout and was not
@@ -37,16 +47,18 @@ relocated or represented as a successful ODEE-002 workspace-isolation drill.
 No project-memory interface is exposed among the available tools; no obsolete
 local memory was consulted or recreated.
 
-## User-owned dirty work: external, unverified provenance
+## User-owned work: historical dirty inventory and current clean branch
 
-The parent initially reported groups of modifications/untracked files in the
-**original local checkout**, which was not copied into this cloud checkout.
-It subsequently supplied a read-only path inventory observed on 2026-11-04:
+The parent initially reported modifications/untracked files in the **original
+local checkout**, which was not copied into this cloud checkout. It supplied a
+read-only, time-specific path inventory observed on 2026-11-04:
 17 modified tracked files (573 insertions, 186 deletions) and eight untracked
-files. The exact inventory below is **attributed to that time-specific parent
-observation**, not independently verified here. It is not a semantic comparison
-or an attestation that the files remain unchanged. This session never accessed
-the original checkout, its Git metadata, environment files or original storage.
+files. The exact inventory below is **attributed to that historical parent
+observation**, not a current dirty-state report. The coordinator later reported
+that the original checkout is clean on `feature/accounting` at `378008e`, pushed
+to `origin/feature/accounting`; PR [#15](https://github.com/uug-ai/odee/pull/15)
+remains open and unmerged. This session did not access the original checkout,
+its Git metadata, environment files or original storage.
 
 | Parent-reported modified tracked paths | Classification and reconciliation boundary |
 | --- | --- |
@@ -68,27 +80,49 @@ the original checkout, its Git metadata, environment files or original storage.
 | `web/src/ThemeToggle.tsx` | User-owned theme UI |
 | `web/tests/oauth.mjs`, `web/tests/theme.spec.ts` | User-owned OAuth/theme verification |
 
-All rows remain owned by the user until explicit reconciliation. No reset,
-stash, checkout-overwrite, implicit commit, patch import, environment-file copy
-or original-file migration was performed. A clean remote tree does not establish
-equivalence to the original dirty workspace.
+No reset, stash, checkout-overwrite, environment-file copy or original-file
+migration was performed by this session. The parent reports that the historical
+work is now committed and the original checkout clean; the preserved branch is
+separately reviewable, not yet integrated into `main`.
 
-**Behavior differences remain unknown.** This checkout executes committed
-`21de316` code, not the original workspace's pending startup/auth/API/extraction/
-storage/UI/dependency changes. Some reported surfaces also have committed
-implementations here; filename overlap is not proof that the pending changes
-were included, omitted byte-for-byte, superseded or tested. No claim is made that
-the original dirty behavior has been preserved by this source baseline.
+### Behavior differences identified against the committed main baseline
 
-The parent-reported inventory improves path/status provenance but does not close
-semantic reconciliation. Before overlapping implementation, the coordinator must
-obtain an owner-approved comparison against this exact application SHA and
-explicit keep/integrate/defer decisions. Code, fixtures and runtime originals
-need separate treatment. Secrets and real records stay outside evidence. Record
-functional differences and their independent checks before accepting this as
-the reconciled execution baseline. If the owner cannot establish that evidence,
-keep this gate blocked; do not treat absence from the cloud checkout as
-reconciliation.
+The parent-reported branch head was fetched read-only from `origin` and compared
+with `origin/main` at `21de316`. The branch's net diff is 15 files. The original
+workspace itself was not read, so this is a comparison of the two commits, not a
+byte-for-byte comparison with the historical dirty snapshot.
+
+The exact net-diff paths are `.env.example`, `README.md`,
+`internal/accounting/auth.go`, `internal/accounting/auth_browser_test.go`,
+`internal/accounting/auth_test.go`, `internal/accounting/http.go`,
+`web/index.html`, `web/package.json`, `web/src/App.tsx`,
+`web/src/ThemeToggle.tsx`, `web/src/main.tsx`, `web/src/styles.css`,
+`web/tests/imports.spec.ts`, `web/tests/oauth.mjs`, and
+`web/tests/theme.spec.ts`.
+
+| Net difference on `feature/accounting` | Classification |
+| --- | --- |
+| `.env.example` and README: prefer `127.0.0.1`, revise local persistent-workspace instructions, OAuth callback guidance and test command documentation | Configuration/documentation behavior; review separately from product baseline |
+| `internal/accounting/auth.go` and tests: redirect an OAuth login request whose Host differs from configured `ODEE_ORIGIN` to that canonical origin before issuing state; expose the authorization endpoint for controlled testing | Authentication/OAuth host behavior |
+| `web/src/ThemeToggle.tsx`, `App.tsx`, `main.tsx`, `index.html` and styles: initialize from saved/system preference; toggle and persist light/dark choice locally; synchronize tabs; update theme color | User-visible theme behavior |
+| OAuth browser test, theme browser tests, and import test changes | Verification changes; not independently accepted by this note |
+| `web/package.json` | Adds the explicit `test:oauth` command; no dependency addition is reported in the branch diff |
+
+The historical scanner/extraction and original-file paths in the dirty inventory
+are **not net changes** in the current `origin/main...origin/feature/accounting`
+diff; they match the current main tree at this comparison. This does not prove
+the old working-copy bytes or behavior were identical. The clean branch therefore
+preserves the reported work without making its unmerged theme/auth/UI changes
+part of the `main` execution baseline. The baseline source remains `21de316`
+until PRs land through normal review. Path provenance is now reconciled to a
+clean, committed branch; acceptance of its behavior remains the separate PR
+review and test gate.
+
+At the observed `378008e` head, PR #15's server and web checks failed; agent and
+both security-scan checks passed. The coordinator assigned a separate developer
+to repair the existing configuration browser failure on that branch. This PM
+session does not modify its source or tests. Neither that branch nor its failed
+checks are claimed as accepted implementation.
 
 ## Reproducible checks and actual outcomes
 
@@ -182,6 +216,33 @@ verdicts** for either required role. The author's frontend passes above must not
 be attributed to the tester. Final `qa-api-data` and `qa-integration` verdicts
 must separately name the committed documentation candidate and revision 1.
 
+### Pull request runs on the prior documentation candidate
+
+PR [#14](https://github.com/uug-ai/odee/pull/14) was opened draft at
+`20fa4d0505dbac8c7106c5dac5974e9836761e70` against `21de316`. Its exact-head
+checks were:
+
+| Check on `20fa4d0` | Result |
+| --- | --- |
+| `server` | PASS |
+| `agents` | PASS |
+| `security-scan (amd64, ubuntu-24.04)` | PASS |
+| `security-scan (arm64, ubuntu-24.04-arm)` | PASS |
+| `web` | FAIL in `npm run test:e2e`; `web/tests/configuration.mjs --browser-only` could not find expected text `Configuratieconcept opgeslagen.`; the subsequent persistence step did not run |
+
+The failing run is
+[Check Odee](https://github.com/uug-ai/odee/actions/runs/41868995035), web job
+126710585500. A separate developer was assigned to investigate this existing
+configuration-browser failure; this PM assignment does not change those source
+or test files. Any edit to this evidence document creates a new PR head and
+requires fresh exact-head checks and both required independent QA roles. The old
+results above are not transferable.
+
+At the later reported `feature/accounting` head `378008e`, PR #15 likewise had
+server and web failures, with agents and both security scans passing. Those
+failures belong to that separate, still-open source candidate; they are not a
+repair or a new ticket claim here.
+
 ## Ownership, protections and human-only triggers
 
 | Surface | Ownership and boundary |
@@ -189,7 +250,7 @@ must separately name the committed documentation candidate and revision 1.
 | This document | ODEE-001 coordinator; only this bounded documentation evidence is changed |
 | Versioned roadmap/backlog/decisions/capabilities | PM product authority; read-only for this assignment |
 | Scheduler/control state and file leases | Single parent coordinator; no private ledger or fabricated ticket completion |
-| Backend/frontend/startup/configuration/fixtures | Existing user-owned work must first be reconciled, then a bounded feature lease assigned; this gate changes no product source |
+| Backend/frontend/startup/configuration/fixtures | Historical dirty work is reported committed on the separate `feature/accounting` branch; do not overwrite it. New work needs a reconciled source base and nonoverlapping lease; this gate changes no product source |
 | Independent verdicts | `qa-api-data` and `qa-integration`; author cannot accept its own evidence |
 | Main integration | Coordinator only after exact-head QA, required remote checks, reconciled changes and verified enforceable server controls |
 | Releases, artifacts, deployment, production migration and live business actions | Human only; neither this evidence nor green CI authorizes them |
@@ -228,11 +289,15 @@ deployment-side controls were not audited here.
 
 ## Gate outcome and conditional successors
 
-**ODEE-001 acceptance is BLOCKED**, not PASS. Required independent role verdicts
-must be bound to the committed documentation candidate and revision 1.
-Unverified original-work reconciliation/behavior equivalence and inaccessible
-server enforcement details remain explicit blockers; local MongoDB, scanner,
-browser and persistence coverage is unavailable, not inferred green.
+**ODEE-001 acceptance is BLOCKED**, not PASS. The historical dirty-path list is
+no longer a current dirty-work blocker: the parent reports a clean, committed
+user-work branch, and this note compares its net source diff with main and
+identifies observable behavior differences. That branch remains unmerged and
+its acceptance is separate. PR #14's prior exact-head web check failed;
+candidate-bound `qa-api-data`/`qa-integration` verdicts and fresh checks after
+the evidence update are required. Detailed protection/release-control settings
+remain inaccessible (HTTP 403). Local MongoDB/OCR/browser/persistence gaps are
+recorded; remote CI results do not retroactively erase them.
 
 Only after coordinator acceptance of this gate could these direct successors
 become dependency-ready, subject to current revisions, leases and control:
@@ -243,6 +308,6 @@ become dependency-ready, subject to current revisions, leases and control:
 | ODEE-003 | 1 | 10 | Durable loop; overlaps ODEE-002 tool/docs leases |
 | ODEE-020 | 1 | 11 | PM authority/feedback contract; docs leases must be reconciled |
 | ODEE-013 | 2 | 25 | Docs-only provider comparison; no signup, transport, credentials or application changes |
-| ODEE-004 | 3 | 30 | Source-changing shell/client slice; explicit original dirty-path reconciliation and independent role gates remain mandatory |
+| ODEE-004 | 3 | 30 | Source-changing shell/client slice overlaps open PR #15 (`web/src/`, `web/tests/`, auth); first reconcile that candidate and lease the exact net paths |
 
 No successor is declared ready, dispatched, implemented or accepted here.
