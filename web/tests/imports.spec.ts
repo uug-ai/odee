@@ -93,19 +93,16 @@ test('drop a PDF, review beside original, save draft, deduplicate and retain aft
 test('prefill paid-bill lines from invoice totals without importing a payment', async ({
   page,
 }) => {
-  await page.goto('http://localhost:8099/')
+  await page.goto('/')
   await page.getByRole('button', { name: /Open accounting/ }).click()
   await page
     .getByRole('navigation')
     .getByRole('button', { name: /^Bills$/ })
     .click()
   await page.getByLabel('Upload bills').setInputFiles(join(directory, 'paid.pdf'))
-  await expect(page.getByText('Ready for review', { exact: true })).toBeVisible()
-  await page
-    .getByRole('row')
-    .filter({ hasText: 'paid.pdf' })
-    .getByRole('button', { name: 'Review original' })
-    .click()
+  const paidRow = page.getByRole('row').filter({ hasText: 'paid.pdf' })
+  await expect(paidRow.getByText('Ready for review', { exact: true })).toBeVisible()
+  await paidRow.getByRole('button', { name: 'Review original' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByLabel('Line 1 description')).toHaveValue('Managed service')
   await expect(dialog.getByLabel('Line 1 quantity')).toHaveValue('2')
