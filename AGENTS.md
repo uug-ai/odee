@@ -5,8 +5,10 @@ ticket before editing. The [roadmap](docs/roadmap/README.md) defines approved
 product scope. Consult centralized project memory first when available;
 never recreate obsolete local memory.
 
-- Preserve unrelated uncommitted changes. Work in assigned worktrees under
-  `/home/vscode/worktrees/`, not inside the monorepo.
+- Preserve unrelated uncommitted changes. In default ledger mode, work in
+  assigned worktrees under `/home/vscode/worktrees/`, not inside the monorepo.
+  Only after the temporary app-managed fallback is explicitly adopted as
+  described in `docs/agents.md`, use its host-assigned isolated worktree path.
 - Keep Go, React/TypeScript and MongoDB. Extend the existing application with
   bounded vertical slices, not speculative frameworks or a rewrite.
 - Preserve BSON ObjectID ownership. A valid legacy `ownerId` fills missing

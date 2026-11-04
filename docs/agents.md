@@ -459,7 +459,10 @@ Every worker receives:
 
 - Ticket ID and specification revision; allowed outcome and excluded behavior.
 - Current candidate/base SHA, branch, worktree and allowed path prefixes.
-- Absolute shared coordinator control root, not an unrelated per-worker state.
+- In default ledger mode, the absolute shared coordinator control root, not an
+  unrelated per-worker state. In active app-managed fallback mode, the parent
+  Project/session authority and assignment/handoff record instead; do not
+  create a worker ledger or treat a Project ID as a filesystem root.
 - Synthetic data/database/ports, permitted integration mode and test selectors.
 - Required tester roles, expected financial/state results and acceptance cases.
 - A bounded stop condition and known blockers.
