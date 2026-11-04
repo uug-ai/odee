@@ -11,6 +11,118 @@ for (const locale of ['en', 'nl'] as const) {
   const decimal = (en: string, dutch: string) => (locale === 'en' ? en : dutch)
   const money = (en: string, dutch: string) => (locale === 'en' ? en : dutch)
 
+  test(`${locale}: orphaned policy lines and server meaning errors remain unresolved`, async ({
+    page,
+    baseURL,
+  }) => {
+    if (!baseURL) throw new Error('An isolated fixture origin is required')
+    const partner = `Unresolved ${locale} ${randomUUID()}`
+    const created = await page.request.post('/api/documents', {
+      headers: { Origin: new URL(baseURL).origin },
+      data: {
+        kind: 'invoice',
+        partner,
+        email: '',
+        reference: '',
+        date: '2026-11-03',
+        dueDate: '2026-12-03',
+        calculationPolicy: {
+          policyId: 'exact-fixed-v1',
+          schemaVersion: 1,
+          currency: 'EUR',
+          currencyExponent: 2,
+        },
+        lines: [
+          {
+            description: 'Preserved policy line',
+            accountCode: '4000',
+            calculation: {
+              quantityUnits: '3334',
+              unitPriceUnits: '15000',
+              fixedDiscountUnits: '0',
+              percentageDiscountBps: [],
+              taxRateBps: '2100',
+            },
+          },
+        ],
+      },
+    })
+    expect(created.status()).toBe(201)
+    const draft: Document = await created.json()
+    const postedResponse = await page.request.post(`/api/documents/${draft.id}/post`, {
+      headers: { Origin: new URL(baseURL).origin },
+      data: { version: draft.version },
+    })
+    expect(postedResponse.status()).toBe(200)
+    const posted: Document = await postedResponse.json()
+    const before: State = await (await page.request.get('/api/state')).json()
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    const writes: string[] = []
+    page.on('request', (request) => {
+      if (request.method() !== 'GET' && request.url().includes(`/api/documents/${draft.id}`))
+        writes.push(request.url())
+    })
+    await page.addInitScript((value) => localStorage.setItem('odee.locale', value), locale)
+
+    for (const source of [draft, posted]) {
+      for (const history of ['orphaned-lines', 'server-error', 'meaning-error-only'] as const) {
+        const malformed = structuredClone(source)
+        if (history === 'orphaned-lines') {
+          delete malformed.calculationPolicy
+          delete malformed.calculation
+          expect(malformed.lines[0].calculation).toBeDefined()
+        } else {
+          malformed.meaningError = 'calculation policy history is unresolved'
+          if (history === 'meaning-error-only') {
+            delete malformed.calculationPolicy
+            delete malformed.calculation
+            malformed.lines.forEach((line) => delete line.calculation)
+          }
+        }
+        await page.route('**/api/state', async (route) => {
+          const response = await route.fetch()
+          const state: State = await response.json()
+          state.documents = state.documents.map((doc) =>
+            doc.id === malformed.id ? malformed : doc,
+          )
+          await route.fulfill({ response, json: state })
+        })
+        await page.goto('/accounting/invoices')
+        await page.getByRole('button', { name: partner, exact: true }).click()
+        await expect(page.getByRole('alert')).toContainText(
+          l('Calculation policy history is unresolved.'),
+        )
+        const cells = page.getByRole('table').first().locator('tbody td.numeric')
+        await expect(cells).toHaveText(['—', '—', '—', '—'])
+        const totals = page.locator('.detail-totals strong')
+        await expect(totals.nth(0)).toHaveText('—')
+        await expect(totals.nth(1)).toHaveText('—')
+        await expect(totals.nth(2)).toHaveText('—')
+        if (source.status === 'draft') {
+          await expect(
+            page.getByRole('button', { name: l('Edit draft'), exact: true }),
+          ).toBeDisabled()
+          await expect(
+            page.getByRole('button', { name: l('Post document'), exact: true }),
+          ).toBeDisabled()
+        } else {
+          await expect(totals.nth(4)).toHaveText('—')
+          await expect(
+            page.getByRole('button', { name: l('Record payment'), exact: true }),
+          ).toBeDisabled()
+        }
+        await page.unroute('**/api/state')
+      }
+    }
+    expect(writes).toEqual([])
+    expect(errors).toEqual([])
+    const after: State = await (await page.request.get('/api/state')).json()
+    expect(after.documents.find((doc) => doc.id === draft.id)).toEqual(
+      before.documents.find((doc) => doc.id === draft.id),
+    )
+  })
+
   test(`${locale}: exact-policy save, reload, post, payment, and legacy compatibility`, async ({
     page,
   }) => {

@@ -1476,8 +1476,14 @@ function DocumentDetail({
   canPost: boolean
   onAudit?: () => void
 }) {
-  const resolvedPolicy = knownCalculationPolicy(doc)
-  const unresolvedPolicy = Boolean(doc.calculationPolicy || doc.calculation) && !resolvedPolicy
+  const resolvedPolicy = !doc.meaningError && knownCalculationPolicy(doc)
+  const unresolvedPolicy =
+    Boolean(
+      doc.meaningError ||
+      doc.calculationPolicy ||
+      doc.calculation ||
+      doc.lines.some((line) => line.calculation != null),
+    ) && !resolvedPolicy
   return (
     <div className="detail">
       <section className="panel">
@@ -1668,15 +1674,25 @@ function DocumentDetail({
         <div className="detail-totals">
           <div>
             <span>{t('Subtotal')}</span>
-            <strong>{money(resolvedPolicy ? doc.calculation!.netMinor : doc.subtotal)}</strong>
+            <strong>
+              {unresolvedPolicy
+                ? '—'
+                : money(resolvedPolicy ? doc.calculation!.netMinor : doc.subtotal)}
+            </strong>
           </div>
           <div>
             <span>{t('VAT')}</span>
-            <strong>{money(resolvedPolicy ? doc.calculation!.taxMinor : doc.tax)}</strong>
+            <strong>
+              {unresolvedPolicy ? '—' : money(resolvedPolicy ? doc.calculation!.taxMinor : doc.tax)}
+            </strong>
           </div>
           <div className="grand-total">
             <span>{t('Total')}</span>
-            <strong>{money(resolvedPolicy ? doc.calculation!.grossMinor : doc.total)}</strong>
+            <strong>
+              {unresolvedPolicy
+                ? '—'
+                : money(resolvedPolicy ? doc.calculation!.grossMinor : doc.total)}
+            </strong>
           </div>
           {resolvedPolicy &&
             doc.calculation!.taxGroups.map((group) => (
@@ -1699,11 +1715,13 @@ function DocumentDetail({
               <div className="grand-total">
                 <span>{t('Amount due')}</span>
                 <strong>
-                  {money(
-                    resolvedPolicy
-                      ? BigInt(doc.calculation!.grossMinor) - BigInt(doc.paid)
-                      : doc.total - doc.paid,
-                  )}
+                  {unresolvedPolicy
+                    ? '—'
+                    : money(
+                        resolvedPolicy
+                          ? BigInt(doc.calculation!.grossMinor) - BigInt(doc.paid)
+                          : doc.total - doc.paid,
+                      )}
                 </strong>
               </div>
             </>
