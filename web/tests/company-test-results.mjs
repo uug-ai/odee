@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 
 export const mongoSelector = '^(TestMongo|TestSnapshot|TestCompanyProfile|TestReview)'
+export const requiredMongoDiskCases = [
+  'TestMongoDiskPersistence',
+  'TestMongoDocumentVolumeDiskPersistence',
+]
+export const mongoDiskSelector = `^(${requiredMongoDiskCases.join('|')})$`
 export const requiredMongoCases = [
   'TestMongoConfigurationLifecycle',
   'TestMongoConfigurationDurableReassertion',
@@ -11,6 +16,7 @@ export const requiredMongoCases = [
   'TestMongoAuthorizationCanonicalAndLegacyEverySurface',
   'TestMongoContactsPersistenceIsolationAndSources',
   'TestMongoGridFSOriginalsAndOwnership',
+  'TestMongoVolumeCopiesAndSharedGridFS',
   'TestMongoPersistenceIsolationAndAtomicity',
   'TestSnapshotLifecycleMongo',
   'TestSnapshotCanonicalAndLegacyScope/true',
@@ -38,7 +44,7 @@ export function requireMongoResults(events, phase = '') {
     'Go test failure',
   )
   const required = phase
-    ? ['TestMongoDiskPersistence', 'TestMongoDiskPersistence/configuration']
+    ? [...requiredMongoDiskCases, 'TestMongoDiskPersistence/configuration']
     : requiredMongoCases
   for (const name of required)
     assert.ok(
@@ -46,8 +52,8 @@ export function requireMongoResults(events, phase = '') {
       `Required Mongo case did not pass: ${name}`,
     )
   assert.deepEqual(
-    skipped.map((event) => event.Test),
-    phase ? [] : ['TestMongoDiskPersistence'],
+    skipped.map((event) => event.Test).sort(),
+    phase ? [] : [...requiredMongoDiskCases].sort(),
     'Unexpected Mongo fixture skip',
   )
   return {

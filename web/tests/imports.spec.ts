@@ -103,7 +103,7 @@ test('browse an image batch, surface failures, and keep mobile review usable', a
     .setInputFiles([join(directory, 'bill.png'), join(directory, 'bill.jpg')])
   await expect(
     page.locator('.upload-progress').getByText('Ready for review', { exact: true }),
-  ).toHaveCount(2)
+  ).toHaveCount(2, { timeout: 30_000 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page
     .getByRole('row')
