@@ -79,7 +79,10 @@ const test = base.extend<{ local: LocalFixture }>({
       origin = await listen(app)
       transport = await createLocalTransport([origin])
       browser = await transport.launch(chromium)
-      const context = await browser.newContext({ serviceWorkers: 'block' })
+      const context = await browser.newContext({
+        proxy: transport.proxy,
+        serviceWorkers: 'block',
+      })
       await use({ transport, context, origin, trap, trapHits })
       expect(trapHits).toEqual({ requests: 0, connections: 0 })
       expect(transport.connections.every((destination) => destination === origin)).toBe(true)

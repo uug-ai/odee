@@ -193,7 +193,10 @@ async function isolated() {
         ODEE_CAPABILITY_GRANTS: JSON.stringify(grants),
       })
       const revokeOrigin = transport.allowOrigin(origin)
-      const context = await browser.newContext({ serviceWorkers: 'block' })
+      const context = await browser.newContext({
+        proxy: transport.proxy,
+        serviceWorkers: 'block',
+      })
       const page = await context.newPage()
       page.setDefaultTimeout(10000)
       const blockedOrigins = []
