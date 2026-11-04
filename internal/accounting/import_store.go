@@ -76,14 +76,24 @@ type ImportStore interface {
 type MongoImports struct {
 	store  *MongoStore
 	native *mongo.Database
+	disk   *diskOriginals
+}
+
+type storedImport struct {
+	ID       primitive.ObjectID `bson:"_id"`
+	Metadata BillImport         `bson:"metadata"`
 }
 
 func NewMongoImports(ctx context.Context, store *MongoStore) (*MongoImports, error) {
+	return newMongoImports(ctx, store, nil)
+}
+
+func newMongoImports(ctx context.Context, store *MongoStore, disk *diskOriginals) (*MongoImports, error) {
 	client, ok := store.Client.(*database.MongoClient)
 	if !ok {
 		return nil, fmt.Errorf("GridFS requires the native shared MongoDB client")
 	}
-	m := &MongoImports{store, client.Client.Database(store.Name)}
+	m := &MongoImports{store: store, native: client.Client.Database(store.Name), disk: disk}
 	_, err := m.native.Collection("bill_imports.files").Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys: bson.D{{Key: "metadata.organisationId", Value: 1}, {Key: "metadata.projectId", Value: 1}, {Key: "metadata.sha256", Value: 1}},
 		Options: options.Index().SetUnique(true).SetPartialFilterExpression(bson.M{
@@ -96,6 +106,14 @@ func NewMongoImports(ctx context.Context, store *MongoStore) (*MongoImports, err
 		return nil, fmt.Errorf("create bill import duplicate index: %w", err)
 	}
 	return m, nil
+}
+
+func NewFilesystemImports(ctx context.Context, store *MongoStore, directory string) (*MongoImports, error) {
+	disk, err := newDiskOriginals(ctx, directory)
+	if err != nil {
+		return nil, err
+	}
+	return newMongoImports(ctx, store, disk)
 }
 
 func (m *MongoImports) filter(extra bson.M) bson.M {
@@ -111,10 +129,7 @@ func (m *MongoImports) ByHash(ctx context.Context, hash string) (BillImport, err
 }
 
 func (m *MongoImports) find(ctx context.Context, filter bson.M) (BillImport, error) {
-	var file struct {
-		ID       primitive.ObjectID `bson:"_id"`
-		Metadata BillImport         `bson:"metadata"`
-	}
+	var file storedImport
 	err := m.native.Collection("bill_imports.files").FindOne(ctx, m.filter(filter)).Decode(&file)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return BillImport{}, ErrNotFound
@@ -135,10 +150,7 @@ func (m *MongoImports) List(ctx context.Context) ([]BillImport, error) {
 			slog.Error("close import cursor", "error", err)
 		}
 	}()
-	var files []struct {
-		ID       primitive.ObjectID `bson:"_id"`
-		Metadata BillImport         `bson:"metadata"`
-	}
+	var files []storedImport
 	if err := cursor.All(ctx, &files); err != nil {
 		return nil, err
 	}
@@ -184,6 +196,11 @@ func (m *MongoImports) Upload(ctx context.Context, item BillImport, data []byte)
 	if err != nil {
 		return err
 	}
+	if m.disk != nil {
+		if err := m.disk.write(ctx, item, data); err != nil {
+			return err
+		}
+	}
 	err = bucket.UploadFromStreamWithID(item.ID, item.Filename, bytes.NewReader(data), options.GridFSUpload().SetMetadata(item))
 	if err != nil {
 		// Never delete an existing original if a reused ID caused the upload to fail.
@@ -194,6 +211,10 @@ func (m *MongoImports) Upload(ctx context.Context, item BillImport, data []byte)
 			if _, cleanupErr := m.native.Collection("bill_imports.chunks").DeleteMany(ctx, bson.M{"files_id": item.ID}); cleanupErr != nil {
 				slog.Error("clean uncommitted GridFS chunks", "error", cleanupErr)
 			}
+		}
+		if m.disk != nil && !mongo.IsDuplicateKeyError(err) {
+			// An ambiguous acknowledgement must never delete a published volume copy.
+			slog.Error("shared original write failed; volume copy retained for retry/recovery", "import", item.ID.Hex(), "error", err)
 		}
 	}
 	return err
