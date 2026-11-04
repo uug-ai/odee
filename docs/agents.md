@@ -127,7 +127,8 @@ deliverable outcomes; do not manufacture tiny PRs just to increase the count.
 The coordinator publishes branches and manages PRs; feature workers and testers
 retain their existing ownership and cannot merge their own work.
 
-Open a draft once there is a coherent committed candidate. Each PR records:
+Open a draft once there is a coherent committed candidate. Use the
+[repository PR template](../.github/PULL_REQUEST_TEMPLATE.md). Each PR records:
 
 - Ticket ID, specification revision, full candidate SHA and base branch/SHA.
 - User outcome, included/excluded scope, dependencies and linked predecessor PRs.
