@@ -168,8 +168,12 @@ test("overlapping directory/file leases survive QA; segment neighbors do not col
   claim(f, "B");
 });
 
-test("caps of three features and two QA claims, one assignment per worker and ticket", (t) => {
-  const f = fixture(t, ["A", "B", "C", "D"].map((id) => spec(id, { requiredQa: ["qa-api-data", "qa-integration"] })));
+test("caps of three features and four mixed-role QA claims remain independent and durable", (t) => {
+  const f = fixture(t, [
+    ...["A", "B", "C", "D", "E", "F", "G"].map((id) => spec(id, { requiredQa: ["qa-api-data", "qa-integration"] })),
+    spec("overlap", { paths: ["src/A/file"] }),
+    spec("dependent", { dependsOn: ["A"] }),
+  ]);
   f.run("init");
   claim(f, "A");
   claim(f, "B");
@@ -184,13 +188,48 @@ test("caps of three features and two QA claims, one assignment per worker and ti
   for (const [id, number] of [["A", 1], ["B", 2]]) {
     f.run("claim", { ticket: id, worker: `qa-${id}`, revision: 1, kind: "qa", role: "qa-api-data", sha: sha(number) });
   }
+  const legacyState = fs.readFileSync(f.statePath, "utf8");
+  assert.deepEqual(f.run("status").active, { feature: 2, qa: 2 });
+  assert.equal(fs.readFileSync(f.statePath, "utf8"), legacyState, "two-QA version-1 ledgers need no migration");
+  assert.equal(f.state().version, 1);
+  assert.ok(f.run("next", { kind: "qa" }).next);
+  for (const [id, number] of [["A", 1], ["B", 2]]) {
+    f.run("claim", { ticket: id, worker: `integration-${id}`, revision: 1, kind: "qa", role: "qa-integration", sha: sha(number) });
+  }
+  submit(f, "C", 3);
+  claim(f, "E");
+  claim(f, "F");
+  assert.deepEqual(f.run("status").active, { feature: 3, qa: 4 });
+  assert.equal(f.run("next").next, null);
+  code("CAPACITY", () => claim(f, "G"));
+  assert.ok(f.run("status").leaves.blocked.find((entry) => entry.ticket === "G").blockers.includes("feature-capacity"));
   assert.equal(f.run("next", { kind: "qa" }).next, null);
-  code("CAPACITY", () => f.run("claim", { ticket: "A", worker: "third-qa", revision: 1, kind: "qa", role: "qa-integration", sha: sha(1) }));
+  const fifth = { ticket: "C", worker: "fifth-qa", revision: 1, kind: "qa", role: "qa-api-data", sha: sha(3) };
+  code("CAPACITY", () => f.run("claim", fifth));
+  code("WORKER_BUSY", () => f.run("claim", { ...fifth, worker: "feature-D" }));
+  code("WORKER_BUSY", () => f.run("claim", { ...fifth, worker: "qa-A" }));
+  const fullState = fs.readFileSync(f.statePath, "utf8");
+  const corrupt = JSON.parse(fullState);
+  corrupt.tickets.C.qa["qa-api-data"] = { ...corrupt.tickets.A.qa["qa-api-data"], worker: "fifth-qa", sha: sha(3) };
+  corrupt.tickets.C.status = "testing";
+  fs.writeFileSync(f.statePath, JSON.stringify(corrupt));
+  code("CORRUPT_STATE", () => f.run("status"));
+  fs.writeFileSync(f.statePath, fullState);
   f.run("verdict", { ticket: "A", worker: "qa-A", role: "qa-api-data", revision: 1, sha: sha(1), result: "PASS", evidence });
+  code("SELF_QA", () => f.run("claim", { ...fifth, worker: "feature-C" }));
+  code("QA_NOT_READY", () => f.run("claim", { ...fifth, ticket: "B", sha: sha(2) }));
+  submit(f, "D", 4);
+  code("PATH_COLLISION", () => claim(f, "overlap"));
+  code("DEPENDENCIES_UNMET", () => claim(f, "dependent"));
   const next = f.run("next", { kind: "qa", role: "qa-integration", worker: "qa-A" }).next;
-  assert.equal(next.ticket.id, "A");
+  assert.equal(next.ticket.id, "C");
   assert.equal(next.role, "qa-integration");
+  f.run("claim", fifth);
+  assert.deepEqual(f.run("status").active, { feature: 2, qa: 4 });
   code("QA_GATE", () => f.run("gate", { ticket: "A", revision: 1, sha: sha(1) }));
+  const help = f.subprocess("--help");
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /Feature claims: max 3; QA claims: max 4;/);
 });
 
 test("independent exact-SHA and revision verdict contract", (t) => {

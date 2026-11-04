@@ -10,7 +10,10 @@
 | Expert tester | Independent expected results, reproduction, tests and PASS/FAIL/BLOCKED evidence | Quietly changing production code or weakening acceptance |
 
 Use the [roadmap and backlog](roadmap/README.md). The default capacity is three
-feature workers and two testers. PM checkpoints are bounded planning jobs, not
+feature workers and four independent testers. The increased QA cap applies only
+after independent acceptance and verified adoption of the updated scheduler in
+the shared control root; until then, retain the previous two-tester cap. PM
+checkpoints are bounded planning jobs, not
 an additional permanent implementation worker. Do not launch all named
 specialists at once or nest uncontrolled agent trees.
 
