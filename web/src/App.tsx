@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import {
   ViewGrid as Apps,
   ArrowLeft,
@@ -11,7 +20,6 @@ import {
   CreditCard,
   Download,
   GraphUp,
-  HomeSimple,
   Plus,
   RefreshDouble,
   Search,
@@ -42,22 +50,15 @@ import type {
   ReviewOptions,
   Session,
   State,
-  View,
 } from './types'
 import { BillImports, OriginalPreview } from './BillImports'
-import { Contacts } from './Contacts'
 import { Modal } from './Modal'
+import { AppLauncher } from './AppLauncher'
+import { createAPIRequest } from './api'
+import { defaultView, moduleForView, navigation, views } from './modules'
+import { githubSignInPath, useWorkspaceRoute } from './routing'
+import { RouteNotFound } from './RouteNotFound'
 
-const titles: Record<View, string> = {
-  apps: 'Your workspace',
-  contacts: 'Contacts',
-  dashboard: 'Dashboard',
-  invoices: 'Customer invoices',
-  bills: 'Vendor bills',
-  journal: 'Journal entries',
-  accounts: 'Chart of accounts',
-  reports: 'Trial balance',
-}
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'An unexpected error occurred.'
 
@@ -81,7 +82,6 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const csrf = useRef('')
   const generation = useRef(0)
-  const [view, setView] = useState<View>('apps')
   const [selected, setSelected] = useState<string | null>(null)
   const [editor, setEditor] = useState<Kind | Document | null>(null)
   const [review, setReview] = useState<BillImport | null>(null)
@@ -98,8 +98,7 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
 
-  const clearWorkspace = useCallback(() => {
-    setState(null)
+  const clearTransient = useCallback(() => {
     setSelected(null)
     setEditor(null)
     setReview(null)
@@ -107,8 +106,15 @@ export default function App() {
     setPayment(null)
     setPosting(null)
     setNotice('')
-    setView('apps')
+    setQuery('')
+    setFilter('All')
   }, [])
+  const { view, navigate, routeKey, routeVersion } = useWorkspaceRoute(clearTransient)
+
+  const clearWorkspace = useCallback(() => {
+    setState(null)
+    clearTransient()
+  }, [clearTransient])
 
   const expireSession = useCallback(() => {
     generation.current++
@@ -121,39 +127,15 @@ export default function App() {
     )
   }, [clearWorkspace])
 
-  const request = useCallback(
-    async <T,>(path: string, body?: unknown, method = 'POST'): Promise<T> => {
-      const requestGeneration = generation.current
-      const response = await fetch(`/api/${path}`, {
-        method: body === undefined ? 'GET' : method,
-        credentials: 'same-origin',
-        headers: {
-          ...(body !== undefined && csrf.current ? { 'X-CSRF-Token': csrf.current } : {}),
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(body === undefined || body instanceof FormData
-            ? {}
-            : { 'Content-Type': 'application/json' }),
-        },
-        ...(body === undefined
-          ? {}
-          : { body: body instanceof FormData ? body : JSON.stringify(body) }),
-      })
-      const unauthorized = response.status === 401 && requestGeneration === generation.current
-      if (unauthorized) expireSession()
-      if (!response.ok) {
-        const data: unknown = await response.json()
-        const message =
-          typeof data === 'object' &&
-          data !== null &&
-          'error' in data &&
-          typeof data.error === 'string'
-            ? data.error
-            : `Request failed (${response.status}).`
-        if (unauthorized) setError(message)
-        throw new Error(message)
-      }
-      return response.status === 204 ? (undefined as T) : response.json()
-    },
+  const request = useMemo(
+    () =>
+      createAPIRequest({
+        token,
+        csrfToken: () => csrf.current,
+        generation: () => generation.current,
+        onUnauthorized: expireSession,
+        onUnauthorizedError: setError,
+      }),
     [token, expireSession],
   )
 
@@ -204,14 +186,8 @@ export default function App() {
     }
   }
 
-  function navigate(next: View) {
-    setView(next)
-    setSelected(null)
-    setQuery('')
-    setFilter('All')
-    setNotice('')
-  }
   async function mutate(action: () => Promise<Document>, message: string) {
+    const mutationRoute = routeVersion.current
     setBusy(true)
     setError('')
     setNotice('')
@@ -224,6 +200,7 @@ export default function App() {
             documents: [...current.documents.filter((d) => d.id !== doc.id), doc],
           },
       )
+      if (mutationRoute !== routeVersion.current) return true
       setSelected(doc.id)
       setEditor(null)
       setReview(null)
@@ -232,7 +209,7 @@ export default function App() {
       setNotice(message)
       return true
     } catch (error) {
-      setError(errorMessage(error))
+      if (mutationRoute === routeVersion.current) setError(errorMessage(error))
       return false
     } finally {
       setBusy(false)
@@ -265,14 +242,9 @@ export default function App() {
     )
     .filter((d) => filter === 'All' || label(d) === filter)
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
-  const navItems: { view: View; icon: ReactNode; label: string; group?: string }[] = [
-    { view: 'dashboard', icon: <HomeSimple />, label: 'Overview' },
-    { view: 'invoices', icon: <CreditCard />, label: 'Invoices', group: 'CUSTOMERS' },
-    { view: 'bills', icon: <Wallet />, label: 'Bills', group: 'VENDORS' },
-    { view: 'journal', icon: <Book />, label: 'Journal entries', group: 'ACCOUNTING' },
-    { view: 'accounts', icon: <Building />, label: 'Chart of accounts' },
-    { view: 'reports', icon: <GraphUp />, label: 'Trial balance', group: 'REPORTING' },
-  ]
+  const currentModule = view === null ? undefined : moduleForView(view)
+  const ModuleIcon = currentModule?.icon
+  const RegisteredView = view === null || view === 'apps' ? undefined : views[view].component
 
   function downloadReport() {
     if (!state) return
@@ -317,10 +289,10 @@ export default function App() {
           <span className="brand-divider" />
           <button
             className="app-switch"
-            onClick={() => navigate(view === 'apps' ? 'dashboard' : 'apps')}
+            onClick={() => navigate(view === 'apps' ? defaultView : 'apps')}
           >
             <Apps />
-            {view === 'apps' ? 'Workspace' : view === 'contacts' ? 'Contacts' : 'Accounting'}
+            {currentModule?.name ?? 'Workspace'}
           </button>
         </div>
         <div className="topbar-right">
@@ -353,45 +325,36 @@ export default function App() {
             : 'Local development · MongoDB connected · authentication disabled'}
         </div>
       )}
-      <div className={`layout ${view === 'apps' ? 'launcher-layout' : ''}`}>
-        {view !== 'apps' && (
+      <div className={`layout ${view === null || view === 'apps' ? 'launcher-layout' : ''}`}>
+        {currentModule && (
           <aside className="sidebar">
             <div className="sidebar-app">
-              <div className="app-icon small">{view === 'contacts' ? <Building /> : <Book />}</div>
+              <div className="app-icon small">{ModuleIcon && <ModuleIcon />}</div>
               <div>
-                <strong>{view === 'contacts' ? 'Contacts' : 'Accounting'}</strong>
-                <span>
-                  {view === 'contacts' ? 'Your business relationships' : 'Your financial workspace'}
-                </span>
+                <strong>{currentModule?.name}</strong>
+                <span>{currentModule?.workspaceDescription}</span>
               </div>
             </div>
-            <nav
-              aria-label={view === 'contacts' ? 'Workspace navigation' : 'Accounting navigation'}
-            >
-              {navItems.map((item) => (
-                <div key={item.view}>
-                  {item.group && <div className="nav-group">{item.group}</div>}
-                  <button
-                    className={view === item.view ? 'nav-item active' : 'nav-item'}
-                    aria-current={view === item.view ? 'page' : undefined}
-                    onClick={() => navigate(item.view)}
-                  >
-                    {item.icon}
-                    {item.label}
-                    {item.view === 'invoices' && (
-                      <span className="nav-count">{invoices.length}</span>
-                    )}
-                  </button>
-                </div>
-              ))}
-              <div className="nav-group">WORKSPACE</div>
-              <button
-                className={view === 'contacts' ? 'nav-item active' : 'nav-item'}
-                onClick={() => navigate('contacts')}
-              >
-                <Building />
-                Contacts
-              </button>
+            <nav aria-label={currentModule?.navigationLabel}>
+              {navigation.map((item) => {
+                const Container = item.standalone ? Fragment : 'div'
+                return (
+                  <Container key={item.view}>
+                    {item.group && <div className="nav-group">{item.group}</div>}
+                    <button
+                      className={view === item.view ? 'nav-item active' : 'nav-item'}
+                      aria-current={!item.standalone && view === item.view ? 'page' : undefined}
+                      onClick={() => navigate(item.view)}
+                    >
+                      <item.icon />
+                      {item.label}
+                      {item.view === 'invoices' && (
+                        <span className="nav-count">{invoices.length}</span>
+                      )}
+                    </button>
+                  </Container>
+                )
+              })}
             </nav>
             <div className="sidebar-footer">
               <div className="status-dot" />
@@ -425,7 +388,9 @@ export default function App() {
               {notice}
             </div>
           )}
-          {session?.authMode === 'github' && !session.authenticated ? (
+          {view === null ? (
+            <RouteNotFound onLauncher={() => navigate('apps')} />
+          ) : session?.authMode === 'github' && !session.authenticated ? (
             <div className="login panel">
               <ShieldCheck />
               <h1>Your workspace, protected.</h1>
@@ -436,7 +401,7 @@ export default function App() {
                 </strong>
                 .
               </p>
-              <a className="button primary" href="/auth/github">
+              <a className="button primary" href={githubSignInPath(view)}>
                 Sign in with GitHub <ArrowRight />
               </a>
             </div>
@@ -486,70 +451,14 @@ export default function App() {
               )}
             </div>
           ) : view === 'apps' ? (
-            <div className="launcher">
-              <div className="eyebrow">ODEE / WORKSPACE</div>
-              <h1>Good work starts here.</h1>
-              <p className="lead">One workspace for your business. Open by design.</p>
-              <div className="launcher-grid">
-                <button className="tile enabled" onClick={() => navigate('dashboard')}>
-                  <div className="app-icon">
-                    <Book />
-                  </div>
-                  <h2>Accounting</h2>
-                  <p>Invoices, bills & your books.</p>
-                  <span className="tile-link">
-                    Open accounting <ArrowRight />
-                  </span>
-                </button>
-                <button className="tile enabled" onClick={() => navigate('contacts')}>
-                  <div className="app-icon contacts-icon">
-                    <Building />
-                  </div>
-                  <h2>Contacts</h2>
-                  <p>Your business relationships.</p>
-                  <span className="tile-link">
-                    Open contacts <ArrowRight />
-                  </span>
-                </button>
-                {[
-                  ['Sales', 'From opportunity to order', <GraphUp />],
-                  ['Projects', 'Make room for great work', <CheckCircle />],
-                  ['Inventory', 'Everything in its place', <Apps />],
-                ].map(([name, description, icon]) => (
-                  <div className="tile planned" key={String(name)}>
-                    <div className="planned-icon">{icon}</div>
-                    <h2>{name}</h2>
-                    <p>{description}</p>
-                    <span className="badge">Planned</span>
-                  </div>
-                ))}
-              </div>
-              <div className="launcher-note">
-                <ShieldCheck />
-                <div>
-                  <strong>Built on open foundations.</strong>
-                  <p>MongoDB-backed accounting. No hidden spreadsheets, no vendor lock-in.</p>
-                </div>
-                <span>v0.1</span>
-              </div>
-            </div>
-          ) : view === 'contacts' ? (
-            <Contacts
-              items={state.contacts ?? []}
+            <AppLauncher onNavigate={navigate} />
+          ) : RegisteredView ? (
+            <RegisteredView
+              key={routeKey}
+              state={state}
               request={request}
               onRefresh={refresh}
-              onChange={(contact) =>
-                setState(
-                  (current) =>
-                    current && {
-                      ...current,
-                      contacts: [
-                        ...current.contacts.filter((item) => item.id !== contact.id),
-                        contact,
-                      ],
-                    },
-                )
-              }
+              onStateChange={setState}
             />
           ) : (
             <>
@@ -558,7 +467,7 @@ export default function App() {
                 <span>/</span>
                 <span>Accounting</span>
                 <span>/</span>
-                <span>{doc ? doc.partner : titles[view]}</span>
+                <span>{doc ? doc.partner : views[view].title}</span>
               </div>
               <div className="page-heading">
                 <div>
@@ -569,7 +478,7 @@ export default function App() {
                         : 'VENDOR BILL'
                       : 'ACCOUNTING'}
                   </div>
-                  <h1>{doc ? doc.partner : titles[view]}</h1>
+                  <h1>{doc ? doc.partner : views[view].title}</h1>
                   <p>
                     {doc
                       ? doc.number
@@ -735,7 +644,7 @@ export default function App() {
                                 key={d.id}
                                 className="recent-row"
                                 onClick={() => {
-                                  setView(d.kind === 'bill' ? 'bills' : 'invoices')
+                                  navigate(d.kind === 'bill' ? 'bills' : 'invoices')
                                   setSelected(d.id)
                                 }}
                               >

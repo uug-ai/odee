@@ -1,6 +1,5 @@
 export type Kind = 'invoice' | 'bill'
-export type View =
-  'apps' | 'contacts' | 'dashboard' | 'invoices' | 'bills' | 'journal' | 'accounts' | 'reports'
+export type { View } from './modules'
 export interface Line {
   description: string
   quantity: number
