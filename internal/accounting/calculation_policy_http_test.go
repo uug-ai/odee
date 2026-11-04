@@ -203,6 +203,38 @@ func TestCalculationPolicyAPIRejectsPaymentForUnknownHistory(t *testing.T) {
 	}
 }
 
+func TestCalculationPolicyAPIMissingMetadataWithPolicyLinesIsUnresolved(t *testing.T) {
+	store := NewMemoryStore()
+	doc := versionedPostedPolicyDocument(t)
+	doc.CalculationPolicy, doc.Calculation = nil, nil
+	if err := store.Create(t.Context(), doc); err != nil {
+		t.Fatal(err)
+	}
+	before, err := store.Get(t.Context(), doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, call := configHTTP(t, store)
+	state := call(http.MethodGet, "/api/state", nil, http.StatusOK)
+	var response struct {
+		Documents []Document `json:"documents"`
+	}
+	if err := json.Unmarshal(state.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Documents) != 1 || response.Documents[0].MeaningError == "" ||
+		response.Documents[0].FinancialMeaning != nil {
+		t.Fatalf("policy-line history was displayed as understood: %s", state.Body)
+	}
+	call(http.MethodPost, "/api/documents/"+doc.ID.Hex()+"/payments",
+		map[string]any{"version": doc.Version, "id": "blocked", "date": doc.Date, "amount": 1},
+		http.StatusUnprocessableEntity)
+	after, err := store.Get(t.Context(), doc.ID)
+	if err != nil || !reflect.DeepEqual(before, after) {
+		t.Fatalf("unresolved policy-line history was mutated: %v", err)
+	}
+}
+
 func TestLegacyCalculationAndPaymentRemainUnchanged(t *testing.T) {
 	input := draft("invoice")
 	input.Lines = []Line{

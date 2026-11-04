@@ -296,7 +296,7 @@ func (d *Document) RecordPayment(payment Payment) error {
 	if d.Status != "posted" {
 		return invalid("payments require a posted document with an outstanding balance")
 	}
-	if (d.CalculationPolicy != nil || d.Calculation != nil) && !recognizedCalculationPolicy(*d) {
+	if d.hasCalculationPolicyData() && !recognizedCalculationPolicy(*d) {
 		return invalid("calculation policy history is unresolved")
 	}
 	if len(d.Payments) >= 200 {

@@ -73,7 +73,7 @@ func configuredEntries(kind string, total, subtotal, tax int64, data Configurati
 	return entries
 }
 func legacyShape(d Document) bool {
-	if d.CalculationPolicy != nil || d.Calculation != nil {
+	if d.hasCalculationPolicyData() {
 		return false
 	}
 	if d.ConfigurationSelection != nil {
@@ -181,7 +181,7 @@ func (d Document) snapshot(data ConfigurationData) (*FinancialSnapshot, error) {
 	return frozen, nil
 }
 func (d Document) frozenConfiguration() (ConfigurationData, error) {
-	if (d.CalculationPolicy != nil || d.Calculation != nil) && !recognizedCalculationPolicy(d) {
+	if d.hasCalculationPolicyData() && !recognizedCalculationPolicy(d) {
 		return ConfigurationData{}, invalid("calculation policy history is unresolved")
 	}
 	if d.FinancialSnapshot == nil {

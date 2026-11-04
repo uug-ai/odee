@@ -223,6 +223,13 @@ func TestCalculationPolicyUnknownHistoryOnVersionedSnapshotIsUnresolved(t *testi
 				doc.CalculationPolicy = nil
 			},
 		},
+		{
+			name: "missing policy and result with retained policy lines",
+			mutate: func(doc *Document) {
+				doc.CalculationPolicy = nil
+				doc.Calculation = nil
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -231,8 +238,12 @@ func TestCalculationPolicyUnknownHistoryOnVersionedSnapshotIsUnresolved(t *testi
 				t.Fatal("fixture is not bound to a non-starter versioned snapshot")
 			}
 			test.mutate(&doc)
+			beforeRecognition := clone(doc)
 			if _, err := doc.frozenConfiguration(); !errors.Is(err, ErrInvalid) {
 				t.Fatalf("malformed calculation history was accepted: %v", err)
+			}
+			if !reflect.DeepEqual(beforeRecognition, clone(doc)) {
+				t.Fatal("unresolved policy recognition mutated the document")
 			}
 			doc.displayFinancialMeaning()
 			if doc.MeaningError == "" || doc.FinancialMeaning != nil {

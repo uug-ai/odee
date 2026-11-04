@@ -276,6 +276,18 @@ func sameCalculationPolicy(a, b CalculationPolicyMetadata) bool {
 	return a == b
 }
 
+func (d Document) hasCalculationPolicyData() bool {
+	if d.CalculationPolicy != nil || d.Calculation != nil {
+		return true
+	}
+	for _, line := range d.Lines {
+		if line.Calculation != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func recognizedCalculationPolicy(doc Document) bool {
 	if doc.CalculationPolicy == nil || doc.Calculation == nil ||
 		doc.CalculationPolicy.PolicyID != CalculationPolicyID ||
