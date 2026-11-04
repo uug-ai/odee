@@ -124,9 +124,12 @@ Normal `npm --prefix web run test:mongo` also provisions an isolated disposable
 MongoDB and executes `^(TestMongo|TestSnapshot|TestCompanyProfile|TestReview)`.
 It verifies passing JSON test events for the historical Mongo tests and the
 required persistent snapshot/profile/review branches, rejecting unexpected
-fixture skips. The initial matrix explicitly skips only `TestMongoDiskPersistence`
-because that test requires a phase; the runner then requires its real `write`
-and `read` passes on either side of an actual MongoDB daemon disk restart.
+fixture skips. The matrix also requires the shared-GridFS/volume-copy regression.
+It explicitly skips only `TestMongoDiskPersistence` and
+`TestMongoDocumentVolumeDiskPersistence` because these require a phase; the runner
+then requires **both** tests' real `write` and `read` passes on either side of an
+actual MongoDB daemon disk restart. The owned originals directory is retained
+through both phases. Missing or skipped disk fixtures fail the result gate.
 JSON events and a selected-case summary remain under the printed ignored
 `.local-data/mongo/<run>/` path. No inherited application/database credentials
 or caller database URI are used.
