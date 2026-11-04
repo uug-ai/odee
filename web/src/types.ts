@@ -62,12 +62,30 @@ export interface State {
   contacts: Contact[]
 }
 export interface Session {
-  authMode: 'github' | 'token'
+  authMode: 'github' | 'token' | 'development'
   authenticated: boolean
+  access?: {
+    principal: string
+    authorizationMode: 'compatibility' | 'enforced'
+    companyId: string
+    member: boolean
+    capabilities: Capability[]
+  }
   organisation?: string
   team?: string
   csrfToken?: string
   user?: { id: number; login: string; name: string }
+}
+export type Capability = 'read' | 'write' | 'post' | 'admin'
+export interface FinancialEvent {
+  id: string
+  time: string
+  actorType: 'github' | 'token' | 'development'
+  principal: string
+  action: 'document.post' | 'manual-payment.record'
+  targetId: string
+  version: number
+  outcome: 'committed'
 }
 export interface BillImport {
   id: string

@@ -17,38 +17,40 @@ import (
 )
 
 type Server struct {
-	Store       Store
-	Company     primitive.ObjectID
-	Name        string
-	Token       string
-	Origin      string
-	Demo        bool
-	Dev         bool
-	Auth        *GitHubAuth
-	Imports     ImportStore
-	Scanner     *Scanner
-	Contacts    ContactStore
-	uploadSlots chan struct{}
+	Store         Store
+	Company       primitive.ObjectID
+	Name          string
+	Token         string
+	Origin        string
+	Demo          bool
+	Dev           bool
+	Auth          *GitHubAuth
+	Authorization *Authorization
+	Imports       ImportStore
+	Scanner       *Scanner
+	Contacts      ContactStore
+	uploadSlots   chan struct{}
 }
 
 func (s *Server) Handler() http.Handler {
 	s.uploadSlots = make(chan struct{}, 2)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/state", s.state)
-	mux.HandleFunc("GET /api/contacts", s.listContacts)
-	mux.HandleFunc("POST /api/contacts", s.createContact)
-	mux.HandleFunc("PUT /api/contacts/{id}", s.editContact)
-	mux.HandleFunc("POST /api/contacts/import", s.importContacts)
-	mux.HandleFunc("POST /api/documents", s.create)
-	mux.HandleFunc("PUT /api/documents/{id}", s.edit)
-	mux.HandleFunc("POST /api/documents/{id}/post", s.post)
-	mux.HandleFunc("POST /api/documents/{id}/payments", s.payment)
-	mux.HandleFunc("POST /api/imports", s.uploadBill)
-	mux.HandleFunc("GET /api/imports/{id}", s.getImport)
-	mux.HandleFunc("GET /api/imports/{id}/original", s.original)
-	mux.HandleFunc("GET /api/imports/{id}/preview", s.preview)
-	mux.HandleFunc("POST /api/imports/{id}/scan", s.rescan)
-	mux.HandleFunc("POST /api/imports/{id}/draft", s.importDraft)
+	mux.HandleFunc("GET /api/state", s.require(s.state, Read))
+	mux.HandleFunc("GET /api/contacts", s.require(s.listContacts, Read))
+	mux.HandleFunc("POST /api/contacts", s.require(s.createContact, Read, Write))
+	mux.HandleFunc("PUT /api/contacts/{id}", s.require(s.editContact, Read, Write))
+	mux.HandleFunc("POST /api/contacts/import", s.require(s.importContacts, Read, Write))
+	mux.HandleFunc("POST /api/documents", s.require(s.create, Read, Write))
+	mux.HandleFunc("PUT /api/documents/{id}", s.require(s.edit, Read, Write))
+	mux.HandleFunc("POST /api/documents/{id}/post", s.require(s.post, Read, Post))
+	mux.HandleFunc("POST /api/documents/{id}/payments", s.require(s.payment, Read, Post))
+	mux.HandleFunc("GET /api/documents/{id}/audit", s.require(s.audit, Read, Admin))
+	mux.HandleFunc("POST /api/imports", s.require(s.uploadBill, Read, Write))
+	mux.HandleFunc("GET /api/imports/{id}", s.require(s.getImport, Read))
+	mux.HandleFunc("GET /api/imports/{id}/original", s.require(s.original, Read))
+	mux.HandleFunc("GET /api/imports/{id}/preview", s.require(s.preview, Read))
+	mux.HandleFunc("POST /api/imports/{id}/scan", s.require(s.rescan, Read, Write))
+	mux.HandleFunc("POST /api/imports/{id}/draft", s.require(s.importDraft, Read, Write))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -57,9 +59,7 @@ func (s *Server) Handler() http.Handler {
 				return
 			}
 		} else if !s.Dev {
-			expected := sha256.Sum256([]byte(s.Token))
-			actual := sha256.Sum256([]byte(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")))
-			if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") || subtle.ConstantTimeCompare(expected[:], actual[:]) != 1 {
+			if !s.validToken(r) {
 				reply(w, http.StatusUnauthorized, map[string]string{"error": "Enter the company access token to continue."})
 				return
 			}
@@ -92,6 +92,12 @@ func (s *Server) Handler() http.Handler {
 	})
 }
 
+func (s *Server) validToken(r *http.Request) bool {
+	expected := sha256.Sum256([]byte(s.Token))
+	actual := sha256.Sum256([]byte(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")))
+	return s.Token != "" && strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") && subtle.ConstantTimeCompare(expected[:], actual[:]) == 1
+}
+
 func reply(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -110,6 +116,12 @@ func apiError(w http.ResponseWriter, err error) {
 		status, message = http.StatusNotFound, err.Error()
 	case errors.Is(err, ErrConflict):
 		status, message = http.StatusConflict, err.Error()
+	case errors.Is(err, ErrUncertain):
+		reply(w, http.StatusServiceUnavailable, map[string]string{
+			"error": ErrUncertain.Error(), "code": "reconciliation_required",
+		})
+		slog.Error("accounting write requires reconciliation", "error", err)
+		return
 	default:
 		slog.Error("accounting request failed", "error", err)
 	}
@@ -141,6 +153,14 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 		apiError(w, err)
 		return
 	}
+	scoped := make([]Document, 0, len(docs))
+	for _, doc := range docs {
+		doc.NormalizeOwnership()
+		if doc.OrganisationID == s.Company && doc.ProjectID == s.Company {
+			scoped = append(scoped, doc)
+		}
+	}
+	docs = scoped
 	imports := []BillImport{}
 	contacts := []Contact{}
 	if s.Contacts != nil {
@@ -200,6 +220,11 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request, version int64) (Do
 		apiError(w, err)
 		return Document{}, false
 	}
+	doc.NormalizeOwnership()
+	if doc.OrganisationID != s.Company || doc.ProjectID != s.Company {
+		apiError(w, ErrNotFound)
+		return Document{}, false
+	}
 	if version < 1 || version != doc.Version {
 		apiError(w, ErrConflict)
 		return Document{}, false
@@ -245,6 +270,9 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) {
 	doc, ok := s.load(w, r, input.Version)
 	if ok {
 		err := doc.Post()
+		if err == nil {
+			err = doc.attribute(r.Context(), "document.post")
+		}
 		s.save(w, r, doc, err)
 	}
 }
@@ -263,6 +291,9 @@ func (s *Server) payment(w http.ResponseWriter, r *http.Request) {
 	doc, ok := s.load(w, r, input.Version)
 	if ok {
 		err := doc.RecordPayment(Payment{ID: input.ID, Date: input.Date, Amount: input.Amount, Reference: input.Reference})
+		if err == nil {
+			err = doc.attribute(r.Context(), "manual-payment.record")
+		}
 		s.save(w, r, doc, err)
 	}
 }

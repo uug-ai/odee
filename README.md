@@ -384,3 +384,8 @@ warnings, failed-scan manual drafts, previews and original downloads after
 posting. `test:scans` generates synthetic PNG/JPEG/image-only and hybrid PDF
 fixtures locally, and asserts actual OCR fields and exact integer totals. Poppler/Tesseract and
 configured language packs are required. No real financial records are fixtures.
+## Permissions
+
+See [company permissions and financial attribution](docs/permissions.md) for
+compatibility/enforced modes, startup grant validation, the exhaustive route
+matrix, standalone-Mongo atomic audit, reconciliation and the human rollout gate.

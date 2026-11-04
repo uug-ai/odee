@@ -17,13 +17,15 @@ export interface ModuleProps {
   request: APIRequest
   onRefresh: () => Promise<void>
   onStateChange: Dispatch<SetStateAction<State | null>>
+  canWrite?: boolean
 }
 
-function ContactsView({ state, request, onRefresh, onStateChange }: ModuleProps) {
+function ContactsView({ state, request, onRefresh, onStateChange, canWrite = false }: ModuleProps) {
   return createElement(Contacts, {
     items: state.contacts ?? [],
     request,
     onRefresh,
+    canWrite,
     onChange: (contact) =>
       onStateChange(
         (current) =>

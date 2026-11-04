@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	ErrInvalid  = errors.New("invalid accounting input")
-	ErrNotFound = errors.New("document not found")
-	ErrConflict = errors.New("document changed; refresh before trying again")
+	ErrInvalid   = errors.New("invalid accounting input")
+	ErrNotFound  = errors.New("document not found")
+	ErrConflict  = errors.New("document changed; refresh before trying again")
+	ErrUncertain = errors.New("write outcome uncertain; reconcile the document and its financial history before retrying")
 )
 
 const MaxAmount int64 = 1_000_000_000_000
@@ -83,6 +84,9 @@ type Document struct {
 	Payments       []Payment           `json:"payments" bson:"payments"`
 	CreatedAt      time.Time           `json:"createdAt" bson:"createdAt"`
 	UpdatedAt      time.Time           `json:"updatedAt" bson:"updatedAt"`
+
+	FinancialEvents []FinancialEvent `json:"-" bson:"financialEvents,omitempty"`
+	pendingEvent    *FinancialEvent
 }
 
 type Draft struct {

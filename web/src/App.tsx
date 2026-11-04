@@ -50,11 +50,13 @@ import type {
   ReviewOptions,
   Session,
   State,
+  FinancialEvent,
 } from './types'
 import { BillImports, OriginalPreview } from './BillImports'
 import { Modal } from './Modal'
 import { AppLauncher } from './AppLauncher'
-import { createAPIRequest } from './api'
+import { createAPIRequest, responseStatus } from './api'
+import { can } from './permissions'
 import { defaultView, moduleForView, navigation, views } from './modules'
 import { githubSignInPath, useWorkspaceRoute } from './routing'
 import { RouteNotFound } from './RouteNotFound'
@@ -97,6 +99,11 @@ export default function App() {
   const [notice, setNotice] = useState('')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
+  const [forbidden, setForbidden] = useState(false)
+  const [audit, setAudit] = useState<FinancialEvent[] | null>(null)
+  const canWrite = can(session, 'read', 'write')
+  const canPost = can(session, 'read', 'post')
+  const canAudit = can(session, 'read', 'admin')
 
   const clearTransient = useCallback(() => {
     setSelected(null)
@@ -108,6 +115,7 @@ export default function App() {
     setNotice('')
     setQuery('')
     setFilter('All')
+    setAudit(null)
   }, [])
   const { view, navigate, routeKey, routeVersion } = useWorkspaceRoute(clearTransient)
 
@@ -122,6 +130,7 @@ export default function App() {
     clearWorkspace()
     setLoading(false)
     setNeedsToken(true)
+    setForbidden(false)
     setSession((current) =>
       current ? { ...current, authenticated: false, user: undefined, csrfToken: undefined } : null,
     )
@@ -143,6 +152,7 @@ export default function App() {
     const requestID = ++generation.current
     setLoading(true)
     setError('')
+    setForbidden(false)
     try {
       const current = await request<Session>('session')
       if (requestID !== generation.current) return
@@ -158,7 +168,14 @@ export default function App() {
       setState(loaded)
       setNeedsToken(false)
     } catch (error) {
-      if (requestID === generation.current) setError(errorMessage(error))
+      if (requestID === generation.current) {
+        setError(errorMessage(error))
+        if (responseStatus(error) === 403) {
+          clearWorkspace()
+          setNeedsToken(false)
+          setForbidden(true)
+        }
+      }
     } finally {
       if (requestID === generation.current) setLoading(false)
     }
@@ -435,6 +452,18 @@ export default function App() {
                 </button>
               </form>
             </div>
+          ) : forbidden ? (
+            <section className="empty" aria-labelledby="forbidden-heading">
+              <ShieldCheck />
+              <h1 id="forbidden-heading">Access forbidden / Toegang geweigerd</h1>
+              <p>
+                You are still signed in. Ask your administrator for company membership and read
+                access. Je bent nog aangemeld; vraag je beheerder om toegang.
+              </p>
+              <button className="button secondary" onClick={() => void refresh()}>
+                Refresh permissions / Rechten vernieuwen
+              </button>
+            </section>
           ) : !state ? (
             <div className="empty">
               <h1>{loading ? 'Opening your workspace…' : 'Unable to open workspace'}</h1>
@@ -459,6 +488,7 @@ export default function App() {
               request={request}
               onRefresh={refresh}
               onStateChange={setState}
+              canWrite={canWrite}
             />
           ) : (
             <>
@@ -515,6 +545,7 @@ export default function App() {
                     (view === 'dashboard' || view === 'invoices' || view === 'bills') && (
                       <button
                         className="button primary"
+                        disabled={!canWrite}
                         onClick={() => setEditor(view === 'bills' ? 'bill' : 'invoice')}
                       >
                         <Plus />
@@ -528,6 +559,31 @@ export default function App() {
                 <DocumentDetail
                   doc={doc}
                   busy={busy}
+                  canWrite={canWrite}
+                  canPost={canPost}
+                  onAudit={
+                    canAudit
+                      ? () => {
+                          const auditGeneration = generation.current
+                          const auditRoute = routeVersion.current
+                          void request<{ events: FinancialEvent[] }>(`documents/${doc.id}/audit`)
+                            .then((result) => {
+                              if (
+                                auditGeneration === generation.current &&
+                                auditRoute === routeVersion.current
+                              )
+                                setAudit(result.events)
+                            })
+                            .catch((error) => {
+                              if (
+                                auditGeneration === generation.current &&
+                                auditRoute === routeVersion.current
+                              )
+                                setError(errorMessage(error))
+                            })
+                        }
+                      : undefined
+                  }
                   onEdit={() => setEditor(doc)}
                   onPost={() => setPosting(doc)}
                   onPay={() => setPayment(doc)}
@@ -567,6 +623,7 @@ export default function App() {
                       extra={`${invoices.filter(overdue).length} overdue`}
                       onOpen={() => navigate('invoices')}
                       onNew={() => setEditor('invoice')}
+                      canWrite={canWrite}
                     />
                     <JournalCard
                       title="Vendor bills"
@@ -578,6 +635,7 @@ export default function App() {
                       extra={`${bills.filter((d) => d.status === 'draft').length} drafts to review`}
                       onOpen={() => navigate('bills')}
                       onNew={() => setEditor('bill')}
+                      canWrite={canWrite}
                     />
                     <div className="panel journal-card">
                       <div className="card-top">
@@ -716,6 +774,7 @@ export default function App() {
                       onImport={rememberImport}
                       onReview={setReview}
                       onOpen={setSelected}
+                      canWrite={canWrite}
                     />
                   )}
                   <section className="panel document-table">
@@ -1044,6 +1103,23 @@ export default function App() {
           </div>
         </Modal>
       )}
+      {audit !== null && (
+        <Modal title="Financial audit / Financieel controlespoor" onClose={() => setAudit(null)}>
+          <p>Only new posting and manual payments. Shared credentials do not identify a human.</p>
+          {audit.length === 0 ? (
+            <p>No attributed financial actions.</p>
+          ) : (
+            <ul>
+              {audit.map((event) => (
+                <li key={event.id}>
+                  {event.time} · {event.action} · {event.principal} ({event.actorType}) · v
+                  {event.version} · {event.outcome}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Modal>
+      )}
       {payment && (
         <PaymentEditor
           doc={payment}
@@ -1081,6 +1157,7 @@ function JournalCard({
   extra,
   onOpen,
   onNew,
+  canWrite,
 }: {
   title: string
   icon: ReactNode
@@ -1091,6 +1168,7 @@ function JournalCard({
   extra: string
   onOpen: () => void
   onNew: () => void
+  canWrite: boolean
 }) {
   return (
     <div className="panel journal-card">
@@ -1099,6 +1177,7 @@ function JournalCard({
         <button
           className="icon-button"
           aria-label={`Create ${title === 'Vendor bills' ? 'bill' : 'invoice'}`}
+          disabled={!canWrite}
           onClick={onNew}
         >
           <Plus />
@@ -1129,6 +1208,9 @@ function DocumentDetail({
   onPost,
   onPay,
   onOriginal,
+  canWrite,
+  canPost,
+  onAudit,
 }: {
   doc: Document
   busy: boolean
@@ -1136,6 +1218,9 @@ function DocumentDetail({
   onPost: () => void
   onPay: () => void
   onOriginal?: () => void
+  canWrite: boolean
+  canPost: boolean
+  onAudit?: () => void
 }) {
   return (
     <div className="detail">
@@ -1146,6 +1231,11 @@ function DocumentDetail({
             <span>EUR · Version {doc.version}</span>
           </div>
           <div className="heading-actions">
+            {onAudit && (
+              <button className="button secondary" onClick={onAudit}>
+                Financial audit
+              </button>
+            )}
             {onOriginal && (
               <button type="button" className="button secondary" onClick={onOriginal}>
                 <Book />
@@ -1154,16 +1244,16 @@ function DocumentDetail({
             )}
             {doc.status === 'draft' ? (
               <>
-                <button className="button secondary" disabled={busy} onClick={onEdit}>
+                <button className="button secondary" disabled={busy || !canWrite} onClick={onEdit}>
                   Edit draft
                 </button>
-                <button className="button primary" disabled={busy} onClick={onPost}>
+                <button className="button primary" disabled={busy || !canPost} onClick={onPost}>
                   <Check />
                   Post document
                 </button>
               </>
             ) : doc.status === 'posted' ? (
-              <button className="button primary" disabled={busy} onClick={onPay}>
+              <button className="button primary" disabled={busy || !canPost} onClick={onPay}>
                 <Wallet />
                 Record payment
               </button>

@@ -7,6 +7,13 @@ const session = {
   team: 'engineering',
   csrfToken: 'browser-test-csrf',
   user: { id: 42, login: 'example-member', name: 'Example Member' },
+  access: {
+    principal: 'github:42',
+    authorizationMode: 'compatibility',
+    member: true,
+    companyId: '000000000000000000000001',
+    capabilities: ['read', 'write', 'post'],
+  },
 }
 const signedOut = { ...session, authenticated: false, csrfToken: undefined, user: undefined }
 
@@ -145,4 +152,54 @@ test('explicit legacy token mode still reports invalid credentials and accepts a
   await input.fill(token)
   await page.getByRole('button', { name: 'Open workspace' }).click()
   await expect(page.getByRole('button', { name: /Open accounting/ })).toBeVisible()
+})
+
+test('authenticated 403 keeps a valid session and never retries a contact write', async ({
+  page,
+}) => {
+  let writes = 0
+  await page.route('**/api/session', (route) => route.fulfill({ json: session }))
+  await page.route('**/api/contacts', async (route) => {
+    if (route.request().method() === 'POST') {
+      writes++
+      await route.fulfill({
+        status: 403,
+        json: { error: 'Access forbidden. Ask your workspace administrator for write capability.' },
+      })
+    } else await route.continue()
+  })
+  await page.goto('/contacts')
+  await page.getByRole('button', { name: 'New contact' }).click()
+  await page
+    .getByRole('dialog')
+    .getByLabel('Name', { exact: true })
+    .fill('Denied synthetic contact')
+  await page.getByRole('dialog').getByRole('button', { name: 'Save contact' }).click()
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('administrator')
+  await expect(page.getByLabel('Signed in as example-member')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
+  await expect(page.getByLabel('Company access token')).toHaveCount(0)
+  expect(writes).toBe(1)
+})
+
+test('authenticated business-read 403 is an actionable forbidden page, not expiry', async ({
+  page,
+}) => {
+  await page.route('**/api/session', (route) => route.fulfill({ json: session }))
+  await page.route('**/api/state', (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: 'Access forbidden. Ask your administrator for company membership.' },
+    }),
+  )
+  await page.goto('/')
+  await expect(
+    page.getByRole('heading', { name: 'Access forbidden / Toegang geweigerd' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Refresh permissions / Rechten vernieuwen' }),
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: /Sign in with GitHub/ })).toHaveCount(0)
+  await expect(page.getByLabel('Company access token')).toHaveCount(0)
 })
