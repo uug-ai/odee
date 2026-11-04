@@ -10,7 +10,10 @@
 | Expert tester | Independent expected results, reproduction, tests and PASS/FAIL/BLOCKED evidence | Quietly changing production code or weakening acceptance |
 
 Use the [roadmap and backlog](roadmap/README.md). The default capacity is three
-feature workers and two testers. PM checkpoints are bounded planning jobs, not
+feature workers and four independent testers. The increased QA cap applies only
+after independent acceptance and verified adoption of the updated scheduler in
+the shared control root; until then, retain the previous two-tester cap. PM
+checkpoints are bounded planning jobs, not
 an additional permanent implementation worker. Do not launch all named
 specialists at once or nest uncontrolled agent trees.
 
@@ -117,6 +120,278 @@ After three unsuccessful repair rounds, block and triage that ticket instead of
 repeating the same attempt. Continue unrelated safe work. If there is no
 actionable work, checkpoint and wait; do not invent scope or rerun green tests
 indefinitely.
+
+## Slack progress reporting
+
+The coordinator publishes progress to the user's designated Slack channel
+using the configured Slack app. PM, feature and tester handoffs remain the input;
+individual workers do not receive Slack credentials or post independently.
+Slack is a reporting surface, not the execution ledger or an approval mechanism.
+Explicitly authorized coordinator-managed messages have been delivered. This
+does not mean automation, unattended sending or acceptance is installed or
+proven. `tools/agents/slack.mjs` is an explicit, bounded coordinator command and
+library; it does not subscribe to the ledger or run a daemon.
+
+### Configuration and activation
+
+- Configure the destination with `ODEE_SLACK_CHANNEL_ID` in the coordinator's
+  run configuration, and `ODEE_SLACK_BOT_TOKEN` through a secret manager or
+  protected runtime secret. Do not hardcode a channel or credential in source.
+- Revoke and replace any token shared in chat before persistent reporter
+  activation. Never copy
+  tokens into Git, PRs, roadmap files, handoffs, logs, screenshots or messages,
+  and do not request replacement credentials in chat.
+- Invite the bot to the designated channel and grant only the needed
+  `chat:write` permission. Do not add broad channel-history or admin scopes
+  merely to send updates.
+- Keep credentials out of feature/tester environments and synthetic test
+  fixtures. Bounded coordinator sends require explicit authorization. Implement
+  and validate an automated reporter separately before enabling it; manual
+  delivery does not prove that automation exists. The command is not wired into
+  scheduler mutations, agent jobs or workflows.
+
+### Intermediate updates, milestones and message contract
+
+Post meaningful state changes, not every command or test assertion:
+
+- Between milestones, report observed findings, a concise decision rationale,
+  the current action and the next step. Explain why a repair, retest or
+  dependency takes priority without dumping agent transcripts or speculation.
+- When a gate remains pending, state what is being awaited and what will happen
+  after PASS, FAIL or BLOCKED. Do not imply progress or completion without evidence.
+- Feature assignment or a coherent candidate PR ready for independent testing.
+- Tester FAIL/BLOCKED findings, the repair plan and a repaired candidate entering
+  retest; retain the earlier failure rather than replacing it with a green retry.
+- QA results with completed/required role counts, outstanding checks and gaps.
+  Partial PASS, green CI, local integration and actual GitHub merge are distinct.
+- A verified protected-main merge, its real merge SHA and the next unlocked work.
+- Material PM scope/specification changes, dependency blockers and checkpoints
+  when the loop pauses, stops or has no actionable work.
+
+Use one parent message per feature PR and threaded progress updates where
+possible. Include the ticket/revision, concise outcome, exact candidate or merge
+SHA, PR link, role/CI status, limitations and next action. Publish only sanitized
+summaries: no source dumps, private evidence, credentials, personal/business
+records, real invoice data or private browser captures.
+
+### Bounded command and structured input
+
+Only the authorized coordinator runs `send`. Always pass the **same canonical
+shared control root** used by the loop; do not initialize another ledger. Use
+one stable receipt root for the coordinator, not one per worker or invocation.
+Both roots must be absolute real directories without symlink aliases. Receipt
+and event paths remain confined to the receipt root; no credentials/config file
+is read. Supply the two environment variables above through the protected
+coordinator environment, never command-line arguments.
+
+```sh
+node tools/agents/slack.mjs --help
+node tools/agents/slack.mjs status --root "$PWD" --control-root "$ODEE_CONTROL_ROOT"
+node tools/agents/slack.mjs send --root "$PWD" --control-root "$ODEE_CONTROL_ROOT" \
+  --event .local-data/slack-event.json
+```
+
+The event file is a small JSON object, not a transcript or arbitrary Slack body.
+Example with entirely synthetic provenance:
+
+```json
+{
+  "repo": "synthetic/fixture",
+  "ticket": "ODEESLACK-002",
+  "revision": 1,
+  "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "pr": 12,
+  "event": "progress",
+  "updateId": "ci-pending",
+  "outcome": "in-progress",
+  "role": "api",
+  "qa": { "passed": 1, "required": 2, "status": "partial" },
+  "ci": "pending",
+  "findings": "One independent role is still pending.",
+  "decision": "Keep the gate pending until the exact head is tested.",
+  "currentAction": "Assigning the remaining role.",
+  "nextSteps": "On PASS inspect CI; on FAIL repair and retest.",
+  "limitations": "Feature author tests are not independent acceptance."
+}
+```
+
+- Required: lowercase `owner/repo`, ticket ID, positive integer `revision`, full
+  lowercase 40/64-character `sha`, `event`, `outcome`, `qa` and `ci`.
+  Optional: positive integer `pr`, safe lowercase role identifier, stable
+  `updateId` and the five summary fields shown above. A PR URL is constructed,
+  never supplied.
+- `updateId` identifies a distinct observation/decision on the **same**
+  SHA/revision/event/role. Use 1–48 lowercase ASCII letters, digits or hyphens,
+  beginning with a letter; credential patterns, markup and unsafe identifiers
+  are rejected. Keep it unchanged on retries of that observation. For example,
+  after the `ci-pending` update above, a later event may use `updateId: "ci-pass"`
+  and `ci: "pass"` with revised findings/decision/next steps while independent
+  QA remains `1/2` and `partial`. Both updates use the same PR thread. New facts
+  need their own stable identifier, not a random identifier on each invocation.
+- Events: `progress`, `candidate`, `qa`, `repair`, `integration`, `merge`,
+  `checkpoint`. Outcomes: `in-progress`, `ready-for-qa`, `pass`, `fail`, `blocked`,
+  `local-integration`, `merged`, `paused`, `stopped`. Only `merge` may report
+  `merged`; only `integration` may report `local-integration`. A `pass` outcome
+  requires a `qa` event and role; every `qa` event requires a role.
+- QA has integer `passed`/`required` counts (at most 100 roles) and overall status
+  `pending`, `partial`, `pass`, `fail` or `blocked`. Overall PASS requires all
+  nonzero required roles; partial PASS remains explicitly partial. A `qa` event
+  with a failing/blocked role cannot claim overall PASS or that every required
+  role passed. A passing role may still accompany overall FAIL/BLOCKED when
+  other roles fail or block.
+  CI is `not-run`, `pending`, `pass`, `fail`, `blocked` or `unavailable`, and means
+  supplied **remote** CI status, not feature-author local test results.
+- Summaries are optional single-line ASCII prose, at most 220 characters each.
+  Unknown fields, mentions, markup, links, multiline dumps and recognizable
+  credential patterns are rejected, not silently redacted. Do not paste raw
+  source, personal/business records or private evidence even if it would pass
+  these syntactic checks: validation is **not proof of confidentiality**.
+  Messages use Slack plain-text blocks, disable mention/link parsing and previews,
+  and preserve supplied QA/CI/merge distinctions. The reporter records supplied
+  facts; it does not independently verify them or grant acceptance.
+
+### Reliability and acceptance
+
+The reporter must honor the same user stop/control state, without a separate
+polling daemon. Persist nonsecret event/delivery receipts and deduplicate by
+repository, PR/ticket, revision, SHA, event/role and optional update identifier.
+Claim delivery only after
+Slack acknowledges the intended channel/message; HTTP success alone does not
+make an `ok: false` response successful. Surface missing configuration,
+permission failures and delivery errors explicitly, without exposing tokens.
+Respect rate-limit retry instructions with bounded attempts. An uncertain
+send is not proof of failure: record it for reconciliation instead of blindly
+reposting or promising exactly-once Slack delivery.
+
+The command posts only to the official
+`https://slack.com/api/chat.postMessage` endpoint with redirects disabled.
+One delivered parent per repository/PR (or ticket before PR assignment) receives
+subsequent updates in its thread. Moving from ticket-only to a PR creates a new
+PR parent, not an inferred link to the earlier ticket thread. All invocations
+must share the receipt root; using another root can create duplicates.
+
+Nonsecret, mode-0600 atomic receipts live in `.odee/slack/receipts.json`.
+They retain event identity, payload digest, channel/message/thread identifiers,
+timestamps, sanitized failure codes and bounded prior-attempt history, **not**
+tokens, raw message text or response bodies. Identity is repository, PR/ticket,
+revision, full SHA, event/role and optional `updateId`. Identical replay returns
+its receipt without sending; changed content or destination under that identity fails
+`PAYLOAD_MISMATCH`, including changed content under the same `updateId`. Use a
+new stable `updateId` for a genuinely distinct intermediate update; do not
+change identifiers to evade an uncertain send's safeguards. Omitted `updateId`
+retains the original identity/hash shape and a single event per
+SHA/revision/event/role; library `undefined` is equivalent to omission, whereas
+`null` and empty strings are invalid. Existing delivered receipts without the
+field are neither re-keyed nor rewritten. Supplying an identifier creates a
+distinct event, not an alias or automatic migration of an earlier unidentified
+event. Channel changes for an existing PR scope fail closed as well.
+
+An exclusive **reporter** lock covers durable pre-send intent through receipt
+commit, including the bounded request (10 seconds by default; library maximum
+30 seconds). It never holds the scheduler state lock through a network operation.
+Control is fully read/validated before preparing a send and again immediately
+before the request. Pause/stop suppresses delivery; it cannot recall an in-flight
+request or eliminate the race after the final check. No QA or scheduler state
+is mutated, even when notification fails.
+
+`status` is read-only and exposes receipts plus lock presence. A crashed process
+may leave both a stale exclusive ownership lock and an `intended` receipt.
+Do not delete a live lock or infer failure from process death. After proving the
+exact lock owner has exited, the coordinator must inspect/reconcile it manually;
+there is no automatic stale-lock deletion or uncertain-delivery override here.
+`intended` and `uncertain` identities are never resent, even with `--retry`.
+An uncertain parent blocks new events for that PR until external reconciliation.
+The CLI deliberately provides no automatic reconciliation/receipt rewrite;
+retain evidence and resolve with an authorized operator rather than bypassing
+the safeguard with another root.
+
+Only acknowledged Slack `ok: true` with the intended channel, valid message
+timestamp and (for updates) matching thread acknowledgement is delivered.
+`ok: false` is a sanitized failure. Timeouts (including stalled response bodies),
+lost/malformed/mismatched responses, redirects, HTTP 408 and server errors are
+uncertain. HTTP 4xx rejection and explicit Slack API errors are known failures.
+A 429 records `retryAt` from integer `Retry-After` (60 seconds if invalid); there
+is no automatic retry or wait loop. An explicit later `send ... --retry` may
+retry only known failed/rate-limited/control-cancelled events, after `retryAt`,
+retaining earlier failures (at most 20 retries per identity). Delivered and
+uncertain events cannot be retried. The bounded store accepts 2000 identities;
+exhaustion requires operator planning, never automatic deletion of dedupe state.
+
+Exit codes: 0 for delivery/status/help, 1 for failed/uncertain/invalid commands,
+2 for control-suppressed/cancelled sends. Missing config and auth/permission
+failures remain explicit sanitized errors. Root/symlink/hardlink checks protect
+against accidental path escapes/overwrites; trusted, access-controlled local
+directories are still required. This is not a sandbox against another process
+with filesystem mutation privileges or a substitute for OS permissions.
+
+Validate formatting, redaction, event deduplication, partial QA/merge labels,
+stop behavior, Slack API errors, rate limits and uncertain outcomes with a
+mocked transport. Before persistent reporter enablement, verify the rotated
+secret, bot channel membership and a deliberately authorized test message.
+Notification failure
+remains visible but never changes a QA verdict, invents delivery or bypasses a
+merge/release gate. No live Slack request is authorized by a synthetic test.
+
+## Feature pull requests and merge tracking
+
+Use one pull request per independently testable feature ticket. Keep its repair
+commits in the same PR so the failed candidate, fix and independent retest remain
+traceable. Split a ticket before implementation when it contains independently
+deliverable outcomes; do not manufacture tiny PRs just to increase the count.
+The coordinator publishes branches and manages PRs; feature workers and testers
+retain their existing ownership and cannot merge their own work.
+
+Open a draft once there is a coherent committed candidate. Use the
+[repository PR template](../.github/PULL_REQUEST_TEMPLATE.md). Each PR records:
+
+- Ticket ID, specification revision, full candidate SHA and base branch/SHA.
+- User outcome, included/excluded scope, dependencies and linked predecessor PRs.
+- Acceptance criteria, required independent roles and their current verdicts.
+- Exact tested SHA, commands, results, skips and unavailable evidence.
+- Failed-candidate findings, repair commits and renewed retest results.
+- Compatibility implications, known limitations and human-only external gates.
+
+Keep published evidence synthetic and sanitized. Do not upload ignored ledgers,
+private handoffs, credentials, real records or private browser captures. A tester
+reports through its isolated QA handoff; the coordinator posts an attributed
+summary with the tested SHA. Do not impersonate a GitHub reviewer or describe
+agents sharing one GitHub account as independent GitHub review identities.
+
+Draft is not acceptance. Mark ready only after all required roles pass for the
+current specification and exact candidate. A changed head or contract invalidates
+the relevant evidence; an earlier green SHA does not approve the new head.
+Required GitHub CI must also succeed. Local test results are not remote CI.
+
+Dependent features may use stacked PRs against their prerequisite branches. Link
+the stack and merge prerequisites first. Keep those branches until dependents
+are retargeted. Recheck the resulting diff, merge candidate and affected tests
+after a base change or conflict resolution; never assume a green lower PR
+approves the complete stack.
+
+Immediately before a GitHub merge, the coordinator must verify running control,
+the exact-SHA/specification ledger gate, required independent verdicts, required
+remote checks, resolved blocking discussions and current repository protections.
+Reconcile changes already on the destination branch without dropping them and
+renew integration evidence on the resulting candidate. Use a normal merge commit
+to retain the original feature and repair commits, with an exact-head guard;
+never force-push, squash away the repair history, use an admin bypass or merge
+an unprotected destination unattended. If protections or required evidence are
+missing, leave the PR open and continue other safe work.
+
+The ledger's `merged` entry records local integration already performed. It is
+not proof that a GitHub PR merged into `main`. Track the PR URL, base/head and
+actual remote merge commit separately, and do not rewrite historical local
+acceptance records to imply a remote merge.
+
+Already-integrated historical work may need an explicitly labelled foundation
+bundle and stacked feature PRs. Preserve its commits and disclose combined scope
+instead of claiming that interleaved historical work was independently developed
+or tested as separate PRs.
+
+Publishing a development branch or merging a verified PR does not authorize a
+release, deployment, provider transmission or production migration. Recheck
+push/PR/merge triggers before publishing. Release tags, GitHub Releases and live
+business actions remain human-controlled.
 
 VS Code must remain active and authorized. Sessions, permissions, quotas and
 context limits can interrupt the loop. Persist state and resume explicitly;

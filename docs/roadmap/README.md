@@ -191,7 +191,9 @@ in-progress state belongs only to the coordinator, not this planning document.
   candidate SHA and required independent verdicts. It dispatches accepted PM
   contracts but cannot replace product policy or bypass QA.
 - **Feature workers build; testers challenge.** Start with at most three feature
-  workers and two testers. Select domain experts as needed, sequentially for
+  workers and four independent testers after independent acceptance and verified
+  adoption of the updated scheduler in the shared control root (two testers
+  until then). Select domain experts as needed, sequentially for
   additional high-risk gates. Named roles are a roster, not simultaneous agents.
 - Reviewed requirements live here. Live assignments, controls, attempts,
   verdicts and leases live in ignored `.odee/loop.json`, with the coordinator as

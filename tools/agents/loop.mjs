@@ -10,6 +10,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const MODES = ["running", "paused", "stopped"];
+const CAPACITY = Object.freeze({ feature: 3, qa: 4 });
 const STATUSES = ["ready", "building", "awaiting-qa", "testing", "changes-requested", "verified", "integrating", "merged", "blocked", "paused", "cancelled"];
 const SHA = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const SLUG = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/;
@@ -359,7 +360,7 @@ function readState(context) {
     "CORRUPT_STATE", "unreviewed execution record is not in the backlog");
   const claims = Object.values(state.tickets).flatMap(activeClaims);
   check(new Set(claims.map((claim) => claim.worker)).size === claims.length &&
-    counts(state).feature <= 3 && counts(state).qa <= 2, "CORRUPT_STATE", "worker uniqueness/capacity invariant violated");
+    counts(state).feature <= CAPACITY.feature && counts(state).qa <= CAPACITY.qa, "CORRUPT_STATE", "worker uniqueness/capacity invariant violated");
   return state;
 }
 function newEntry(spec) {
@@ -453,7 +454,7 @@ function nextWork(state, options) {
     slug(options.worker, "worker");
     if (!workerAvailable(state, options.worker)) return null;
   }
-  if (counts(state)[kind] >= (kind === "feature" ? 3 : 2)) return null;
+  if (counts(state)[kind] >= CAPACITY[kind]) return null;
   const entries = Object.values(state.tickets).sort((a, b) => a.spec.priority - b.spec.priority || a.spec.id.localeCompare(b.spec.id));
   for (const entry of entries) {
     if (kind === "feature" && featureEligible(state, entry)) return { ticket: clone(entry.spec), kind };
@@ -547,7 +548,7 @@ function leafSummary(state, backlogCurrent) {
     .sort((a, b) => a.spec.priority - b.spec.priority || a.spec.id.localeCompare(b.spec.id));
   const ready = [];
   const blocked = [];
-  const capacityReached = counts(state).feature >= 3;
+  const capacityReached = counts(state).feature >= CAPACITY.feature;
   for (const entry of leaves.filter((entry) => ["ready", "changes-requested", "paused", "blocked"].includes(entry.status))) {
     const blockers = [];
     if (!backlogCurrent) blockers.push("backlog-reconciliation");
@@ -630,7 +631,7 @@ function mutate(state, command, options) {
     currentRevision(entry, options);
     const worker = slug(options.worker, "worker");
     check(workerAvailable(state, worker), "WORKER_BUSY", "worker already has an active claim");
-    check(counts(state)[kind] < (kind === "feature" ? 3 : 2), "CAPACITY", `${kind} active-claim cap reached`);
+    check(counts(state)[kind] < CAPACITY[kind], "CAPACITY", `${kind} active-claim cap reached`);
     check(dependenciesMet(state, entry), "DEPENDENCIES_UNMET", "ticket dependencies are not merged");
     const claim = { worker, revision: entry.spec.revision, startedAt: now(), evidence: [] };
     if (kind === "feature") {
@@ -826,7 +827,7 @@ recover-lock --token TOKEN [--recovery-depth N]
                                 .recovery lock first using its token and depth shown by status.
 --help                          Print this help.
 
-Feature claims: max 3; QA claims: max 2; one active claim per worker; no feature self-QA.
+Feature claims: max ${CAPACITY.feature}; QA claims: max ${CAPACITY.qa}; one active claim per worker; no feature self-QA.
 Leases survive submission/QA/failure/interruption until merge or explicit requeue/recovery.
 All required QA roles must PASS the exact SHA AND revision. Epics are never dispatchable.
 SHA means a full lowercase 40- or 64-character hash. Evidence is required nonempty text:

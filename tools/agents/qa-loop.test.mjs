@@ -151,8 +151,8 @@ test("independent QA: real backlog schema accepts current and extended manifests
   }
 });
 
-test("independent QA: hard caps, advisory next and one active worker assignment", (t) => {
-  const f = fixture(t, ["A", "B", "C", "D", "E"].map((id) =>
+test("independent QA: hard caps of three features and four testers, advisory next and unique workers", (t) => {
+  const f = fixture(t, ["A", "B", "C", "D", "E", "F", "G"].map((id) =>
     ticket(id, { requiredQa: ["qa-api-data", "qa-integration"] })));
   f.run("init");
   const before = f.bytes();
@@ -166,12 +166,20 @@ test("independent QA: hard caps, advisory next and one active worker assignment"
   for (const [id, n] of [["A", 1], ["B", 2], ["C", 3]]) f.submit(id, n);
   f.qaClaim("A", 1);
   f.qaClaim("B", 2);
-  f.reject("claim", { ticket: "C", kind: "qa", worker: "third-tester",
+  assert.deepEqual(f.status().active, { feature: 0, qa: 2 });
+  assert.ok(f.run("next", { kind: "qa" }).next);
+  f.qaClaim("A", 1, "qa-integration");
+  f.qaClaim("B", 2, "qa-integration");
+  for (const id of ["D", "E", "F"]) f.claim(id);
+  assert.deepEqual(f.status().active, { feature: 3, qa: 4 });
+  f.reject("claim", { ticket: "G", worker: "build-G", revision: 1 }, "CAPACITY");
+  f.reject("claim", { ticket: "C", kind: "qa", worker: "fifth-tester",
     role: "qa-api-data", revision: 1, sha: sha(3) }, "CAPACITY");
   assert.equal(f.run("next", { kind: "qa" }).next, null);
   f.verdict("A", 1);
-  assert.equal(f.run("next", { kind: "qa", role: "qa-integration" }).next.ticket.id, "A");
-  assert.deepEqual(f.status().active, { feature: 0, qa: 1 });
+  assert.equal(f.run("next", { kind: "qa", role: "qa-integration" }).next.ticket.id, "C");
+  f.qaClaim("C", 3);
+  assert.deepEqual(f.status().active, { feature: 3, qa: 4 });
 });
 
 test("independent QA: contributors, wrong workers/roles and stale SHA/revision cannot approve", (t) => {
@@ -315,24 +323,31 @@ test("independent QA: three failed candidate rounds stay blocked through resume,
 });
 
 for (const mode of ["pause", "stop"]) {
-  test(`independent QA: ${mode} denies dispatch/gate/merge but late results checkpoint until explicit resume`, (t) => {
-    const f = fixture(t, [ticket("A"), ticket("B"), ticket("C")]);
+  test(`independent QA: ${mode} preserves four QA claims, denies dispatch/gate/merge and accepts late results`, (t) => {
+    const roles = ["qa-api-data", "qa-integration", "qa-browser", "qa-security"];
+    const f = fixture(t, [ticket("A", { requiredQa: roles }), ticket("B"), ticket("C")]);
     f.run("init");
     f.claim("A");
     f.submit("A", 1);
-    f.qaClaim("A", 1);
+    for (const role of roles) f.qaClaim("A", 1, role);
     f.claim("B");
     f.run(mode);
+    assert.deepEqual(f.status().active, { feature: 1, qa: 4 });
     for (const [command, args] of [
       ["next", {}],
+      ["next", { kind: "qa" }],
       ["claim", { ticket: "C", worker: "build-C", revision: 1 }],
       ["gate", { ticket: "A", revision: 1, sha: sha(1) }],
       ["merged", { ticket: "A", revision: 1, sha: sha(1), "merged-sha": sha(11), evidence }],
     ]) f.reject(command, args, "DISPATCH_DISABLED");
     f.run("checkpoint", { ticket: "A", kind: "qa", role: "qa-api-data", worker: "test-A-qa-api-data", evidence });
     f.verdict("A", 1);
+    assert.deepEqual(f.status().active, { feature: 1, qa: 3 });
     f.run("checkpoint", { ticket: "B", worker: "build-B", evidence });
     f.submit("B", 2);
+    f.reject("claim", { ticket: "B", kind: "qa", role: "qa-api-data", worker: "late-dispatch",
+      revision: 1, sha: sha(2) }, "DISPATCH_DISABLED");
+    for (const role of roles.slice(1)) f.verdict("A", 1, "PASS", role);
     assert.equal(f.status().tickets.A.status, "verified");
     assert.equal(f.status().tickets.B.status, "awaiting-qa");
     f.reject("gate", { ticket: "A", revision: 1, sha: sha(1) }, "DISPATCH_DISABLED");
