@@ -106,12 +106,11 @@ async function isolated() {
   const { test } = await import('node:test')
   const env = process.env
   const scratch = env.ODEE_TEST_SCRATCH_DIR
-  const guardPort = await reserveTestPort()
-  await guardPort.release()
-  await command('npm', ['--prefix', 'web', 'run', 'test:e2e', '--', 'local-transport.spec.ts'], {
-    ...env,
-    ODEE_TEST_PORT: String(guardPort.port),
-  })
+  await command(
+    'npm',
+    ['--prefix', 'web', 'run', 'test:e2e', '--', '--config', 'tests/local-transport.config.ts'],
+    env,
+  )
   const dbPath = join(scratch, 'mongo')
   await mkdir(dbPath)
   const mongo = await MongoMemoryServer.create({
