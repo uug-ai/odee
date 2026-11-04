@@ -175,6 +175,7 @@ func (s *MemoryStore) List(context.Context) ([]Document, error) {
 	defer s.mu.Unlock()
 	docs := []Document{}
 	for _, doc := range s.docs {
+		doc.NormalizeOwnership()
 		docs = append(docs, clone(doc))
 	}
 	return docs, nil
@@ -187,6 +188,7 @@ func (s *MemoryStore) Get(_ context.Context, id primitive.ObjectID) (Document, e
 	if !ok {
 		return Document{}, ErrNotFound
 	}
+	doc.NormalizeOwnership()
 	return clone(doc), nil
 }
 

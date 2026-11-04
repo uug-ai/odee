@@ -201,14 +201,20 @@ func TestAuthorizationEveryRouteAuthenticationAndVerification(t *testing.T) {
 						t.Fatalf("origin/CSRF missing: %d %s", w.Code, w.Body)
 					}
 					if s.Auth != nil {
-						r := httptest.NewRequest(route.method, route.path, strings.NewReader(`{}`))
-						r.Header.Set("Origin", s.Origin)
-						r.Header.Set("Content-Type", "application/json")
-						r.AddCookie(authCookie(t, s.Auth, time.Now().Add(30*time.Minute)))
-						w := httptest.NewRecorder()
-						s.Handler().ServeHTTP(w, r)
-						if w.Code != 403 {
-							t.Fatal("origin without CSRF bypass")
+						for _, verification := range []struct{ origin, csrf string }{
+							{s.Origin, ""}, {s.Origin, "wrong-csrf"},
+							{"https://foreign.example.invalid", "test-csrf"}, {"", "test-csrf"},
+						} {
+							r := httptest.NewRequest(route.method, route.path, strings.NewReader(`{}`))
+							r.Header.Set("Origin", verification.origin)
+							r.Header.Set("X-CSRF-Token", verification.csrf)
+							r.Header.Set("Content-Type", "application/json")
+							r.AddCookie(authCookie(t, s.Auth, time.Now().Add(30*time.Minute)))
+							w := httptest.NewRecorder()
+							s.Handler().ServeHTTP(w, r)
+							if w.Code != 403 {
+								t.Fatal("origin or CSRF bypass", verification, w.Code)
+							}
 						}
 					}
 				}
@@ -221,6 +227,23 @@ func TestAuthorizationEveryRouteAuthenticationAndVerification(t *testing.T) {
 						s.Handler().ServeHTTP(w, r)
 						if w.Code != 401 {
 							t.Fatal("expired/invalid cookie or token bypassed GitHub")
+						}
+					}
+					for _, id := range []int64{0, -1} {
+						data, err := json.Marshal(loginSession{
+							User: GitHubUser{ID: id, Login: "admin"}, CSRF: "test-csrf",
+							Expires: time.Now().Add(30 * time.Minute).Unix(),
+						})
+						if err != nil {
+							t.Fatal(err)
+						}
+						r := httptest.NewRequest(route.method, route.path, strings.NewReader(`{}`))
+						r.AddCookie(&http.Cookie{Name: s.Auth.cookieName(), Value: s.Auth.sign("session", data)})
+						r.Header.Set("Authorization", "Bearer "+s.Token)
+						w := httptest.NewRecorder()
+						s.Handler().ServeHTTP(w, r)
+						if w.Code != 401 {
+							t.Fatal("invalid numeric principal bypassed authentication", id, w.Code)
 						}
 					}
 				} else if !s.Dev {

@@ -207,6 +207,23 @@ func TestMemoryFinancialAuditAtomicity(t *testing.T) {
 func TestMemoryAuditScopeAndIntegrity(t *testing.T) {
 	s, request := authorizationServer(t, "development")
 	s.Authorization = testPolicy(t, "enforced", "development:local", testCompany, []Capability{Read, Write, Post, Admin})
+	legacy, _ := NewDocument(draft("invoice"), testCompany)
+	legacy.OrganisationID, legacy.ProjectID, legacy.OwnerID = primitive.NilObjectID, primitive.NilObjectID, testCompany
+	if err := s.Store.Create(context.Background(), legacy); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := s.Store.Get(context.Background(), legacy.ID)
+	if err != nil || loaded.OrganisationID != testCompany || loaded.ProjectID != testCompany {
+		t.Fatal("memory legacy reader requires backfill", err)
+	}
+	listed, err := s.Store.List(context.Background())
+	if err != nil || len(listed) != 1 || listed[0].OrganisationID != testCompany || listed[0].ProjectID != testCompany {
+		t.Fatal("memory legacy list requires backfill", err)
+	}
+	stored := s.Store.(*MemoryStore).docs[legacy.ID]
+	if !stored.OrganisationID.IsZero() || !stored.ProjectID.IsZero() {
+		t.Fatal("legacy reader performed a migration")
+	}
 	for _, axis := range []string{"organisation", "project", "owner"} {
 		doc, _ := NewDocument(draft("invoice"), testCompany)
 		doc.OwnerID = testCompany
