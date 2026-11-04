@@ -50,13 +50,14 @@ import type {
   ReviewOptions,
   Session,
   State,
-  View,
 } from './types'
 import { BillImports, OriginalPreview } from './BillImports'
 import { Modal } from './Modal'
 import { AppLauncher } from './AppLauncher'
 import { createAPIRequest } from './api'
 import { defaultView, moduleForView, navigation, views } from './modules'
+import { githubSignInPath, useWorkspaceRoute } from './routing'
+import { RouteNotFound } from './RouteNotFound'
 
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'An unexpected error occurred.'
@@ -81,7 +82,6 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const csrf = useRef('')
   const generation = useRef(0)
-  const [view, setView] = useState<View>('apps')
   const [selected, setSelected] = useState<string | null>(null)
   const [editor, setEditor] = useState<Kind | Document | null>(null)
   const [review, setReview] = useState<BillImport | null>(null)
@@ -98,8 +98,7 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
 
-  const clearWorkspace = useCallback(() => {
-    setState(null)
+  const clearTransient = useCallback(() => {
     setSelected(null)
     setEditor(null)
     setReview(null)
@@ -107,8 +106,15 @@ export default function App() {
     setPayment(null)
     setPosting(null)
     setNotice('')
-    setView('apps')
+    setQuery('')
+    setFilter('All')
   }, [])
+  const { view, navigate, routeKey, routeVersion } = useWorkspaceRoute(clearTransient)
+
+  const clearWorkspace = useCallback(() => {
+    setState(null)
+    clearTransient()
+  }, [clearTransient])
 
   const expireSession = useCallback(() => {
     generation.current++
@@ -180,14 +186,8 @@ export default function App() {
     }
   }
 
-  function navigate(next: View) {
-    setView(next)
-    setSelected(null)
-    setQuery('')
-    setFilter('All')
-    setNotice('')
-  }
   async function mutate(action: () => Promise<Document>, message: string) {
+    const mutationRoute = routeVersion.current
     setBusy(true)
     setError('')
     setNotice('')
@@ -200,6 +200,7 @@ export default function App() {
             documents: [...current.documents.filter((d) => d.id !== doc.id), doc],
           },
       )
+      if (mutationRoute !== routeVersion.current) return true
       setSelected(doc.id)
       setEditor(null)
       setReview(null)
@@ -208,7 +209,7 @@ export default function App() {
       setNotice(message)
       return true
     } catch (error) {
-      setError(errorMessage(error))
+      if (mutationRoute === routeVersion.current) setError(errorMessage(error))
       return false
     } finally {
       setBusy(false)
@@ -241,9 +242,9 @@ export default function App() {
     )
     .filter((d) => filter === 'All' || label(d) === filter)
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
-  const currentModule = moduleForView(view)
+  const currentModule = view === null ? undefined : moduleForView(view)
   const ModuleIcon = currentModule?.icon
-  const RegisteredView = view === 'apps' ? undefined : views[view].component
+  const RegisteredView = view === null || view === 'apps' ? undefined : views[view].component
 
   function downloadReport() {
     if (!state) return
@@ -324,8 +325,8 @@ export default function App() {
             : 'Local development · MongoDB connected · authentication disabled'}
         </div>
       )}
-      <div className={`layout ${view === 'apps' ? 'launcher-layout' : ''}`}>
-        {view !== 'apps' && (
+      <div className={`layout ${view === null || view === 'apps' ? 'launcher-layout' : ''}`}>
+        {currentModule && (
           <aside className="sidebar">
             <div className="sidebar-app">
               <div className="app-icon small">{ModuleIcon && <ModuleIcon />}</div>
@@ -387,7 +388,9 @@ export default function App() {
               {notice}
             </div>
           )}
-          {session?.authMode === 'github' && !session.authenticated ? (
+          {view === null ? (
+            <RouteNotFound onLauncher={() => navigate('apps')} />
+          ) : session?.authMode === 'github' && !session.authenticated ? (
             <div className="login panel">
               <ShieldCheck />
               <h1>Your workspace, protected.</h1>
@@ -398,7 +401,7 @@ export default function App() {
                 </strong>
                 .
               </p>
-              <a className="button primary" href="/auth/github">
+              <a className="button primary" href={githubSignInPath(view)}>
                 Sign in with GitHub <ArrowRight />
               </a>
             </div>
@@ -451,6 +454,7 @@ export default function App() {
             <AppLauncher onNavigate={navigate} />
           ) : RegisteredView ? (
             <RegisteredView
+              key={routeKey}
               state={state}
               request={request}
               onRefresh={refresh}
@@ -640,7 +644,7 @@ export default function App() {
                                 key={d.id}
                                 className="recent-row"
                                 onClick={() => {
-                                  setView(d.kind === 'bill' ? 'bills' : 'invoices')
+                                  navigate(d.kind === 'bill' ? 'bills' : 'invoices')
                                   setSelected(d.id)
                                 }}
                               >

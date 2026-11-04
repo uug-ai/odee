@@ -37,18 +37,19 @@ function ContactsView({ state, request, onRefresh, onStateChange }: ModuleProps)
 
 interface ViewDefinition {
   title: string
+  path: string
   component?: ComponentType<ModuleProps>
 }
 
 // Accounting screens stay in App; additional modules register their own components here.
 const registeredViews = {
-  dashboard: { title: 'Dashboard' },
-  invoices: { title: 'Customer invoices' },
-  bills: { title: 'Vendor bills' },
-  journal: { title: 'Journal entries' },
-  accounts: { title: 'Chart of accounts' },
-  reports: { title: 'Trial balance' },
-  contacts: { title: 'Contacts', component: ContactsView },
+  dashboard: { title: 'Dashboard', path: '/accounting' },
+  invoices: { title: 'Customer invoices', path: '/accounting/invoices' },
+  bills: { title: 'Vendor bills', path: '/accounting/bills' },
+  journal: { title: 'Journal entries', path: '/accounting/journal' },
+  accounts: { title: 'Chart of accounts', path: '/accounting/accounts' },
+  reports: { title: 'Trial balance', path: '/accounting/reports' },
+  contacts: { title: 'Contacts', path: '/contacts', component: ContactsView },
 } satisfies Record<string, ViewDefinition>
 
 export type ModuleView = keyof typeof registeredViews
@@ -159,3 +160,7 @@ export const navigation = activeModules.flatMap((module) => module.navigation)
 export const defaultView = activeModules[0].entryView
 export const moduleForView = (view: View) =>
   activeModules.find((module) => module.navigation.some((item) => item.view === view))
+
+export const pathForView = (view: View) => (view === 'apps' ? '/' : views[view].path)
+export const viewForPath = (path: string): View | null =>
+  path === '/' ? 'apps' : (navigation.find((item) => views[item.view].path === path)?.view ?? null)

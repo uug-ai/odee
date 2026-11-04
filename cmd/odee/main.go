@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -142,12 +141,7 @@ func run() error {
 			slog.Error("write health response", "error", err)
 		}
 	})
-	dist := env("ODEE_WEB_DIR", "web/dist")
-	mux.Handle("GET /{$}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		http.ServeFile(w, r, filepath.Join(dist, "index.html"))
-	}))
-	mux.Handle("GET /assets/", http.FileServer(http.Dir(dist)))
+	web := registerWeb(mux, env("ODEE_WEB_DIR", "web/dist"))
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -156,7 +150,7 @@ func run() error {
 		if originURL.Scheme == "https" {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}
-		mux.ServeHTTP(w, r)
+		web.ServeHTTP(w, r)
 	})
 	server := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout: 45 * time.Second, WriteTimeout: 210 * time.Second, IdleTimeout: 60 * time.Second}

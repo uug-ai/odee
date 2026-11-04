@@ -82,7 +82,8 @@ test('create, edit, post, pay, report, and refresh invoices and bills', async ({
   await page.getByRole('button', { name: 'Export CSV' }).click()
   expect((await download).suggestedFilename()).toContain('odee-trial-balance')
   await page.reload()
-  await page.getByRole('button', { name: /Open accounting/ }).click()
+  await expect(page).toHaveURL('/accounting/reports')
+  await expect(page.getByRole('heading', { level: 1, name: 'Trial balance' })).toBeVisible()
   await page
     .getByRole('navigation', { name: 'Accounting navigation' })
     .getByRole('button', { name: /^Invoices/ })
