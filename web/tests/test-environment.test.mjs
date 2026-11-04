@@ -5,6 +5,8 @@ import test from 'node:test'
 import { browserEnvironment, isolatedCommand, testPort } from './test-environment.mjs'
 import {
   mongoSelector,
+  mongoDiskSelector,
+  requiredMongoDiskCases,
   requiredMongoCases,
   requireMongoResults,
   requireCompanyResults,
@@ -73,7 +75,7 @@ test('company child reports reject zero execution, fixture skips and child asser
 
 test('normal Mongo result gate requires every persistent branch and the two real restart phases', () => {
   const events = requiredMongoCases.map((Test) => ({ Test, Action: 'pass' }))
-  events.push({ Test: 'TestMongoDiskPersistence', Action: 'skip' })
+  events.push(...requiredMongoDiskCases.map((Test) => ({ Test, Action: 'skip' })))
   assert.equal(requireMongoResults(events).requiredPassed.length, requiredMongoCases.length)
   for (const name of requiredMongoCases) assert.match(name, new RegExp(mongoSelector))
   assert.throws(() => requireMongoResults(events.slice(1)), /Required Mongo case/)
@@ -91,11 +93,27 @@ test('normal Mongo result gate requires every persistent branch and the two real
     /Unexpected Mongo fixture skip/,
   )
   for (const phase of ['write', 'read']) {
-    assert.equal(
-      requireMongoResults([{ Test: 'TestMongoDiskPersistence', Action: 'pass' }], phase).phase,
-      phase,
-    )
-    assert.throws(() => requireMongoResults([], phase), /Required Mongo case/)
+    const diskEvents = requiredMongoDiskCases.map((Test) => ({ Test, Action: 'pass' }))
+    assert.equal(requireMongoResults(diskEvents, phase).phase, phase)
+    for (const name of requiredMongoDiskCases) {
+      assert.match(name, new RegExp(mongoDiskSelector))
+      assert.throws(
+        () =>
+          requireMongoResults(
+            diskEvents.filter((event) => event.Test !== name),
+            phase,
+          ),
+        /Required Mongo case/,
+      )
+      assert.throws(
+        () =>
+          requireMongoResults(
+            diskEvents.map((event) => (event.Test === name ? { ...event, Action: 'skip' } : event)),
+            phase,
+          ),
+        /Required Mongo case/,
+      )
+    }
   }
 })
 
