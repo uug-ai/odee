@@ -107,6 +107,11 @@ switch/reload, the journey returns to Overview before opening Bills, ensuring
 the dashboard journal card and navigation button coexist with the same Dutch
 accessible name. It does not choose an arbitrary first match or rely on timing.
 
+The historical image-batch test still requires both upload-progress rows to be
+ready. Its assertion uses the existing bounded 30-second test deadline rather
+than assuming two sequential real OCR operations finish within five seconds;
+it does not retry uploads or count matching status text elsewhere in the page.
+
 Normal `web/tests/**/*.spec.ts` discovery now includes:
 
 - `localization.spec.ts`: separate English/Dutch protected journeys through the
