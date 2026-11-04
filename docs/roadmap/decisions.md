@@ -1154,6 +1154,20 @@ QA remain required before eventual integration/acceptance.
 
 ### Evidence authority and current checkpoint
 
+The paragraphs below retain the original authorship checkpoint, not a live
+delivery status. At the 2026-11-04 reconciliation checkpoint, company PR5,
+PR-policy PR6, reporting-plan PR11, reporter PR12 and capacity PR13 have actually
+merged into protected main `bc5e58691b0436f386280deb656da8ef321c4a0c`.
+Finance PR9 remains unmerged at
+`73c1852797f38bcf0d00e41a6a5b8198e8fa56cd`: its six scoped independent role
+renewals and five required CI checks passed, but an earlier reported frontend
+timeout/startup failure lacks its original test identity and raw failure log.
+That historical finding remains unknown, not benign or repaired. This planning
+branch incorporates the repaired finance prerequisite and accepted tooling main
+without granting finance acceptance or adopting these future contracts into the
+canonical execution ledger. The original evidence anchor and failures below
+remain unchanged.
+
 The inspected evidence anchor is
 `04562c9e72e513abacf0c90d868f80414b141c3c`, recovered **UNACCEPTED finance
 configuration draft PR9**, not delivered main. It includes accepted-local
