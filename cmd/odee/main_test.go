@@ -23,6 +23,7 @@ func TestAuthenticationStartupFailsClosed(t *testing.T) {
 			for _, key := range []string{"ODEE_AUTH_MODE", "ODEE_DEV_MODE", "ODEE_DEMO", "ODEE_API_TOKEN", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "GITHUB_TEAM", "SESSION_SECRET"} {
 				t.Setenv(key, "")
 			}
+
 			t.Setenv("ODEE_ADDR", "127.0.0.1:8098")
 			t.Setenv("ODEE_ORIGIN", "http://localhost:8098")
 			t.Setenv("GITHUB_ORG", "uug-ai")
@@ -31,6 +32,32 @@ func TestAuthenticationStartupFailsClosed(t *testing.T) {
 			}
 			if err := run(); err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("startup error = %v; want %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestAuthorizationStartupValidationBeforeStorage(t *testing.T) {
+	for _, test := range []struct {
+		name, mode, grants, want string
+	}{
+		{"unknown policy", "automatic", "[]", "ODEE_AUTHZ_MODE"},
+		{"malformed grants", "compatibility", "{}", "ODEE_CAPABILITY_GRANTS"},
+		{"invalid principal", "enforced", `[{"principal":"admin","companyId":"000000000000000000000001","capabilities":["admin"]}]`, "invalid principal"},
+		{"valid enforced requires storage", "enforced", "[]", "MONGODB_URI is required"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			for key, value := range map[string]string{
+				"ODEE_ADDR": "127.0.0.1:19005", "ODEE_ORIGIN": "http://127.0.0.1:19005",
+				"ODEE_AUTH_MODE": "token", "ODEE_API_TOKEN": strings.Repeat("synthetic", 5),
+				"ODEE_DEV_MODE": "false", "ODEE_DEMO": "false", "MONGODB_URI": "",
+				"ODEE_COMPANY_ID": "000000000000000000000001",
+				"ODEE_AUTHZ_MODE": test.mode, "ODEE_CAPABILITY_GRANTS": test.grants,
+			} {
+				t.Setenv(key, value)
+			}
+			if err := run(); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("expected %q before opening any storage/listener, got %v", test.want, err)
 			}
 		})
 	}

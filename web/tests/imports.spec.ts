@@ -3,6 +3,8 @@ import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { billFixtures } from './fixtures.mjs'
 
+test.use({ locale: 'en-GB' })
+
 let directory: string
 test.beforeAll(async () => {
   directory = await billFixtures()
@@ -33,7 +35,9 @@ test('drop a PDF, review beside original, save draft, deduplicate and retain aft
   await page
     .getByRole('region', { name: 'Drop bill documents' })
     .dispatchEvent('drop', { dataTransfer: transfer })
-  await expect(page.getByText('Ready for review', { exact: true })).toBeVisible()
+  await expect(
+    page.locator('.upload-progress').getByText('Ready for review', { exact: true }),
+  ).toBeVisible()
   await page
     .getByRole('row')
     .filter({ hasText: 'digital.pdf' })
@@ -96,12 +100,9 @@ test('prefill paid-bill lines from invoice totals without importing a payment', 
     .getByRole('button', { name: /^Bills$/ })
     .click()
   await page.getByLabel('Upload bills').setInputFiles(join(directory, 'paid.pdf'))
-  await expect(page.getByText('Ready for review', { exact: true })).toBeVisible()
-  await page
-    .getByRole('row')
-    .filter({ hasText: 'paid.pdf' })
-    .getByRole('button', { name: 'Review original' })
-    .click()
+  const paidRow = page.getByRole('row').filter({ hasText: 'paid.pdf' })
+  await expect(paidRow.getByText('Ready for review', { exact: true })).toBeVisible()
+  await paidRow.getByRole('button', { name: 'Review original' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByLabel('Line 1 description')).toHaveValue('Managed service')
   await expect(dialog.getByLabel('Line 1 quantity')).toHaveValue('2')
@@ -139,7 +140,9 @@ test('browse an image batch, surface failures, and keep mobile review usable', a
   await page
     .getByLabel('Upload bills')
     .setInputFiles([join(directory, 'bill.png'), join(directory, 'bill.jpg')])
-  await expect(page.getByText('Ready for review', { exact: true })).toHaveCount(2)
+  await expect(
+    page.locator('.upload-progress').getByText('Ready for review', { exact: true }),
+  ).toHaveCount(2, { timeout: 30_000 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page
     .getByRole('row')

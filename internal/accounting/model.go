@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	ErrInvalid  = errors.New("invalid accounting input")
-	ErrNotFound = errors.New("document not found")
-	ErrConflict = errors.New("document changed; refresh before trying again")
+	ErrInvalid   = errors.New("invalid accounting input")
+	ErrNotFound  = errors.New("document not found")
+	ErrConflict  = errors.New("document changed; refresh before trying again")
+	ErrUncertain = errors.New("write outcome uncertain; reconcile the document and its financial history before retrying")
 )
 
 const MaxAmount int64 = 1_000_000_000_000
@@ -59,30 +60,40 @@ type Payment struct {
 }
 
 type Document struct {
-	ID             primitive.ObjectID  `json:"id" bson:"_id"`
-	OrganisationID primitive.ObjectID  `json:"organisationId" bson:"organisationId"`
-	ProjectID      primitive.ObjectID  `json:"projectId" bson:"projectId"`
-	OwnerID        primitive.ObjectID  `json:"-" bson:"ownerId,omitempty"`
-	SourceID       *primitive.ObjectID `json:"sourceId,omitempty" bson:"sourceId,omitempty"`
-	Version        int64               `json:"version" bson:"version"`
-	Number         string              `json:"number" bson:"number"`
-	Kind           string              `json:"kind" bson:"kind"`
-	Partner        string              `json:"partner" bson:"partner"`
-	Email          string              `json:"email" bson:"email"`
-	Reference      string              `json:"reference" bson:"reference"`
-	Date           string              `json:"date" bson:"date"`
-	DueDate        string              `json:"dueDate" bson:"dueDate"`
-	Currency       string              `json:"currency" bson:"currency"`
-	Status         string              `json:"status" bson:"status"`
-	Lines          []Line              `json:"lines" bson:"lines"`
-	Subtotal       int64               `json:"subtotal" bson:"subtotal"`
-	Tax            int64               `json:"tax" bson:"tax"`
-	Total          int64               `json:"total" bson:"total"`
-	Paid           int64               `json:"paid" bson:"paid"`
-	Entries        []Entry             `json:"entries" bson:"entries"`
-	Payments       []Payment           `json:"payments" bson:"payments"`
-	CreatedAt      time.Time           `json:"createdAt" bson:"createdAt"`
-	UpdatedAt      time.Time           `json:"updatedAt" bson:"updatedAt"`
+	ConfigurationSelection *ConfigurationSelection `json:"configurationSelection,omitempty" bson:"configurationSelection,omitempty"`
+	JournalCode            string                  `json:"journalCode,omitempty" bson:"journalCode,omitempty"`
+	FinancialSnapshot      *FinancialSnapshot      `json:"financialSnapshot,omitempty" bson:"financialSnapshot,omitempty"`
+	FinancialMeaning       *FinancialSnapshot      `json:"financialMeaning,omitempty" bson:"-"`
+	MeaningError           string                  `json:"meaningError,omitempty" bson:"-"`
+	PartnerSnapshot        *PartnerSnapshot        `json:"partnerSnapshot,omitempty" bson:"partnerSnapshot,omitempty"`
+	OwnCompanySnapshot     *CompanySnapshot        `json:"ownCompanySnapshot,omitempty" bson:"ownCompanySnapshot,omitempty"`
+	ID                     primitive.ObjectID      `json:"id" bson:"_id"`
+	OrganisationID         primitive.ObjectID      `json:"organisationId" bson:"organisationId"`
+	ProjectID              primitive.ObjectID      `json:"projectId" bson:"projectId"`
+	OwnerID                primitive.ObjectID      `json:"-" bson:"ownerId,omitempty"`
+	SourceID               *primitive.ObjectID     `json:"sourceId,omitempty" bson:"sourceId,omitempty"`
+	Version                int64                   `json:"version" bson:"version"`
+	Number                 string                  `json:"number" bson:"number"`
+	Kind                   string                  `json:"kind" bson:"kind"`
+	Partner                string                  `json:"partner" bson:"partner"`
+	Email                  string                  `json:"email" bson:"email"`
+	Reference              string                  `json:"reference" bson:"reference"`
+	Date                   string                  `json:"date" bson:"date"`
+	DueDate                string                  `json:"dueDate" bson:"dueDate"`
+	Currency               string                  `json:"currency" bson:"currency"`
+	Status                 string                  `json:"status" bson:"status"`
+	Lines                  []Line                  `json:"lines" bson:"lines"`
+	Subtotal               int64                   `json:"subtotal" bson:"subtotal"`
+	Tax                    int64                   `json:"tax" bson:"tax"`
+	Total                  int64                   `json:"total" bson:"total"`
+	Paid                   int64                   `json:"paid" bson:"paid"`
+	Entries                []Entry                 `json:"entries" bson:"entries"`
+	Payments               []Payment               `json:"payments" bson:"payments"`
+	CreatedAt              time.Time               `json:"createdAt" bson:"createdAt"`
+	UpdatedAt              time.Time               `json:"updatedAt" bson:"updatedAt"`
+
+	FinancialEvents []FinancialEvent `json:"-" bson:"financialEvents,omitempty"`
+	pendingEvent    *FinancialEvent
 }
 
 type Draft struct {
@@ -102,7 +113,7 @@ func ValidDate(value string) bool {
 	return err == nil && date.Year() >= 2000 && date.Year() <= 9999
 }
 
-func NewDocument(input Draft, company primitive.ObjectID) (Document, error) {
+func NewDocument(input Draft, company primitive.ObjectID, binding ...ConfigurationSelection) (Document, error) {
 	id := primitive.NewObjectID()
 	now := time.Now().UTC()
 	doc := Document{
@@ -110,6 +121,13 @@ func NewDocument(input Draft, company primitive.ObjectID) (Document, error) {
 		Currency: "EUR", Status: "draft", CreatedAt: now, UpdatedAt: now,
 		Entries: []Entry{}, Payments: []Payment{},
 	}
+	selection := starterSelection()
+	doc.ConfigurationSelection = &selection
+	if len(binding) > 0 {
+		selection = copyConfiguration(binding[0])
+		doc.ConfigurationSelection = &selection
+	}
+	doc.JournalCode = starterConfiguration().Mappings[input.Kind+"Journal"]
 	if err := doc.SetDraft(input); err != nil {
 		return Document{}, err
 	}
@@ -169,12 +187,17 @@ func (d *Document) SetDraft(input Draft) error {
 		if line.Quantity < 1 || line.Quantity > 10000 || line.UnitCents < 0 || line.UnitCents > 1_000_000_000 || line.TaxBPS < 0 || line.TaxBPS > 10000 {
 			return invalid("line quantity, unit price or tax is out of range")
 		}
-		expected := "4000"
-		if input.Kind == "bill" {
-			expected = "5000"
+		if len(line.AccountCode) < 1 || len(line.AccountCode) > 12 || strings.Trim(line.AccountCode, "0123456789") != "" {
+			return invalid("invalid line account code")
 		}
-		if line.AccountCode != expected {
-			return invalid("invoice lines use Sales revenue; bill lines use Operating expenses")
+		if d.ConfigurationSelection == nil || d.ConfigurationSelection.Policy == starterPolicy {
+			expected := "4000"
+			if input.Kind == "bill" {
+				expected = "5000"
+			}
+			if line.AccountCode != expected {
+				return invalid("invoice lines use Sales revenue; bill lines use Operating expenses")
+			}
 		}
 		base := line.Quantity * line.UnitCents
 		lineTax := (base*line.TaxBPS + 5000) / 10000
@@ -193,29 +216,41 @@ func (d *Document) SetDraft(input Draft) error {
 	return nil
 }
 
-func (d *Document) Post() error {
+func (d *Document) Post(config ...ConfigurationData) error {
 	if d.Status != "draft" {
 		return invalid("only drafts can be posted")
 	}
 	if err := d.SetDraft(Draft{d.Kind, d.Partner, d.Email, d.Reference, d.Date, d.DueDate, d.Lines}); err != nil {
 		return err
 	}
-	entries := []Entry{}
-	if d.Kind == "invoice" {
-		entries = append(entries, Entry{"1100", d.Total, 0}, Entry{"4000", 0, d.Subtotal})
-		if d.Tax > 0 {
-			entries = append(entries, Entry{"2100", 0, d.Tax})
-		}
-	} else {
-		entries = append(entries, Entry{"5000", d.Subtotal, 0}, Entry{"2000", 0, d.Total})
-		if d.Tax > 0 {
-			entries = append(entries, Entry{"1200", d.Tax, 0})
-		}
+	data := starterConfiguration()
+	if len(config) > 0 {
+		data = config[0]
+	} else if !legacyShape(*d) {
+		return invalid("financial meaning is unknown; reconcile before changing this document")
 	}
+	if d.ConfigurationSelection == nil {
+		selection := starterSelection()
+		d.ConfigurationSelection = &selection
+	}
+	if d.ConfigurationSelection.Digest != configurationDigest(data) {
+		return invalid("selected configuration integrity check failed")
+	}
+	if d.JournalCode == "" && d.ConfigurationSelection.Policy == starterPolicy {
+		d.JournalCode = data.Mappings[d.Kind+"Journal"]
+	}
+	if err := d.postingReadiness(data); err != nil {
+		return err
+	}
+	frozen, err := d.snapshot(data)
+	if err != nil {
+		return err
+	}
+	entries := configuredEntries(d.Kind, d.Total, d.Subtotal, d.Tax, data)
 	if !Balanced(entries) {
 		return invalid("journal is not balanced")
 	}
-	d.Entries, d.Status = entries, "posted"
+	d.Entries, d.Status, d.FinancialSnapshot = entries, "posted", frozen
 	return nil
 }
 
@@ -253,11 +288,20 @@ func (d *Document) RecordPayment(payment Payment) error {
 		}
 	}
 	payment.Reference = strings.TrimSpace(payment.Reference)
-	if d.Kind == "invoice" {
-		payment.Entries = []Entry{{"1000", payment.Amount, 0}, {"1100", 0, payment.Amount}}
-	} else {
-		payment.Entries = []Entry{{"2000", payment.Amount, 0}, {"1000", 0, payment.Amount}}
+	data, err := d.frozenConfiguration()
+	if err != nil {
+		return err
 	}
+	if d.FinancialSnapshot == nil {
+		frozen, err := d.snapshot(data)
+		if err != nil {
+			return err
+		}
+		d.FinancialSnapshot = frozen
+		selection := starterSelection()
+		d.ConfigurationSelection = &selection
+	}
+	payment.Entries = paymentEntries(d.Kind, payment.Amount, data)
 	d.Payments = append(d.Payments, payment)
 	d.Paid += payment.Amount
 	if d.Paid == d.Total {

@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Book, Download, Plus, RefreshDouble, ShieldCheck } from 'iconoir-react'
 import { money } from './accounting'
 import type { APIRequest, BillImport } from './types'
+import { messageText, requestMessage, scanMethodText, statusText, t } from './i18n'
+import { responseStatus } from './api'
 
-const message = (error: unknown) =>
-  error instanceof Error ? error.message : 'The document operation failed.'
+const message = (error: unknown) => requestMessage(error, responseStatus(error))
 const maxBytes = 20 * 1024 * 1024
 const sourceMoney = (cents: number, currency: string) =>
   currency === 'EUR'
     ? money(cents)
-    : `${(cents / 100).toLocaleString('en-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency || '(currency not detected)'}`
+    : `${money(cents).replace('€', '').trim()} ${currency || t('(currency not detected)')}`
 interface Upload {
   key: string
   name: string
@@ -25,6 +26,7 @@ export function BillImports({
   onImport,
   onReview,
   onOpen,
+  canWrite = false,
 }: {
   items: BillImport[]
   scannerReady: boolean
@@ -33,6 +35,7 @@ export function BillImports({
   onImport: (item: BillImport) => void
   onReview: (item: BillImport) => void
   onOpen: (id: string) => void
+  canWrite?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)
   const running = useRef(false)
@@ -47,6 +50,10 @@ export function BillImports({
     )
 
   async function upload(files: File[]) {
+    if (!canWrite) {
+      setError('Write capability required.')
+      return
+    }
     setDragging(false)
     setError('')
     if (running.current) {
@@ -92,11 +99,7 @@ export function BillImports({
             response.import.error,
           )
         } catch (error) {
-          update(
-            key,
-            'Not confirmed',
-            `${message(error)} Refresh the workspace before retrying; the original may already have been stored.`,
-          )
+          update(key, 'Not confirmed', message(error))
         }
       }
     } finally {
@@ -143,33 +146,35 @@ export function BillImports({
         onDragEnter={() => setDragging(true)}
         onDragLeave={() => setDragging(false)}
         role="region"
-        aria-label="Drop bill documents"
+        aria-label={t('Drop bill documents')}
       >
         <span className="empty-icon">
           <Book />
         </span>
         <div>
-          <h2>Drop your bills. Keep the originals.</h2>
-          <p>PDF, PNG or JPEG · up to 20 MiB each · up to 20 files per batch</p>
-          <small>Local scan → review → draft. Nothing is posted or paid automatically.</small>
+          <h2>{t('Drop your bills. Keep the originals.')}</h2>
+          <p>{t('PDF, PNG or JPEG · up to 20 MiB each · up to 20 files per batch')}</p>
+          <small>
+            {t('Local scan → review → draft. Nothing is posted or paid automatically.')}
+          </small>
         </div>
         <button
           type="button"
           className="button secondary"
-          disabled={busy}
+          disabled={busy || !canWrite}
           onClick={() => input.current?.click()}
         >
           <Plus />
-          Choose bills
+          {t('Choose bills')}
         </button>
         <input
           ref={input}
           className="sr-only"
           type="file"
-          aria-label="Upload bills"
+          aria-label={t('Upload bills')}
           accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
           multiple
-          disabled={busy}
+          disabled={busy || !canWrite}
           onChange={(event) => {
             void upload(Array.from(event.target.files ?? []))
             event.target.value = ''
@@ -178,13 +183,13 @@ export function BillImports({
       </div>
       {!scannerReady && (
         <p className="form-error" role="status">
-          {scannerError || 'Local scanning is unavailable.'} Originals can still be stored and
-          reviewed manually.
+          {scannerError ? messageText(scannerError) : t('Local scanning is unavailable.')}{' '}
+          {t('Originals can still be stored and reviewed manually.')}
         </p>
       )}
       {error && (
         <p className="form-error" role="alert">
-          {error}
+          {messageText(error)}
         </p>
       )}
       {uploads.length > 0 && (
@@ -192,8 +197,15 @@ export function BillImports({
           {uploads.map((item) => (
             <div key={item.key}>
               <strong>{item.name}</strong>
-              <span>{item.status}</span>
-              {item.error && <small className="late-text">{item.error}</small>}
+              <span>{messageText(item.status)}</span>
+              {item.error && <small className="late-text">{messageText(item.error)}</small>}
+              {item.status === 'Not confirmed' && (
+                <small>
+                  {t(
+                    'Refresh the workspace before retrying; the original may already have been stored.',
+                  )}
+                </small>
+              )}
             </div>
           ))}
         </div>
@@ -202,19 +214,19 @@ export function BillImports({
         <div className="panel import-inbox">
           <div className="section-heading">
             <div>
-              <h2>Document inbox</h2>
-              <p>Originals stay here, including failed scans and linked drafts.</p>
+              <h2>{t('Document inbox')}</h2>
+              <p>{t('Originals stay here, including failed scans and linked drafts.')}</p>
             </div>
-            <span className="badge">{items.length} originals</span>
+            <span className="badge">{t('{count} originals', { count: items.length })}</span>
           </div>
           <div className="table-scroll">
             <table>
               <thead>
                 <tr>
-                  <th>Original</th>
-                  <th>Scan result</th>
-                  <th>Total detected</th>
-                  <th>Action</th>
+                  <th>{t('Original')}</th>
+                  <th>{t('Scan result')}</th>
+                  <th>{t('Total detected')}</th>
+                  <th>{t('Action')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -225,7 +237,8 @@ export function BillImports({
                       <td>
                         <strong>{item.filename}</strong>
                         <small>
-                          {(item.size / 1024).toFixed(0)} KiB · {item.scan.method || 'Not scanned'}
+                          {(item.size / 1024).toFixed(0)} KiB ·{' '}
+                          {scanMethodText(item.scan.method, 'Not scanned')}
                         </small>
                       </td>
                       <td>
@@ -233,17 +246,19 @@ export function BillImports({
                           className={`badge ${item.status === 'failed' ? 'overdue' : item.documentId ? 'paid' : 'posted'}`}
                         >
                           {item.documentId
-                            ? 'Bill linked'
+                            ? t('Bill linked')
                             : item.status === 'failed'
-                              ? 'Needs attention'
-                              : item.status}
+                              ? t('Needs attention')
+                              : statusText(item.status)}
                         </span>
-                        {item.error && <small className="late-text">{item.error}</small>}
+                        {item.error && (
+                          <small className="late-text">{messageText(item.error)}</small>
+                        )}
                       </td>
                       <td>
                         {item.scan.total > 0
-                          ? `${sourceMoney(item.scan.total, item.scan.currency)} ${item.scan.currency && item.scan.currency !== 'EUR' ? '(unsupported)' : ''}`
-                          : 'Not detected'}
+                          ? `${sourceMoney(item.scan.total, item.scan.currency)} ${item.scan.currency && item.scan.currency !== 'EUR' ? t('(unsupported)') : ''}`
+                          : t('Not detected')}
                       </td>
                       <td>
                         <div className="heading-actions">
@@ -253,23 +268,27 @@ export function BillImports({
                               className="text-button"
                               onClick={() => onOpen(item.documentId!)}
                             >
-                              Open bill <ArrowRight />
+                              {t('Open bill')} <ArrowRight />
                             </button>
                           ) : (
                             <>
                               <button
                                 type="button"
                                 className="text-button"
-                                disabled={item.status === 'pending' || item.status === 'scanning'}
+                                disabled={
+                                  !canWrite ||
+                                  item.status === 'pending' ||
+                                  item.status === 'scanning'
+                                }
                                 onClick={() => onReview(item)}
                               >
-                                Review original <ArrowRight />
+                                {t('Review original')} <ArrowRight />
                               </button>
                               <button
                                 type="button"
                                 className="icon-button"
-                                disabled={rescanning !== '' || busy}
-                                aria-label={`Retry scan ${item.filename}`}
+                                disabled={!canWrite || rescanning !== '' || busy}
+                                aria-label={t('Retry scan {filename}', { filename: item.filename })}
                                 onClick={() => void rescan(item)}
                               >
                                 <RefreshDouble className={rescanning === item.id ? 'spin' : ''} />
@@ -302,6 +321,8 @@ async function fileResponse(
     signal,
   })
   if (response.status === 401) onSessionExpired()
+  if (response.status === 401 || response.status === 403)
+    throw new Error(requestMessage(undefined, response.status))
   if (!response.ok) {
     const data: unknown = await response.json()
     throw new Error(
@@ -368,12 +389,14 @@ export function OriginalPreview({
       <div className="original-heading">
         <div>
           <strong>{item.filename}</strong>
-          <small>Unmodified original · {item.scan.method || 'Manual review'}</small>
+          <small>
+            {t('Unmodified original')} · {scanMethodText(item.scan.method, 'Manual review')}
+          </small>
         </div>
         <button
           type="button"
           className="icon-button"
-          aria-label="Download original"
+          aria-label={t('Download original')}
           onClick={() => void download()}
         >
           <Download />
@@ -381,64 +404,67 @@ export function OriginalPreview({
       </div>
       {item.contentType === 'application/pdf' && item.scan.pages > 1 && (
         <label className="preview-pages">
-          PDF page
+          {t('PDF page')}
           <select value={page} onChange={(event) => setPage(Number(event.target.value))}>
             {Array.from({ length: item.scan.pages }, (_, index) => (
               <option key={index} value={index + 1}>
-                {index + 1} of {item.scan.pages}
+                {t('{page} of {total}', { page: index + 1, total: item.scan.pages })}
               </option>
             ))}
           </select>
         </label>
       )}
-      {loading && <p className="preview-status">Preparing original preview…</p>}
+      {loading && <p className="preview-status">{t('Preparing original preview…')}</p>}
       {error && (
         <p className="form-error" role="alert">
-          {error} You can still download the original.
+          {messageText(error)} {t('You can still download the original.')}
         </p>
       )}
       {url && (
         <a href={url} target="_blank" rel="noreferrer">
           <img
             src={url}
-            alt={`Original bill ${item.filename}, page ${page}`}
+            alt={t('Original bill {filename}, page {page}', { filename: item.filename, page })}
             onError={() => setError('The original image could not be displayed.')}
           />
         </a>
       )}
       <div className="scanned-totals">
         <span>
-          Detected subtotal
+          {t('Detected subtotal')}
           <strong>
             {item.scan.subtotal > 0
               ? sourceMoney(item.scan.subtotal, item.scan.currency)
-              : 'Not detected'}
+              : t('Not detected')}
           </strong>
         </span>
         <span>
-          Detected VAT
+          {t('Detected VAT')}
           <strong>
-            {item.scan.taxKnown ? sourceMoney(item.scan.tax, item.scan.currency) : 'Not detected'}
+            {item.scan.taxKnown
+              ? sourceMoney(item.scan.tax, item.scan.currency)
+              : t('Not detected')}
           </strong>
         </span>
         <span>
-          Detected total
+          {t('Detected total')}
           <strong>
             {item.scan.total > 0
               ? sourceMoney(item.scan.total, item.scan.currency)
-              : 'Not detected'}
+              : t('Not detected')}
           </strong>
         </span>
       </div>
       <p className="source-currency">
         <ShieldCheck />
-        Source currency: {item.scan.currency || 'Not detected; confirm EUR'}
+        {t('Source currency')}: {item.scan.currency || t('Not detected; confirm EUR')}
       </p>
-      {item.error && <p className="form-error">{item.error}</p>}
+      {item.error && <p className="form-error">{messageText(item.error)}</p>}
       <details className="extracted-text">
-        <summary>Extracted text</summary>
+        <summary>{t('Extracted text')}</summary>
         <pre>
-          {item.scan.text || 'No text could be extracted. Complete the fields from the original.'}
+          {item.scan.text ||
+            t('No text could be extracted. Complete the fields from the original.')}
         </pre>
       </details>
     </aside>

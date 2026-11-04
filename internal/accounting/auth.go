@@ -68,6 +68,7 @@ type oauthState struct {
 	State    string `json:"state"`
 	Verifier string `json:"verifier"`
 	Expires  int64  `json:"expires"`
+	ReturnTo string `json:"returnTo,omitempty"`
 }
 
 type GitHubAuth struct {
@@ -147,9 +148,17 @@ func (a *GitHubAuth) readSession(r *http.Request) (loginSession, bool) {
 }
 
 func (a *GitHubAuth) Register(mux *http.ServeMux) {
+	a.register(mux, nil)
+}
+
+func (a *GitHubAuth) register(mux *http.ServeMux, discovery http.HandlerFunc) {
 	mux.HandleFunc("GET /auth/github", a.login)
 	mux.HandleFunc("GET /auth/github/callback", a.callback)
 	mux.HandleFunc("GET /api/session", func(w http.ResponseWriter, r *http.Request) {
+		if discovery != nil {
+			discovery(w, r)
+			return
+		}
 		session, ok := a.readSession(r)
 		response := map[string]any{
 			"authMode": "github", "authenticated": ok,
@@ -203,7 +212,10 @@ func (a *GitHubAuth) login(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, err)
 		return
 	}
-	data, err := json.Marshal(oauthState{State: state, Verifier: verifier, Expires: time.Now().Add(10 * time.Minute).Unix()})
+	data, err := json.Marshal(oauthState{
+		State: state, Verifier: verifier, Expires: time.Now().Add(10 * time.Minute).Unix(),
+		ReturnTo: a.returnPath(r.URL.Query().Get("returnTo")),
+	})
 	if err != nil {
 		a.fail(w, err)
 		return
@@ -249,7 +261,31 @@ func (a *GitHubAuth) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.setCookie(w, a.cookieName(), a.sign("session", data), "/", 3600)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, a.returnPath(state.ReturnTo), http.StatusSeeOther)
+}
+
+// Mirror the active web/src/modules.ts paths at the authentication trust boundary.
+// The signed OAuth cookie, never a callback query parameter, carries the destination.
+func (a *GitHubAuth) returnPath(destination string) string {
+	u, err := url.Parse(destination)
+	if err != nil || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.RawPath != "" {
+		return "/"
+	}
+	if u.IsAbs() {
+		origin, err := url.Parse(a.config.Origin)
+		if err != nil || u.Scheme != origin.Scheme || u.Host != origin.Host {
+			return "/"
+		}
+	} else if u.Host != "" || !strings.HasPrefix(destination, "/") || strings.HasPrefix(destination, "//") {
+		return "/"
+	}
+	switch u.Path {
+	case "/", "/accounting", "/accounting/invoices", "/accounting/bills", "/accounting/journal",
+		"/accounting/accounts", "/accounting/reports", "/contacts":
+		return u.Path
+	default:
+		return "/"
+	}
 }
 
 func (a *GitHubAuth) fail(w http.ResponseWriter, err error) {

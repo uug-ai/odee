@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uug-ai/database/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -89,7 +88,7 @@ func NewMongoImports(ctx context.Context, store *MongoStore) (*MongoImports, err
 }
 
 func newMongoImports(ctx context.Context, store *MongoStore, disk *diskOriginals) (*MongoImports, error) {
-	client, ok := store.Client.(*database.MongoClient)
+	client, ok := nativeDatabase(store.Client)
 	if !ok {
 		return nil, fmt.Errorf("GridFS requires the native shared MongoDB client")
 	}

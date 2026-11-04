@@ -71,6 +71,10 @@ GOWORK=off go run ./cmd/odee
 Open **http://127.0.0.1:8098** (matching `ODEE_ORIGIN`). The backend serves the compiled frontend and API
 on the same origin. Environment files are not loaded automatically.
 
+In explicit token development mode, `localhost` and loopback IP aliases work on
+the same scheme and port when the request host matches the browser origin.
+Production/token and GitHub-authenticated modes still require the exact origin.
+
 Normal mode requires `MONGODB_URI`; there is **no automatic memory fallback**.
 Connection, ping, and required-index failures prevent startup. One client is
 reused throughout the process and disconnected during graceful shutdown.
@@ -458,3 +462,9 @@ write, CSRF rejection and logout. It does not mock frontend session responses,
 use real GitHub credentials or connect to a real MongoDB database. Build the
 frontend and install Chromium first. The ordinary Go-only suite skips this
 browser integration unless `ODEE_TEST_BROWSER=true`.
+
+## Permissions
+
+See [company permissions and financial attribution](docs/permissions.md) for
+compatibility/enforced modes, startup grant validation, the exhaustive route
+matrix, standalone-Mongo atomic audit, reconciliation and the human rollout gate.

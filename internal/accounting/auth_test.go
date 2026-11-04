@@ -220,7 +220,7 @@ func TestGitHubOAuthTeamAuthorization(t *testing.T) {
 			}))
 			defer fake.Close()
 			auth.oauthURL, auth.apiURL = fake.URL+"/token", fake.URL
-			login := authRequest(handler, "GET", "/auth/github", "", nil, "", "")
+			login := authRequest(handler, "GET", "/auth/github?returnTo=%2Faccounting%2Finvoices", "", nil, "", "")
 			location, err := url.Parse(login.Header().Get("Location"))
 			if err != nil || location.Host != "github.com" || location.Query().Get("scope") != "read:user read:org" || location.Query().Get("code_challenge_method") != "S256" {
 				t.Fatal("invalid authorization redirect")
@@ -230,12 +230,15 @@ func TestGitHubOAuthTeamAuthorization(t *testing.T) {
 			if len(cookies) != 1 || cookies[0].Name != "odee_oauth" || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].SameSite != http.SameSiteLaxMode || cookies[0].MaxAge != 600 {
 				t.Fatal("unsafe OAuth state cookie")
 			}
-			callback := "/auth/github/callback?code=valid&state=" + location.Query().Get("state")
+			callback := "/auth/github/callback?code=valid&returnTo=https://evil.example&state=" + location.Query().Get("state")
 			rec := authRequest(handler, "GET", callback, "", cookies, "", "")
 			if rec.Code != test.want {
 				t.Fatalf("callback = %d %s; want %d", rec.Code, rec.Body, test.want)
 			}
 			if test.want == 303 {
+				if rec.Header().Get("Location") != "/accounting/invoices" {
+					t.Fatal("OAuth did not restore the signed registered destination")
+				}
 				var sessionCookie *http.Cookie
 				for _, cookie := range rec.Result().Cookies() {
 					if cookie.Name == auth.cookieName() {
@@ -263,6 +266,48 @@ func TestGitHubOAuthTeamAuthorization(t *testing.T) {
 						t.Fatal("failed authorization issued a session")
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestGitHubReturnPathValidation(t *testing.T) {
+	auth := testGitHubAuth(t)
+	for _, path := range []string{
+		"/", "/accounting", "/accounting/invoices", "/accounting/bills", "/accounting/journal",
+		"/accounting/accounts", "/accounting/reports", "/contacts",
+	} {
+		for _, destination := range []string{path, auth.config.Origin + path} {
+			t.Run(destination, func(t *testing.T) {
+				if got := auth.returnPath(destination); got != path {
+					t.Fatalf("registered return = %q; want %q", got, path)
+				}
+				rec := authRequest(authHandler(auth), "GET", "/auth/github?returnTo="+url.QueryEscape(destination), "", nil, "", "")
+				var state oauthState
+				cookies := rec.Result().Cookies()
+				if rec.Code != 302 || len(cookies) != 1 || !auth.verify("oauth", cookies[0].Value, &state) || state.ReturnTo != path {
+					t.Fatal("validated destination missing from signed OAuth state")
+				}
+			})
+		}
+	}
+	for _, destination := range []string{
+		"", "contacts", "//evil.example/contacts", "https://evil.example/contacts",
+		"http://odee.example/contacts", "https://odee.example:444/contacts",
+		"https://user@odee.example/contacts", "javascript:alert(1)", "/contacts?next=evil",
+		"/contacts?", "/contacts#private", "/contacts/", "/%63ontacts", "/accounting/../contacts",
+		"/sales", "/projects", "/inventory", "/missing", "/api/state", "/auth/github", "/assets/app.js",
+		"/healthz", "/contacts\\evil", "/%0d%0aLocation:evil", "https://odee.example.evil/contacts",
+	} {
+		t.Run(destination, func(t *testing.T) {
+			if got := auth.returnPath(destination); got != "/" {
+				t.Fatalf("unsafe/unregistered destination accepted: %q => %q", destination, got)
+			}
+			rec := authRequest(authHandler(auth), "GET", "/auth/github?returnTo="+url.QueryEscape(destination), "", nil, "", "")
+			var state oauthState
+			cookies := rec.Result().Cookies()
+			if rec.Code != 302 || len(cookies) != 1 || !auth.verify("oauth", cookies[0].Value, &state) || state.ReturnTo != "/" {
+				t.Fatal("unsafe destination entered signed OAuth state")
 			}
 		})
 	}
