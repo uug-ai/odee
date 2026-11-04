@@ -105,6 +105,36 @@
       "candidateBaseSha": "4e9164d5eaff475e289abccc8f77e42fa6588ce5",
       "rationale": "Replace overlapping docs/ leases with the actual disjoint routing and provider-document files so ODEE-004, ODEE-013 and ODEE-023 may use the approved three-feature capacity without broad shared-prefix serialization.",
       "candidateBoundary": "Only revision/path metadata changes for ODEE-004/013; all acceptance, dependency, priority, ownership, QA and human gates remain unchanged. Coordinator preserves the checkpointed ODEE-013 work and reconciles pause/requeue/renew before dispatch; no state or source changes here."
+    },
+    {
+      "id": "PM-20261104-007-SNAPSHOTS",
+      "recordedOn": "2026-11-04",
+      "decisionId": "D018",
+      "classification": "missing-or-ambiguous-requirement",
+      "findingIds": ["F-007-SNAPSHOT-BOUNDARY-20261104"],
+      "capabilityIds": ["CAP-CONTACTS", "CAP-COMPANY"],
+      "sourceRefs": ["ODOO-CONTACTS", "ODOO-BELGIUM", "BE-APPLICABILITY", "MONGODB-ATOMICITY"],
+      "referenceVersion": "20.0",
+      "evidenceBaseSha": "b17e7222bccfd7bd4b151cfb3d1572796bd62d2a",
+      "candidateBaseSha": "d65d0558c6fbf679fd3f1c7887397d8a8a177cff",
+      "ticketChanges": [{"ticket": "ODEE-007", "fromRevision": 1, "toRevision": 2}],
+      "rationale": "Pin authoritative snapshots, explicit refresh, ownership separation and settings permissions; add the actual localization foundation dependency. Initial source evidence was b17e722; accepted d65d055 retains byte-identical accounting backend rules and translated equivalent contact selection.",
+      "candidateBoundary": "Future ODEE-007 only, after ODEE-006 QA/integration and before ODEE-007 dispatch. Preserve ODEE-006 revision 1, its exact-SHA evidence and failure history, execution state and existing QA gates; coordinator alone integrates and reconciles this packet."
+    },
+    {
+      "id": "PM-20261104-008-COEXISTENCE",
+      "recordedOn": "2026-11-04",
+      "decisionId": "D018",
+      "classification": "missing-or-ambiguous-requirement",
+      "findingIds": ["F-008-CONFIG-COEXISTENCE-20261104"],
+      "capabilityIds": ["CAP-CHART"],
+      "sourceRefs": ["ODOO-EDITIONS", "ODOO-BELGIUM", "MONGODB-ATOMICITY"],
+      "referenceVersion": "20.0",
+      "evidenceBaseSha": "b17e7222bccfd7bd4b151cfb3d1572796bd62d2a",
+      "candidateBaseSha": "d65d0558c6fbf679fd3f1c7887397d8a8a177cff",
+      "ticketChanges": [{"ticket": "ODEE-008", "fromRevision": 1, "toRevision": 2}],
+      "rationale": "Pin immutable-version coexistence, activation/posting race semantics and original-binding payments; add localization dependency and browser/localization QA without weakening existing criteria. Initial source evidence was b17e722; accepted d65d055 retains byte-identical accounting backend rules and translated equivalent historical-account lookup.",
+      "candidateBoundary": "Future ODEE-008 only, after ODEE-006 QA/integration and before ODEE-008 dispatch. Preserve serialization, ODEE-006 revision 1 and exact-SHA evidence, execution state and existing QA gates; coordinator alone integrates and reconciles this packet."
     }
   ],
   "proposedFollowUps": [
@@ -255,32 +285,52 @@
       "epic": "ODEE-W0-4"
     },
     {
-      "id": "ODEE-007", "revision": 1,
+      "id": "ODEE-007", "revision": 2,
       "title": "Add the single legal-company profile and stable partner snapshots",
-      "owner": "feature-contacts-catalog", "priority": 40, "dependsOn": ["ODEE-005"],
+      "owner": "feature-contacts-catalog", "priority": 40, "dependsOn": ["ODEE-005", "ODEE-006"],
       "paths": ["internal/accounting/", "cmd/odee/", "web/src/", "web/tests/", "docs/"],
       "acceptance": [
         "Validate and expose one legal company's name, address, enterprise/VAT identifiers and payment/bank metadata with explicit unsupported applicability values.",
         "Selecting a saved contact copies a versioned accounting snapshot with stable contact reference; later contact edit/archive cannot change a posted document.",
         "Customer/vendor payment/tax metadata is permission-scoped; imported Odoo IDs remain provenance, never ownership.",
-        "Invalid identifiers and stale writes produce explicit errors in both locales without dropping the existing contact profile."
+        "Invalid identifiers and stale writes produce explicit errors in both locales without dropping the existing contact profile.",
+        "Scoped settings display requires read; legal-company settings mutation requires read+admin; contact/draft mutation requires read+write; posting/manual payment requires read+post. Capabilities imply nothing else. Legal identifiers, contact IDs, imported Odoo IDs and capability principals never create or replace BSON ownership. Preserve existing nonempty canonical axes and independent legacy ownerId fallback without migration.",
+        "Selecting or explicitly refreshing a saved contact submits contactId and expectedContactVersion; draft updates also submit the existing document version. The server resolves an active, scoped contact and copies its validated accounting fields, stable reference, source contact version and snapshot schema version. Reject missing/invalid selection inputs, wrong scope and observed version mismatch explicitly; stale selection returns 409. Never trust a client-supplied snapshot. Capture is consistent with the contact version read, not a cross-document lock: an edit after resolution may coexist with that complete older snapshot.",
+        "Ordinary draft edits, reads and posting preserve captured partner data without consulting the latest contact. Refresh/reselection is an explicit version-checked draft operation. Editing captured partner fields requires explicit conversion to manual entry or reselection; do not silently overwrite or detach the reference. Failed refresh, including an archived contact, preserves the existing draft. Posted snapshots cannot be refreshed or changed by contact edits/archive.",
+        "New documents capture the server-resolved own-company profile/version at creation when configured: seller identity for invoices, buyer identity for bills. Explicit version-checked refresh is permitted only while draft. Posting freezes the persisted capture; profile changes never rewrite existing captures. Missing profiles and legacy documents remain explicitly incomplete/unknown, without invented historical identity or newly blocking existing manual accounting flows. This adds neither statutory-invoice completeness certification nor financial calculation changes.",
+        "Manual partner entry and legacy documents lacking references/snapshots remain readable, editable while draft, postable and payable under existing rules; preserve their known values without fabricating missing history. Real disposable-Mongo restart/conflict tests and EN/NL browser journeys must prove selection, refresh, failed refresh, manual conversion, profile changes and post/edit/archive preservation, including direct-API permission and canonical/legacy scope cases."
       ],
       "requiredQa": ["qa-api-data", "qa-integration", "qa-browser", "qa-localization"],
-      "epic": "ODEE-F1", "capabilities": ["CAP-CONTACTS", "CAP-COMPANY"]
+      "epic": "ODEE-F1", "capabilities": ["CAP-CONTACTS", "CAP-COMPANY"],
+      "referenceVersion": "20.0",
+      "sourceRefs": ["ODOO-CONTACTS", "ODOO-BELGIUM", "BE-APPLICABILITY", "MONGODB-ATOMICITY"],
+      "originatingFindingIds": ["F-007-SNAPSHOT-BOUNDARY-20261104"],
+      "pmDecisionId": "D018"
     },
     {
-      "id": "ODEE-008", "revision": 1,
+      "id": "ODEE-008", "revision": 2,
       "title": "Configure one chart, journals and fiscal year while preserving starter accounts",
-      "owner": "feature-finance", "priority": 41, "dependsOn": ["ODEE-005"],
+      "owner": "feature-finance", "priority": 41, "dependsOn": ["ODEE-005", "ODEE-006"],
       "paths": ["internal/accounting/", "web/src/", "web/tests/", "docs/"],
       "acceptance": [
         "One company can review and maintain validated account/journal/fiscal-year configuration; invalid account types or overlapping periods cannot be activated.",
         "Historical starter-chart entries retain codes, amounts and interpretation when a new Belgian mapping is selected.",
         "Posting rejects missing/inactive configured mappings instead of guessing accounts; independently calculated balanced fixtures remain correct.",
-        "Belgian PCMN/MAR mapping references and unresolved accountant decisions are recorded; activation for statutory use is not inferred from passing software tests."
+        "Belgian PCMN/MAR mapping references and unresolved accountant decisions are recorded; activation for statutory use is not inferred from passing software tests.",
+        "Editable configuration is staged. Publication creates an immutable, scoped version containing account meanings, mappings, journals, fiscal periods and enabled/inactive states. Published versions remain available for historical references and cannot be edited or deleted through application APIs. Activation is an expected-version-checked change of the company's default published-version pointer; it is not statutory approval or retroactive revocation. Invalid account types and overlapping periods cannot activate. Missing/inactive mappings must be visibly unready, never silently defaulted.",
+        "New drafts bind to the default version observed during server-side selection and return that binding. Existing drafts retain their selected published version across activation changes. Rebinding requires an explicit read+write action, expected document version and server-resolved published target; no background migration or line/account substitution. Drafts without configuration metadata use the identified legacy starter policy until explicitly rebound. Posting validates the selected immutable version, not whichever version is currently default.",
+        "Posting rejects missing/inactive required mappings, unsupported journals and dates outside the selected configuration's supported fiscal periods. Inactive refers to the immutable flags in that selected version. Replacing the default with V2 does not invalidate a valid V1-bound draft. Successful posting freezes the applicable configuration identity and sufficient account/mapping meaning for subsequent historical display and payments. No guessing, recalculation of posted history or implicit financial authority is permitted.",
+        "Activation uses a guarded pointer update only after the referenced immutable version is durably published. Concurrent default selection may bind either version actually observed; activation must not cause mixed-version posting. A V1-bound post racing V2 activation remains wholly V1. Posting/payment state, version increment, required financial snapshot and existing financial audit append commit in the same owner/version-filtered document write. Preserve standalone MongoDB, explicit conflicts and uncertain-result reconciliation; promise neither cross-record validation atomicity nor immediate revocation. Before implementation, document the publication/write ordering, crash states and recovery within this ticket's existing documentation lease; independent tests must exercise these exact semantics.",
+        "Payments use the posted document's frozen receivable/payable and bank bindings, never the active configuration. Known legacy starter documents retain the existing starter rules; unknown meanings fail explicitly rather than being guessed or rewritten. Retain existing manual-payment date/idempotency/amount validation; this ticket introduces no fiscal locking policy, and closed-period controls remain ODEE-011. Historical views/reports resolve original account meaning and must not drop entries or combine different meanings merely because account codes match.",
+        "Under starter V1, post an EUR242.00 invoice (24200 cents): debit receivable 24200 cents, credit revenue 20000 cents, credit VAT payable 4200 cents. Activate a synthetic V2 with different receivable/bank mappings; a 10000-cent payment (EUR100.00) against the V1 invoice still debits original bank account 1000 by 10000 cents, credits original receivable account 1100 by 10000 cents, and leaves 14200 cents (EUR142.00) receivable. Verify balanced journals, original meanings and unchanged original entries; cover the vendor-bill counterpart. Test V1-post/V2-activation races, explicit draft rebind, missing/inactive mapping rejection, stale activation, retries, uncertain writes and restart persistence. Rejections create no successful financial event.",
+        "Configuration display requires read; staging/publication/activation requires read+admin; draft changes require read+write; financial actions require read+post. Admin implies nothing. Verify direct HTTP and accessible EN/NL browser behavior, including 403 without logout and unchanged monetary/ISO-date values. Preserve ownership compatibility and financial-only audit coverage; no broader nonfinancial audit, legal numbering, automatic transfers or statutory activation is implied."
       ],
-      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-belgian-peppol"],
-      "epic": "ODEE-F2", "capabilities": ["CAP-CHART"], "risk": "high"
+      "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-belgian-peppol", "qa-browser", "qa-localization"],
+      "epic": "ODEE-F2", "capabilities": ["CAP-CHART"], "risk": "high",
+      "referenceVersion": "20.0",
+      "sourceRefs": ["ODOO-EDITIONS", "ODOO-BELGIUM", "MONGODB-ATOMICITY"],
+      "originatingFindingIds": ["F-008-CONFIG-COEXISTENCE-20261104"],
+      "pmDecisionId": "D018"
     },
     {
       "id": "ODEE-009", "revision": 1,

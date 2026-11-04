@@ -272,9 +272,21 @@
       "baseline": "Source contains company/person profile, VAT/address/tags/customer/vendor flags, archive and Odoo provenance; document Draft has partner/email but no stable contact ID or structured posted partner snapshot.",
       "baselinePaths": ["internal/accounting/contacts.go", "internal/accounting/model.go", "README.md"],
       "tickets": ["ODEE-007", "ODEE-F1"],
-      "workflowCases": ["select saved partner", "edit/archive after posting", "ambiguous duplicate review", "imported ID never controls scope"],
-      "acceptance": ["Posted snapshots survive contact edits and archives; invalid/stale/cross-scope updates fail explicitly."],
-      "prerequisites": ["ODEE-005"], "risk": "high",
+      "assessmentSha": "d65d0558c6fbf679fd3f1c7887397d8a8a177cff",
+      "projectEvidence": [
+        {"path": "internal/accounting/model.go", "symbols": ["Document", "Draft", "SetDraft"]},
+        {"path": "web/src/App.tsx", "symbols": ["DraftEditor contact selector"]}
+      ],
+      "plannedTicketRevision": 2,
+      "originatingFindingIds": ["F-007-SNAPSHOT-BOUNDARY-20261104"],
+      "pmDecisionId": "D018",
+      "workflowCases": ["select saved partner", "edit/archive after posting", "ambiguous duplicate review", "imported ID never controls scope", "server contactId and expectedContactVersion resolution", "explicit draft refresh/reselection or manual conversion", "failed refresh preserves prior snapshot", "contact edit after resolution does not mix snapshot versions", "manual and legacy missing-snapshot compatibility", "EN/NL scoped permission and restart journeys"],
+      "acceptance": [
+        "Posted snapshots survive contact edits and archives; invalid/stale/cross-scope updates fail explicitly.",
+        "The server copies the scoped active contact's validated accounting fields, ID, source version and snapshot schema version after checking expectedContactVersion; client-provided snapshots are not authoritative and observed stale selection returns 409.",
+        "Only explicit version-checked draft refresh/reselection or manual conversion changes captured partner data. Ordinary saves/posting do not refresh it; failed refresh preserves it, and manual/legacy documents remain usable without fabricated historical data or a cross-document locking claim."
+      ],
+      "prerequisites": ["ODEE-005", "ODEE-006"], "risk": "high",
       "priorityRationale": "First accounting and structured-invoice prerequisite.",
       "deliveredSha": null, "qaEvidence": []
     },
@@ -287,9 +299,22 @@
       "baseline": "README describes single-company EUR foundation and stable ObjectID scoping; richer legal profile, bank/payment terms and applicability contract are not established by the current model.",
       "baselinePaths": ["README.md", "internal/accounting/model.go", "internal/accounting/store.go"],
       "tickets": ["ODEE-007", "ODEE-F1"],
-      "workflowCases": ["legal/VAT identifiers", "participant prerequisites", "country/establishment exceptions", "canonical ownership precedence"],
-      "acceptance": ["Validated legal metadata never reassigns historical organisation/project axes."],
-      "prerequisites": ["ODEE-005"], "risk": "high",
+      "assessmentSha": "d65d0558c6fbf679fd3f1c7887397d8a8a177cff",
+      "projectEvidence": [
+        {"path": "internal/accounting/http.go", "symbols": ["Server", "state", "create"]},
+        {"path": "internal/accounting/authorization.go", "symbols": ["Grant", "Access", "require"]},
+        {"path": "internal/accounting/store.go", "symbols": ["ScopeFilter", "Save"]}
+      ],
+      "plannedTicketRevision": 2,
+      "originatingFindingIds": ["F-007-SNAPSHOT-BOUNDARY-20261104"],
+      "pmDecisionId": "D018",
+      "workflowCases": ["legal/VAT identifiers", "participant prerequisites", "country/establishment exceptions", "canonical ownership precedence", "read settings versus read+admin mutation", "own-company capture at document creation when configured", "explicit draft-only own-company refresh", "missing profile remains visibly incomplete without blocking legacy manual flows", "profile edit after posting preserves captured seller/buyer identity"],
+      "acceptance": [
+        "Validated legal metadata never reassigns historical organisation/project axes.",
+        "Scoped settings display requires read and legal-company mutation requires read+admin with no implied capabilities; legal identity, contact/import IDs and principals never replace canonical BSON axes or per-axis legacy ownerId fallback.",
+        "Configured own-company identity/version is captured at new-document creation as invoice seller or bill buyer, explicitly refreshable only while draft and frozen on posting. Missing/legacy captures stay unknown rather than fabricated or newly blocking existing manual accounting; statutory completeness and live applicability remain professional/human gates."
+      ],
+      "prerequisites": ["ODEE-005", "ODEE-006"], "risk": "high",
       "priorityRationale": "Avoid false applicability and ownership assumptions before invoice exchange.",
       "deliveredSha": null, "qaEvidence": []
     },
@@ -302,9 +327,24 @@
       "baseline": "model.go defines eight fixed starter accounts; README explicitly excludes editable chart/opening balances and statutory compliance.",
       "baselinePaths": ["internal/accounting/model.go", "README.md"],
       "tickets": ["ODEE-008", "ODEE-F2"],
-      "workflowCases": ["invalid/inactive mapping", "new fiscal year", "starter-history preservation"],
-      "acceptance": ["Independent journals balance through explicit mappings and historical starter accounts remain interpretable."],
-      "prerequisites": ["ODEE-005"], "risk": "high",
+      "assessmentSha": "d65d0558c6fbf679fd3f1c7887397d8a8a177cff",
+      "projectEvidence": [
+        {"path": "internal/accounting/model.go", "symbols": ["Accounts", "Post", "RecordPayment"]},
+        {"path": "internal/accounting/store.go", "symbols": ["Save"]},
+        {"path": "web/src/App.tsx", "symbols": ["DraftEditor", "state.accounts.find historical journal display"]}
+      ],
+      "plannedTicketRevision": 2,
+      "originatingFindingIds": ["F-008-CONFIG-COEXISTENCE-20261104"],
+      "pmDecisionId": "D018",
+      "workflowCases": ["invalid/inactive mapping", "new fiscal year", "starter-history preservation", "staged edit versus immutable publication", "expected-version default activation is not revocation", "observed draft binding and explicit rebind", "V1 posting races V2 activation without mixed mappings", "old-document payment retains original bank and receivable/payable bindings", "24200 less 10000 leaves 14200 with balanced invoice and bill journals", "historical same-code meanings are not conflated", "stale/uncertain publication and financial recovery on standalone MongoDB", "EN/NL settings permission and browser journeys"],
+      "acceptance": [
+        "Independent journals balance through explicit mappings and historical starter accounts remain interpretable.",
+        "Published configuration versions coexist immutably; guarded activation selects the new default, not retroactive revocation. Drafts retain their observed or identified legacy version until explicit version-checked rebind, and posting validates that selected version's mappings, journals and fiscal periods.",
+        "Posting freezes sufficient original account/mapping meaning; later payments use those bindings, never the active chart. The starter 24200-cent invoice paid 10000 cents leaves 14200, with original bank 1000 and receivable 1100, balanced journals and the vendor-bill counterpart. Unknown meanings and missing/inactive selected mappings fail explicitly without guessing, rewriting history or successful audit events.",
+        "A required pre-implementation publication/crash-recovery design and independent race/retry/restart tests preserve standalone MongoDB and same-document financial snapshot, state, version and audit atomicity without cross-record atomicity or immediate-revocation claims.",
+        "Settings reads require read; staging/publication/activation requires read+admin; draft/financial actions retain read+write/read+post with no implication. Browser/localization QA covers EN/NL and 403 without logout. Fiscal locks remain ODEE-011; statutory mapping and live activation require qualified/human approval and no broader nonfinancial audit or legal numbering is claimed."
+      ],
+      "prerequisites": ["ODEE-005", "ODEE-006"], "risk": "high",
       "priorityRationale": "Foundational finance correctness, not a cosmetic Odoo screen match.",
       "deliveredSha": null, "qaEvidence": []
     },

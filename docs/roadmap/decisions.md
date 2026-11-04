@@ -756,6 +756,243 @@ valid invalidation/handoff assertion.
 Only backlog/decision documents change; no source, state, capacity configuration,
 rollback, push, merge, activation or release is performed.
 
+## D018 — Future company snapshots and immutable finance configuration
+
+**Authority/date:** PM refinement under user-approved roadmap autonomy,
+2026-11-04. This exact packet remains pending final coordinator review/integration;
+professional/human gates and live-activation approval are unchanged.
+Revise existing ODEE-007 and ODEE-008 **1 → 2**, not a new feature, framework,
+extraction or split. The assigned PM worktree starts at accepted application
+`d65d0558c6fbf679fd3f1c7887397d8a8a177cff`. Initial read-only source evidence was
+`b17e7222bccfd7bd4b151cfb3d1572796bd62d2a`; a Git comparison confirms
+`internal/accounting/` is byte-unchanged between those commits. The translated
+App has shifted locations: the saved-contact selector is in `DraftEditor`
+(name/email assignment at d65 line 1587), and historical journal display still
+uses `state.accounts.find` (d65 line 960). Capability `assessmentSha` therefore
+names **d65**, while both planning changes retain **b17** as `evidenceBaseSha`
+and **d65** as `candidateBaseSha`. Neither is a delivered 007/008 SHA.
+
+The verified **Odoo 20.0 / 2026-11-03** reference, historical foundation baseline,
+official source records and edition/legal caveats are unchanged. Existing source
+IDs `ODOO-CONTACTS`, `ODOO-EDITIONS`, `ODOO-BELGIUM`, `BE-APPLICABILITY` and
+`MONGODB-ATOMICITY` are reused; no public-source recrawl, new legal interpretation
+or inferred latest version is asserted. Centralized project memory is not
+exposed by the available interface; no obsolete local memory is consulted.
+
+### Findings, deduplication and current boundary
+
+| Finding | Classification and source evidence | Decision / impact |
+| --- | --- | --- |
+| `F-007-SNAPSHOT-BOUNDARY-20261104` | Missing/ambiguous requirement: [Document/Draft/SetDraft](../../internal/accounting/model.go), [contact versions and scoping](../../internal/accounting/contacts.go), and [DraftEditor](../../web/src/App.tsx) currently retain partner/email but no authoritative structured contact snapshot/reference. | Refine ODEE-007 and CAP-CONTACTS/CAP-COMPANY: pin server capture, explicit refresh, own-company boundary and missing-history compatibility before implementation. This is source inspection, not a fabricated failing application test. |
+| `F-008-CONFIG-COEXISTENCE-20261104` | Missing/ambiguous requirement: [Accounts/Post/RecordPayment](../../internal/accounting/model.go) hardcode starter bindings; [historical journal display](../../web/src/App.tsx) resolves current account names; [Save](../../internal/accounting/store.go) already commits financial state/version/event in one scoped document write. | Refine ODEE-008 and CAP-CHART: preserve original financial meanings and define publication, activation, draft binding, races and payments without claiming cross-record atomicity. |
+
+The existing **ODEE-005 redirect/isolation finding** and **ODEE-006
+locale-invalid-money finding** are resolved ordinary defects in their existing
+contracts, not missing product capabilities. Retain their existing identities
+and failure/repair histories; create no duplicate finding or feature ticket and
+do not relabel an earlier failure PASS. Accepted source contains the
+[owned redirect transport proofs](../../web/tests/local-transport.spec.ts).
+The coordinator reports ODEE-005 locally integrated after fresh four-role QA
+and ODEE-006 revision 1 locally fast-forward integrated/ledger merged at exact
+`d65d0558c6fbf679fd3f1c7887397d8a8a177cff`, following four fresh independent
+PASS verdicts and parent validation. Rejected 006
+`1dee7771b9ec75ce9cea7748e54118f0b2a55ff9` and failure count/history remain.
+These are coordinator-reported milestones, **not application QA rerun by PM**.
+
+The canonical control was read-only to PM: running, with no active feature/QA
+claims reported at this checkpoint. This packet changes no ledger, claims,
+controls, application code, live grant or activation. Coordinator alone reviews,
+integrates and reconciles the versioned contracts before dispatch. All other
+tickets, including **ODEE-006 revision 1 and its specification hash**, remain
+unchanged. No old verdict authorizes either revised future ticket; fresh
+independent exact-candidate/revision evidence is required for implementation.
+
+### Exact contract delta and serialization
+
+Both tickets retain all four original acceptance strings **verbatim**, then
+append the precise behavior in [backlog.json](backlog.json). Preserve title,
+owner, priorities **40/41**, every path, epic, capabilities and risk.
+
+- Both now depend on **ODEE-005 and ODEE-006**, the actual permissions and EN/NL
+  foundations. Add no artificial ODEE-007 → ODEE-008 dependency.
+- ODEE-007 retains `qa-api-data`, `qa-integration`, `qa-browser`,
+  `qa-localization`. ODEE-008 retains its original `qa-api-data`,
+  `qa-integration`, `qa-ledger`, `qa-belgian-peppol` and **adds**
+  `qa-browser`, `qa-localization`. More roles do not increase tester capacity.
+- Link `PM-20261104-007-SNAPSHOTS` to the 007 finding and
+  CAP-CONTACTS/CAP-COMPANY; link `PM-20261104-008-COEXISTENCE` to the 008 finding
+  and CAP-CHART. Both use D018 and planned revision 2. Capability status,
+  delivered SHA, QA evidence, source dates and planning/reference baselines do
+  not change.
+
+**Concurrency NO-CHANGE:** retain current source leases and serialize 007 then
+008 by existing priority. These are real shared integration surfaces:
+
+| Shared source | ODEE-007 | ODEE-008 |
+| --- | --- | --- |
+| `internal/accounting/model.go` | Document/Draft reference and snapshots | Selected configuration, posting and original payment bindings |
+| `internal/accounting/store.go` | Preserve new document snapshots through CAS saves | Persist financial configuration meaning with state/version/audit |
+| `internal/accounting/http.go` | Settings, scoped contact resolution and document creation | Settings and selected-configuration posting |
+| `web/src/types.ts`, `web/src/App.tsx` | Legal profile, contact selection and document display | Configuration controls, draft bindings and historical account meaning |
+
+Splitting contacts-only files or documentation does not remove these overlaps
+while preserving the two usable vertical outcomes. Do not manufacture parallel
+work, narrow leases speculatively or introduce an extraction/framework ticket.
+
+### ODEE-007: authoritative capture without historical invention
+
+Settings display is scoped `read`; legal-company mutation is `read+admin`;
+contact/draft mutation is `read+write`; post/payment is `read+post`.
+[Capabilities](../../internal/accounting/authorization.go) imply nothing.
+Legal-company identity is neither the configured BSON scope nor the principal.
+Canonical organisation/project axes win independently; valid stable `ownerId`
+fills only missing axes at runtime, without backfill. Imported Odoo company,
+contact, creator and actor fields never supply ownership.
+
+Selection/refresh submits `contactId` and `expectedContactVersion`; document
+updates retain the existing expected document `version`. The server loads an
+active scoped contact, validates the observed version, and copies validated
+accounting fields plus stable reference, source contact version and snapshot
+schema version. Reject forged snapshots, wrong scope, missing/invalid selection
+inputs and observed stale versions (409) before confirming a change.
+Do not claim the contact is locked until the document save: an edit after
+resolution may coexist with a complete snapshot of the version actually read,
+never a mixture of versions.
+
+Ordinary saves/reads/posting do not refresh a snapshot. Refresh/reselection and
+conversion to manual entry are explicit, expected-version-checked draft actions.
+Changing captured partner fields cannot silently detach the reference.
+Failed refresh, including archive, preserves the existing draft. Posting
+preserves the captured version even if the contact has since changed/archived;
+posted snapshots cannot be refreshed.
+
+Own-company identity/version is captured **at new-document creation when
+configured**: seller for invoices, buyer for bills. Explicit draft-only refresh
+is allowed; posting freezes the persisted capture, not the latest profile.
+Absent profiles and legacy missing captures remain visibly incomplete/unknown.
+Never fabricate historical identity, retrofit it on read/payment, or newly block
+manual/legacy draft, post and payment flows. This tightly coupled identity
+capture does not change totals, certify legal invoice completeness or implement
+numbering/Peppol.
+
+Independent isolated Mongo/browser cases cover save/restart, stale document and
+contact versions, edit-after-resolution, refresh/reselection/manual conversion,
+archive and failed-refresh preservation, profile changes and both locales.
+Permission and wrong-scope cases must exercise direct HTTP as well as UI.
+
+### ODEE-008: immutable coexistence, not instantaneous revocation
+
+Edits are staged; publication freezes a scoped version with account meanings,
+mappings, journals, fiscal periods and enabled/inactive flags. Published
+versions remain referenceable and cannot be mutated/deleted by application
+APIs. Invalid types/overlapping periods cannot activate. Missing/inactive
+mappings remain visibly unready and cannot be guessed into a successful post.
+Activation is an expected-version CAS of the default pointer, **not statutory
+approval or retroactive revocation**.
+
+New drafts bind to the default version actually observed at server selection;
+the response identifies it. Existing drafts keep their selected published
+version. An explicit `read+write`, expected-document-version rebind resolves a
+published target; it cannot substitute lines/accounts silently. Metadata-free
+drafts retain the identified legacy starter policy until explicit rebind.
+Posting validates the **selected** immutable version's mappings, journals and
+supported fiscal periods, not whichever version is now default.
+
+Thus a draft-selection read overlapping activation may bind V1 or V2 as actually
+observed. A V1-bound post racing activation of V2 remains wholly V1. Inactive
+means inactive in the selected version; switching the default does not disable
+V1-bound drafts. Reject missing/inactive selected mappings and unsupported
+dates/journals explicitly. Do not implement an unachievable promise that every
+post must validate against a different record's latest value at commit time.
+
+**Required design before coding:** within the existing ticket/docs lease, record
+the durable publication ordering, immutable-reference enforcement, guarded
+pointer update, bounded financial projection, failure boundaries and recovery.
+The design must implement these already-pinned outcomes, not postpone choosing
+their semantics:
+
+- Never expose a default pointer to an unpublished/missing version.
+- A crash after publication but before activation leaves the prior default
+  unchanged and the durable published version available for reviewed retry.
+- Stale activation is explicit conflict. A lost acknowledgement requires reading
+  authoritative pointer/version state before retry; it is not proof of failure.
+- Post/payment state, required frozen financial meaning, version increment and
+  existing financial event append commit in **one owner/version-filtered
+  document write**, retaining standalone MongoDB and equivalent memory behavior.
+  Stale/rejected operations create no successful event; uncertain writes retain
+  the existing reconciliation outcome and cannot be blindly replayed.
+- Cross-record publication/pointer/business checks are not claimed atomic.
+  Immutable referenced versions plus pinned document semantics make coexistence
+  safe without immediate revocation or a new replica-set prerequisite.
+
+Payments use the original frozen receivable/payable and bank bindings, never
+the current default. Known legacy starter documents retain known starter rules;
+unknown meanings fail explicitly rather than being guessed or rewritten.
+Retain existing payment date/idempotency/amount rules. This slice adds no fiscal
+locks: ODEE-011 owns closed-period controls. Historical views/reports resolve
+original meanings, retain all entries and do not conflate distinct meanings
+merely because codes match.
+
+Independent expected fixtures, in **cents**, are source-backed synthetic rules,
+not asserted Belgian statutory mappings:
+
+| V1 action, followed by V2 with different mappings | Independent expected entries / balance |
+| --- | --- |
+| Invoice: net 20000, VAT 4200, total 24200 | DR `1100` 24200; CR `4000` 20000; CR `2100` 4200 |
+| Pay that V1 invoice 10000 after V2 activation | DR original bank `1000` 10000; CR original receivable `1100` 10000; remaining receivable **14200** |
+| Bill: net 20000, recoverable VAT 4200, total 24200 | DR `5000` 20000; DR `1200` 4200; CR `2000` 24200 |
+| Pay that V1 bill 10000 after V2 activation | DR original payable `2000` 10000; CR original bank `1000` 10000; remaining payable **14200** |
+
+All journals balance; original entries/meanings remain unchanged. Test V1/V2
+selection and activation/post races, explicit rebind, missing/inactive mappings,
+same-code historical interpretation, unknown meanings, stale/denied requests,
+retries, lost acknowledgements and restart persistence. Test settings reads as
+`read`, staging/publication/activation as `read+admin`, draft changes as
+`read+write` and financial actions as `read+post`, with no implication. Browser
+and localization QA independently cover EN/NL, exact values/ISO dates and
+authenticated 403 without logout.
+
+### Professional/human gates and excluded claims
+
+Qualified review must establish legal identifier/applicability rules and Belgian
+PCMN/MAR mapping references and unresolved choices. No checksum, statutory
+mapping, filing rule or applicability is guessed from Odoo behavior.
+Synthetic admin/grant/configuration tests are authorized. Real grants,
+shared/live activation and statutory use remain human-gated; software PASS does
+not authorize them. No live action, release, deploy, paid signup, numbering,
+Peppol transport, automatic bank transfer or broad nonfinancial audit is added.
+`PF-AUDIT-NONFINANCIAL-001` remains proposed and non-dispatchable.
+
+### PM validation, not application acceptance
+
+Executed on this d65-based documentation candidate, with the allowlisted
+`safeTestEnvironment` and owned project-local scratch; all owned fixture data
+was cleaned after the synchronous children exited:
+
+- The actual `validateBacklog` graph/path validator accepts all **70** existing
+  contracts. An additional invariant check verifies only 007/008 changed,
+  original acceptance prefixes and QA roles remain, all other contracts and
+  historical planning entries are identical, and source/finding/capability
+  references plus local Markdown targets resolve. Capability status/delivery/QA,
+  public-source dates and baseline metadata are unchanged.
+- A disposable **synthetic** D018 rehearsal using the actual `runCommand`
+  init/claim/verdict/reconcile API checks 007/008 revision 1 → 2, the real path
+  collision, failure and interrupted-handoff retention, unchanged synthetic
+  merged 006 state, stale-approval rejection without a ledger write, six required
+  008 roles without fabricated verdicts, and repeated reconciliation idempotence.
+  Its fake hashes/verdicts/merge records are not application delivery or QA; it
+  never reads or writes the canonical ledger as a fixture.
+- `NODE_ENV=test node --test tools/agents/loop-planning.test.mjs tools/agents/qa-loop.test.mjs`:
+  **18 PASS, zero FAIL/skipped**.
+- `NODE_ENV=test node --test tools/agents/*.test.mjs web/tests/test-environment.test.mjs`:
+  **72 PASS, zero FAIL/skipped**.
+- ODEE-006 revision 1 retains specification hash
+  `acd5cbbb68a3f3c2e64a4821e13c7956193ae58b6be233e6e1b4b22640bd2df1`.
+
+No production code, test tooling, dependencies or canonical execution state was
+changed. This is specification validation only, not independent final QA for
+the future implementations; no financial/Mongo/browser feature test is claimed.
+
 ## Material feedback packet
 
 Use the following as a **template**, not a fabricated finding:

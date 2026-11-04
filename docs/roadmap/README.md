@@ -6,6 +6,41 @@ not evidence that its tickets have been implemented, tested or released.
 See [backlog](backlog.json), [capabilities and sources](capabilities.json),
 [decisions and feedback contract](decisions.md) and [operating guide](../agents.md).
 
+## 2026-11-04 checkpoint: future ODEE-007/008 revision 2
+
+[D018](decisions.md#d018--future-company-snapshots-and-immutable-finance-configuration)
+versions only existing ODEE-007/008 from 1 to 2 on accepted application
+`d65d0558c6fbf679fd3f1c7887397d8a8a177cff`. Initial evidence was
+`b17e7222bccfd7bd4b151cfb3d1572796bd62d2a`; accounting backend rules are
+byte-unchanged, and current translated UI source was rechecked.
+The original planning and verified Odoo **20.0 / 2026-11-03** baselines remain.
+
+Both future tickets depend on ODEE-005 **and ODEE-006**, preserve every original
+criterion and path, and retain priorities 40/41. ODEE-007 pins server-resolved
+contact/version snapshots, explicit draft refresh/manual conversion and
+own-company capture at creation when configured, without fabricating missing
+history or blocking existing manual flows. ODEE-008 pins immutable published
+versions, observed draft bindings, default activation rather than revocation,
+original-binding historical payments, and standalone same-document financial
+snapshot/state/version/audit atomicity. It adds browser/localization QA to its
+original four roles. A bounded publication/crash-recovery design is required
+before its implementation; no cross-record atomicity is promised.
+
+**Serialization is unchanged:** shared model/store/HTTP/App/type edits genuinely
+overlap. No fake 007→008 dependency, lease narrowing, framework, split or new
+feature is added. Settings reads require `read`, settings mutation/publication/
+activation `read+admin`, contact/draft changes `read+write`, and financial actions
+`read+post`; capabilities imply nothing else. Live grants/activation and
+statutory use remain human/professional gates.
+
+The coordinator reports ODEE-006 revision 1 locally integrated/ledger merged at
+d65 after fresh independent QA; its prior failure and history remain. Existing
+005 isolation and 006 invalid-money repairs are ordinary resolved defects, not
+duplicate features. This PM packet changes no execution state, delivered/QA
+capability claims or application code. Coordinator review, integration and
+reconciliation precede dispatch. Earlier checkpoint sections below are planning
+history, not a substitute for current coordinator state.
+
 ## Material QA checkpoint: next candidate only
 
 The coordinator reports ODEE-004 blocked on missing non-root direct-route
