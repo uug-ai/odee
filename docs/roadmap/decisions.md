@@ -1312,10 +1312,11 @@ the canonical ledger or live environment:
   (`D019 !== D014`). They fail before completing their rehearsal.
   Nearby historical revision/last-criterion assumptions are also visible in
   that fixture, but are not claimed as separately executed failures.
-- **Root is not green and no failure is waived.** This is a current-manifest
+- **The initial four-document packet was not root-green; no failure was waived.**
+  This was a current-manifest
   fixture-portability blocker for coordinator follow-up in separately approved
   test scope, not a missing accounting feature or permission to weaken D019.
-  No tests/tools/customizations are edited in this four-document packet.
+  No tests/tools/customizations were edited in that initial packet.
 - A separate **disposable synthetic** full-70-contract D019 bookkeeping
   rehearsal uses actual `runCommand` init/status/pause/reconcile only. Pending
   status retains old accepted revisions/planning; reconciliation revises only
@@ -1326,9 +1327,28 @@ the canonical ledger or live environment:
 - Named owned structural/root-test/reconciliation fixture directories were
   removed after bounded children completed; root test fixture cleanup left no
   named `.loop-test-*`, `.loop-planning-test-*` or `.qa-loop-*` directories.
-  No Go, application, MongoDB, browser, socket/workspace-test suites, watcher or
-  nested agent was launched. No remote/public-source or live writes occurred.
+  That initial pass launched no Go, application, MongoDB, browser,
+  socket/workspace-test suites, watcher or nested agent. No remote/public-source
+  or live writes occurred.
+- A separately scoped **coordinator fixture-portability repair** updates only
+  `tools/agents/loop-planning.test.mjs`: the current capability's declared
+  planning decision/revision must resolve to a recorded change for the same
+  historical ticket, at least the historical revision and no later than the
+  actual ticket revision. D013/D014 source/finding/discovery assertions remain.
+  The exact partial-credit oracle is checked at its preserved fifth position,
+  not assumed to be the newest appended criterion. No D014-to-D019 hardcoded
+  substitution or weaker financial oracle is used.
+- Fresh actual commands, still using an allowlisted environment and explicit
+  owned local scratch:
+  `node --test --test-concurrency=1 tools/agents/loop-planning.test.mjs`
+  reports **5/5 PASS**, followed by the complete
+  `node --test --test-concurrency=1 tools/agents/*.test.mjs web/tests/test-environment.test.mjs`
+  suite at **75/75 PASS**, zero failures/skips/cancelled/todo. The latter includes
+  the existing owned synthetic workspace/socket tests, not an application,
+  MongoDB or browser service. Parent-owned scratch was removed after children
+  completed. Original failed-run evidence and its handoff remain unchanged.
 
-The ignored D019 handoff records exact commit/commands/counts/limits for parent
-verification. Passing structural and synthetic checks neither repairs the
-two failed root tests nor grants any feature acceptance.
+The original ignored D019 handoff records the first commit and failed run; the
+coordinator follow-up records its separate repair commit and passing checks.
+Passing planning/tooling checks grants neither feature acceptance nor canonical
+ledger adoption, and all reviewed-design/professional/live gates remain.

@@ -48,11 +48,12 @@ Coordinator review, protected final-main/dependency reconciliation and separate
 tester-gated PRs precede implementation/acceptance; this packet changes no
 canonical ledger, claims, grants or live system.
 
-Draft validation: actual graph/deep-preservation checks pass; selected root
-documentation/coordinator tests are **48 PASS / 2 FAIL / zero skipped**.
-Both failures are historical D013/D014 fixture assumptions that the current
-credit capability still points to D014. **Root is not green**; see D019's
-validation record. No fixture repair or application acceptance is included.
+Draft validation: actual graph/deep-preservation checks pass. The initial
+four-document packet recorded **48 PASS / 2 FAIL / zero skipped** from historical
+D013/D014 fixture assumptions. A separately scoped coordinator fixture repair
+preserves those failures and the original credit oracle; focused tests now pass
+**5/5** and the complete root suite **75/75**, zero skipped. See D019's validation
+record. These are planning/tooling checks, not application acceptance.
 
 ## 2026-11-04 checkpoint: future ODEE-007/008 revision 2
 
