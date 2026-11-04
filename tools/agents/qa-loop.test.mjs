@@ -30,7 +30,7 @@ function fixture(t, tickets = [ticket("A"), ticket("B")], metadata = {}) {
   const raw = (command, args = {}) => spawnSync(process.execPath, [
     cli, "--root", root, "--backlog", "backlog.json", command,
     ...Object.entries(args).flatMap(([name, value]) => [`--${name}`, String(value)]),
-  ], { encoding: "utf8", env: { PATH: process.env.PATH } });
+  ], { encoding: "utf8", maxBuffer: 4 * 1024 * 1024, env: { PATH: process.env.PATH, NODE_ENV: "test" } });
   const run = (command, args = {}) => {
     const result = raw(command, args);
     assert.equal(result.status, 0, `${command}: ${result.stderr || result.error || result.stdout}`);
@@ -101,23 +101,54 @@ test("independent QA: two-ticket fail/fix/exact-role retest/gate/merge survives 
   f.reject("init", {}, "ALREADY_INITIALIZED");
 });
 
-test("independent QA: real backlog schema accepts 69 records without fabricated completion", (t) => {
+test("independent QA: real backlog schema accepts current and extended manifests without fabricated completion", (t) => {
   const shared = JSON.parse(fs.readFileSync(path.join(repository, "docs/roadmap/backlog.json"), "utf8"));
-  assert.equal(shared.tickets.length, 69);
-  assert.equal(validateBacklog(shared, repository).tickets.length, 69);
-  const { tickets, version: _version, ...metadata } = shared;
-  const f = fixture(t, tickets, metadata);
-  f.run("init");
-  const result = f.status();
-  const entries = Object.values(result.tickets);
-  assert.equal(entries.length, 69);
-  assert.equal(result.counts.merged, 0);
-  assert.ok(entries.every((entry) => !entry.merged && !entry.candidate && !entry.gate));
-  assert.ok(entries.every((entry) => !entry.feature && Object.keys(entry.qa).length === 0));
-  assert.ok(entries.filter((entry) => entry.spec.kind === "epic")
-    .every((entry) => entry.status === "cancelled"));
-  const state = JSON.parse(f.bytes());
-  assert.deepEqual(state.backlog, shared, "preserve PM metadata and schema extensions");
+  const extended = structuredClone(shared);
+  const revised = extended.tickets.find((item) => item.id === "ODEE-005");
+  revised.revision += 1;
+  revised.requiredQa.push("qa-fixture-extra");
+  revised.acceptance.push("Additional synthetic unrelated manifest regression.");
+  extended.tickets.push(ticket("QA-UNRELATED", { revision: 3, requiredQa: ["qa-fixture-unrelated"] }));
+  extended.fixtureExtension = { purpose: "synthetic current-manifest variation", nested: { retained: true } };
+  for (const [name, manifest] of [["current", shared], ["added/revised unrelated contract", extended]]) {
+    const validated = validateBacklog(manifest, repository);
+    const expectedTotal = validated.tickets.length;
+    const expectedEpics = validated.tickets.filter((item) => item.kind === "epic").length;
+    const expectedLeaves = expectedTotal - expectedEpics;
+    assert.equal(validated.tickets.length, manifest.tickets.length);
+    const { tickets, version: _version, ...metadata } = validated;
+    const f = fixture(t, tickets, metadata);
+    f.run("init");
+    const before = f.bytes();
+    const result = f.status();
+    const entries = Object.values(result.tickets);
+    assert.equal(entries.length, expectedTotal);
+    assert.deepEqual(Object.keys(result.tickets).sort(), tickets.map((item) => item.id).sort());
+    assert.equal(result.leaves.total, expectedLeaves);
+    assert.equal(result.counts.ready, expectedLeaves);
+    assert.equal(result.counts.cancelled, expectedEpics);
+    assert.equal(result.counts.merged, 0);
+    assert.equal(result.leaves.counts.merged, 0);
+    assert.equal(result.leaves.counts.cancelled, 0);
+    assert.deepEqual(result.active, { feature: 0, qa: 0 });
+    assert.ok(entries.every((entry) => !entry.merged && !entry.candidate && !entry.gate));
+    assert.ok(entries.every((entry) => !entry.feature && Object.keys(entry.qa).length === 0));
+    assert.ok(entries.every((entry) => entry.lease === null && entry.contributors.length === 0 &&
+      entry.verdicts.length === 0 && entry.submissions.length === 0 && entry.checkpoints.length === 0 && entry.failureCount === 0));
+    const epics = entries.filter((entry) => entry.spec.kind === "epic");
+    assert.equal(epics.length, expectedEpics);
+    assert.ok(epics.every((entry) => entry.status === "cancelled"));
+    assert.ok(result.leaves.ready.every((entry) => result.tickets[entry.ticket].spec.kind !== "epic"));
+    if (result.next) assert.notEqual(result.next.ticket.kind, "epic");
+    if (epics.length) f.reject("claim", { ticket: epics[0].spec.id, worker: "synthetic-epic-worker",
+      revision: epics[0].spec.revision }, "NOT_DISPATCHABLE");
+    const state = JSON.parse(f.bytes());
+    assert.deepEqual(state.backlog, validated, "preserve exact accepted PM metadata and schema extensions");
+    assert.deepEqual(validated.tickets.map((item) => result.tickets[item.id].spec), validated.tickets,
+      "preserve current revisions and required roles for every contract without depending on object-key order");
+    assert.equal(f.bytes(), before, "schema/status and refused epic dispatch fabricate no execution history");
+    t.diagnostic(`${name}: ${expectedTotal} validated tickets, ${expectedLeaves} leaves, ${expectedEpics} epics; no fabricated completion or execution.`);
+  }
 });
 
 test("independent QA: hard caps, advisory next and one active worker assignment", (t) => {
