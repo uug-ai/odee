@@ -130,6 +130,11 @@ func loopbackOrigin(value string) *url.URL {
 	return u
 }
 
+func (s *Server) validToken(r *http.Request) bool {
+	expected := sha256.Sum256([]byte(s.Token))
+	actual := sha256.Sum256([]byte(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")))
+	return s.Token != "" && strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") && subtle.ConstantTimeCompare(expected[:], actual[:]) == 1
+}
 
 
 func reply(w http.ResponseWriter, status int, value any) {

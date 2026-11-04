@@ -463,6 +463,7 @@ use real GitHub credentials or connect to a real MongoDB database. Build the
 frontend and install Chromium first. The ordinary Go-only suite skips this
 browser integration unless `ODEE_TEST_BROWSER=true`.
 
+
 ## Permissions
 
 See [company permissions and financial attribution](docs/permissions.md) for

@@ -55,6 +55,7 @@ import type {
 import { BillImports, OriginalPreview } from './BillImports'
 import { Modal } from './Modal'
 import { ThemeToggle } from './ThemeToggle'
+
 import { AccountingSummary } from './Company'
 import { Configuration, DraftBinding } from './Configuration'
 import { AppLauncher } from './AppLauncher'
