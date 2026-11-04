@@ -67,10 +67,48 @@ for (const locale of ['en', 'nl'] as const) {
           expectedStageVersion: current.stage.version,
           data: starter,
         })
-        await page.getByRole('button', { name: l('Refresh workspace'), exact: true }).click()
       }
+      let releaseRefresh!: () => void
+      let refreshRequested!: () => void
+      const heldRefresh = new Promise<void>((resolve) => (releaseRefresh = resolve))
+      const refreshStarted = new Promise<void>((resolve) => (refreshRequested = resolve))
+      await page.route(
+        '**/api/state',
+        async (route) => {
+          refreshRequested()
+          await heldRefresh
+          await route.continue()
+        },
+        { times: 1 },
+      )
+      try {
+        await page.getByRole('button', { name: l('Refresh workspace'), exact: true }).click()
+        await refreshStarted
+        await expect(
+          page.getByRole('button', { name: l('Save stage'), exact: true }),
+        ).toBeDisabled()
+        await expect(
+          page.getByRole('button', { name: l('Publish observed stage'), exact: true }),
+        ).toBeDisabled()
+        await expect(page.getByLabel(`${l('Account code')} 1`, { exact: true })).toBeDisabled()
+        for (const button of await page
+          .getByRole('button', { name: new RegExp(`^${l('Make default')} `) })
+          .all()) {
+          await expect(button).toBeDisabled()
+        }
+      } finally {
+        releaseRefresh()
+      }
+      const refreshed = (await state()).configuration!
       await page.getByRole('button', { name: l('Save stage'), exact: true }).click()
       await expect(page.getByRole('status')).toContainText(l('Configuration stage saved.'))
+      const saved = (await state()).configuration!
+      expect(saved.stage.version).toBe(refreshed.stage.version + 1)
+      expect(saved.stage.data).toEqual({
+        ...refreshed.stage.data,
+        journals: [...refreshed.stage.data.journals].sort((a, b) => a.code.localeCompare(b.code)),
+      })
+      await expect(page.getByRole('alert')).toHaveCount(0)
       await page.getByRole('button', { name: l('Publish observed stage'), exact: true }).click()
       await expect(page.getByRole('status')).toContainText(l('Configuration published.'))
       const list = await call<{ items: PublishedConfiguration[] }>(
