@@ -37,6 +37,8 @@ import {
   money,
   overdue,
   today,
+  entryMeaning,
+  financialMeaningConflicts,
 } from './accounting'
 import type {
   BillImport,
@@ -53,13 +55,14 @@ import type {
 import { BillImports, OriginalPreview } from './BillImports'
 import { Modal } from './Modal'
 import { AccountingSummary } from './Company'
+import { Configuration, DraftBinding } from './Configuration'
 import { AppLauncher } from './AppLauncher'
 import { createAPIRequest, responseStatus } from './api'
 import { can } from './permissions'
 import { defaultView, moduleForView, navigation, views } from './modules'
 import { githubSignInPath, useWorkspaceRoute } from './routing'
 import { RouteNotFound } from './RouteNotFound'
-import { accountName, messageText, requestMessage, statusText, t, useLocale } from './i18n'
+import { messageText, requestMessage, statusText, t, useLocale } from './i18n'
 import { LocaleSwitch } from './LocaleSwitch'
 import { localizedValidation } from './form-validation'
 import {
@@ -265,10 +268,11 @@ export default function App() {
   const sumOpen = (docs: Document[]) =>
     docs.filter((d) => d.status === 'posted').reduce((sum, d) => sum + BigInt(d.total - d.paid), 0n)
   const ledger = balances(documents)
-  const accountBalance = (code: string) => {
-    const value = ledger.get(code)
-    return value ? value.debit - value.credit : 0n
-  }
+  const meaningConflicts = financialMeaningConflicts(documents)
+  const accountBalance = (role: string) =>
+    [...ledger.values()]
+      .filter((row) => row.currency === 'EUR' && row.role.includes(role))
+      .reduce((sum, row) => sum + row.debit - row.credit, 0n)
   const filtered = documents
     .filter((d) => d.kind === (view === 'bills' ? 'bill' : 'invoice'))
     .filter((d) =>
@@ -283,12 +287,24 @@ export default function App() {
   function downloadReport() {
     if (!state) return
     const rows = [
-      [t('Code'), t('Account'), t('Debit EUR'), t('Credit EUR')],
-      ...state.accounts.map((account) => {
-        const value = ledger.get(account.code)
+      [
+        t('Configuration version'),
+        t('Code'),
+        t('Account'),
+        t('Type'),
+        t('Resolution'),
+        t('Currency'),
+        t('Debit EUR'),
+        t('Credit EUR'),
+      ],
+      ...[...ledger.values()].map((value) => {
         return [
-          account.code,
-          account.name,
+          value.version,
+          value.code,
+          value.name,
+          value.type,
+          value.known ? 'resolved' : 'unresolved',
+          value.currency,
           ((value?.debit ?? 0n) / 100n).toString() +
             '.' +
             String((value?.debit ?? 0n) % 100n).padStart(2, '0'),
@@ -585,6 +601,15 @@ export default function App() {
               </div>
               {doc ? (
                 <DocumentDetail
+                  binding={
+                    <DraftBinding
+                      key={doc.id}
+                      doc={doc}
+                      request={request}
+                      onRefresh={refresh}
+                      canWrite={canWrite}
+                    />
+                  }
                   doc={doc}
                   busy={busy}
                   canWrite={canWrite}
@@ -677,7 +702,7 @@ export default function App() {
                         <span className="badge">{t('Manual ledger')}</span>
                       </div>
                       <h2>{t('Bank account')}</h2>
-                      <div className="metric">{money(accountBalance('1000'))}</div>
+                      <div className="metric">{money(accountBalance('bank'))}</div>
                       <p className="metric-caption">{t('Recorded payment movements')}</p>
                       <div className="card-facts">
                         <span>{t('Bank feed')}</span>
@@ -696,7 +721,7 @@ export default function App() {
                       </div>
                       <h2>{t('VAT position')}</h2>
                       <div className="metric">
-                        {money(-accountBalance('2100') - accountBalance('1200'))}
+                        {money(-accountBalance('vatPayable') - accountBalance('vatRecoverable'))}
                       </div>
                       <p className="metric-caption">{t('Output VAT less recoverable VAT')}</p>
                       <div className="card-facts">
@@ -957,10 +982,24 @@ export default function App() {
                                 </td>
                                 <td>
                                   <span className="account-code">{entry.accountCode}</span>
-                                  {accountName(
-                                    entry.accountCode,
-                                    state.accounts.find((a) => a.code === entry.accountCode)?.name,
-                                  )}
+                                  {
+                                    entryMeaning(
+                                      journal.document,
+                                      entry,
+                                      `${journal.key}/${index}`,
+                                      meaningConflicts,
+                                    ).name
+                                  }
+                                  <small>
+                                    {
+                                      entryMeaning(
+                                        journal.document,
+                                        entry,
+                                        `${journal.key}/${index}`,
+                                        meaningConflicts,
+                                      ).version
+                                    }
+                                  </small>
                                 </td>
                                 <td className="numeric">
                                   {entry.debit ? money(entry.debit) : '—'}
@@ -976,6 +1015,13 @@ export default function App() {
                     </div>
                   )}
                 </section>
+              ) : view === 'accounts' && state.configuration ? (
+                <Configuration
+                  view={state.configuration}
+                  request={request}
+                  onRefresh={refresh}
+                  canAdmin={canAudit}
+                />
               ) : (
                 <section className="panel">
                   <div className="section-heading">
@@ -1009,17 +1055,23 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {state.accounts.map((account) => {
-                          const value = ledger.get(account.code) ?? { debit: 0n, credit: 0n }
+                        {[...ledger.values()].map((value) => {
                           return (
-                            <tr key={account.code}>
-                              <td className="account-code">{account.code}</td>
+                            <tr key={value.key}>
+                              <td className="account-code">
+                                {value.code}
+                                <small>
+                                  {value.version} · {value.currency}
+                                </small>
+                              </td>
                               <td>
-                                <strong>{accountName(account.code, account.name)}</strong>
+                                <strong>{value.name}</strong>
                               </td>
                               <td>
                                 <span className="badge account-type">
-                                  {statusText(account.type)}
+                                  {value.known
+                                    ? statusText(value.type)
+                                    : t('Financial meaning unknown')}
                                 </span>
                               </td>
                               <td className="numeric">{money(value.debit)}</td>
@@ -1059,6 +1111,9 @@ export default function App() {
       </div>
       {editor && (
         <DraftEditor
+          defaultAccount={
+            state?.configuration?.defaultData?.mappings[editor === 'bill' ? 'expense' : 'revenue']
+          }
           onSessionExpired={expireSession}
           contacts={state?.contacts ?? []}
           companyProfile={state?.companyProfile}
@@ -1271,6 +1326,7 @@ function JournalCard({
 }
 
 function DocumentDetail({
+  binding,
   doc,
   busy,
   onEdit,
@@ -1281,6 +1337,7 @@ function DocumentDetail({
   canPost,
   onAudit,
 }: {
+  binding: ReactNode
   doc: Document
   busy: boolean
   onEdit: () => void
@@ -1294,6 +1351,7 @@ function DocumentDetail({
   return (
     <div className="detail">
       <section className="panel">
+        {binding}
         <div className="section-heading">
           <div className="detail-status">
             <Badge doc={doc} />
@@ -1387,7 +1445,9 @@ function DocumentDetail({
                     {line.description}
                     <small>
                       {line.accountCode} ·{' '}
-                      {doc.kind === 'bill' ? t('Operating expenses') : t('Sales revenue')}
+                      {(doc.financialSnapshot ?? doc.financialMeaning)?.accounts.find(
+                        (a) => a.code === line.accountCode,
+                      )?.name ?? t('Selected accounting configuration')}
                     </small>
                   </td>
                   <td className="numeric">{line.quantity}</td>
@@ -1462,6 +1522,7 @@ function DocumentDetail({
 }
 
 function DraftEditor({
+  defaultAccount,
   initial,
   busy,
   error,
@@ -1473,6 +1534,7 @@ function DraftEditor({
   companyProfile,
   onSessionExpired,
 }: {
+  defaultAccount?: string
   initial: Kind | Draft
   busy: boolean
   error: string
@@ -1493,7 +1555,10 @@ function DraftEditor({
     quantity: 1,
     unitCents: 0,
     taxBps: 2100,
-    accountCode: kind === 'bill' ? '5000' : '4000',
+    accountCode:
+      typeof initial === 'string'
+        ? (defaultAccount ?? (kind === 'bill' ? '5000' : '4000'))
+        : (initial.lines[0]?.accountCode ?? ''),
   }
   const [draft, setDraft] = useState<Draft>(() =>
     typeof initial === 'string'
@@ -1780,6 +1845,16 @@ function DraftEditor({
                         value={line.description}
                         onChange={(e) => setLine(index, { description: e.target.value })}
                         placeholder={t('What is this for?')}
+                      />
+                    </label>
+                    <label>
+                      {t('Account code')}
+                      <input
+                        aria-label={`${t('Line account')} ${index + 1}`}
+                        required
+                        maxLength={12}
+                        value={line.accountCode}
+                        onChange={(event) => setLine(index, { accountCode: event.target.value })}
                       />
                     </label>
                     <label>

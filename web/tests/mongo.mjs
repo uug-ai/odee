@@ -19,7 +19,7 @@ async function isolated() {
   const dbPath = join(scratch, 'mongo')
   const documentsDirectory = join(dbPath, 'document-originals')
   await mkdir(dbPath)
-  const server = await MongoMemoryServer.create({
+  const mongoOptions = {
     binary: {
       version: '8.0.16',
       downloadDir: process.env.MONGOMS_DOWNLOAD_DIR,
@@ -29,7 +29,8 @@ async function isolated() {
     },
     instance: { ip: '127.0.0.1', dbPath },
     spawn: { env: process.env },
-  })
+  }
+  let server = await MongoMemoryServer.create(mongoOptions)
   async function verify(selector, phase = '') {
     const uri = server.getUri()
     if (!uri.startsWith('mongodb://127.0.0.1:')) throw new Error('Nonlocal MongoDB')
@@ -56,19 +57,26 @@ async function isolated() {
     await mkdir(documentsDirectory)
     const matrix = await verify(mongoSelector)
     const write = await verify(mongoDiskSelector, 'write')
-    await bounded(server.stop({ doCleanup: false }), 20000, 'MongoDB disk restart stop')
+    const process = server.instanceInfo?.instance?.mongodProcess
+    if (!process?.pid || process.pid < 1) throw new Error('Missing owned MongoDB PID')
+    const exited = new Promise((resolve) => process.once('close', resolve))
+    if (!process.kill('SIGKILL')) throw new Error(`Could not crash owned MongoDB ${process.pid}`)
+    await bounded(exited, 20000, 'Owned MongoDB hard crash')
+    await bounded(server.stop({ doCleanup: false }), 20000, 'MongoDB crash handle cleanup')
+    // A crashed instance retains a dead child handle; reopen the same disk with a fresh owner.
+    server = new MongoMemoryServer(mongoOptions)
     await bounded(server.start(), 20000, 'MongoDB disk restart start')
     const read = await verify(mongoDiskSelector, 'read')
     await writeFile(
       join(scratch, 'summary.json'),
       JSON.stringify(
-        { mongo: '8.0.16 standalone', diskRestart: true, matrix, write, read },
+        { mongo: '8.0.16 standalone', diskRestart: true, hardCrash: true, matrix, write, read },
         null,
         2,
       ),
     )
   } finally {
-    await bounded(server.stop(), 20000, 'MongoDB shutdown')
+    await bounded(server.stop({ doCleanup: false }), 20000, 'MongoDB shutdown')
   }
 }
 if (process.argv.includes('--isolated')) {

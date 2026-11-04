@@ -164,6 +164,7 @@ func TestMongoDiskPersistence(t *testing.T) {
 	if phase == "" {
 		t.Skip("run npm run test:mongo for daemon-restart verification")
 	}
+	t.Run("configuration", func(t *testing.T) { configurationDiskProof(t, phase) })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	company := primitive.ObjectID{2}

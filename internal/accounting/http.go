@@ -39,6 +39,13 @@ func (s *Server) Handler() http.Handler {
 	s.uploadSlots = make(chan struct{}, 2)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/state", s.require(s.state, Read))
+	mux.HandleFunc("GET /api/accounting-configuration", s.require(s.getConfiguration, Read))
+	mux.HandleFunc("PUT /api/accounting-configuration/stage", s.require(s.stageConfiguration, Read, Admin))
+	mux.HandleFunc("POST /api/accounting-configuration/versions", s.require(s.publishConfiguration, Read, Admin))
+	mux.HandleFunc("GET /api/accounting-configuration/versions", s.require(s.listPublishedConfigurations, Read))
+	mux.HandleFunc("GET /api/accounting-configuration/versions/{id}", s.require(s.getPublishedConfiguration, Read))
+	mux.HandleFunc("POST /api/accounting-configuration/activate", s.require(s.activateConfiguration, Read, Admin))
+	mux.HandleFunc("POST /api/documents/{id}/configuration", s.require(s.rebindConfiguration, Read, Write))
 	mux.HandleFunc("GET /api/company-profile", s.require(s.getCompany, Read))
 	mux.HandleFunc("PUT /api/company-profile", s.require(s.saveCompany, Read, Admin))
 	mux.HandleFunc("GET /api/contacts", s.require(s.listContacts, Read))
@@ -188,10 +195,16 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 	for _, doc := range docs {
 		doc.NormalizeOwnership()
 		if doc.OrganisationID == s.Company && doc.ProjectID == s.Company {
+			doc.displayFinancialMeaning()
 			scoped = append(scoped, doc)
 		}
 	}
 	docs = scoped
+	configView, err := s.configurationView(r)
+	if err != nil {
+		apiError(w, err)
+		return
+	}
 	imports := []BillImport{}
 	contacts := []Contact{}
 	var profile *CompanyProfile
@@ -229,7 +242,7 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 	}
 	reply(w, http.StatusOK, map[string]any{
 		"company": s.Name, "currency": "EUR", "demo": s.Demo, "development": s.Dev,
-		"accounts": Accounts, "documents": docs,
+		"accounts": Accounts, "documents": docs, "configuration": configView,
 		"contacts":       contacts,
 		"companyProfile": profile,
 		"imports":        imports, "scannerReady": scannerReady, "scannerError": scannerError,
@@ -246,6 +259,10 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		err = s.Store.Create(r.Context(), doc)
 	}
 	if err != nil {
+		if errors.Is(err, ErrUncertain) {
+			reply(w, 503, map[string]any{"error": ErrUncertain.Error(), "code": "reconciliation_required", "documentId": doc.ID})
+			return
+		}
 		apiError(w, err)
 		return
 	}
@@ -322,7 +339,10 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) {
 	}
 	doc, ok := s.load(w, r, input.Version)
 	if ok {
-		err := doc.Post()
+		data, err := selectedConfiguration(r.Context(), s.Store, doc)
+		if err == nil {
+			err = doc.Post(data)
+		}
 		if err == nil {
 			err = doc.attribute(r.Context(), "document.post")
 		}
