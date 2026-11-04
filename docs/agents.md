@@ -118,6 +118,66 @@ repeating the same attempt. Continue unrelated safe work. If there is no
 actionable work, checkpoint and wait; do not invent scope or rerun green tests
 indefinitely.
 
+## Slack progress reporting (planned, not enabled)
+
+The coordinator will publish progress to the user's designated Slack channel
+using the configured Slack app. PM, feature and tester handoffs remain the input;
+individual workers do not receive Slack credentials or post independently.
+Slack is a reporting surface, not the execution ledger or an approval mechanism.
+
+### Configuration and activation
+
+- Configure the destination with `ODEE_SLACK_CHANNEL_ID` in the coordinator's
+  run configuration, and `ODEE_SLACK_BOT_TOKEN` through a secret manager or
+  protected runtime secret. Do not hardcode a channel or credential in source.
+- Revoke and replace any token shared in chat before activation. Never copy
+  tokens into Git, PRs, roadmap files, handoffs, logs, screenshots or messages,
+  and do not request replacement credentials in chat.
+- Invite the bot to the designated channel and grant only the needed
+  `chat:write` permission. Do not add broad channel-history or admin scopes
+  merely to send updates.
+- Keep credentials out of feature/tester environments and synthetic test
+  fixtures. Implement and validate the reporter separately before enabling it;
+  this planning section does not claim that notifications are already running.
+
+### Milestones and message contract
+
+Post meaningful state changes, not every command or test assertion:
+
+- Feature assignment or a coherent candidate PR ready for independent testing.
+- Tester FAIL/BLOCKED findings, the repair plan and a repaired candidate entering
+  retest; retain the earlier failure rather than replacing it with a green retry.
+- QA results with completed/required role counts, outstanding checks and gaps.
+  Partial PASS, green CI, local integration and actual GitHub merge are distinct.
+- A verified protected-main merge, its real merge SHA and the next unlocked work.
+- Material PM scope/specification changes, dependency blockers and checkpoints
+  when the loop pauses, stops or has no actionable work.
+
+Use one parent message per feature PR and threaded milestone updates where
+possible. Include the ticket/revision, concise outcome, exact candidate or merge
+SHA, PR link, role/CI status, limitations and next action. Publish only sanitized
+summaries: no source dumps, private evidence, credentials, personal/business
+records, real invoice data or private browser captures.
+
+### Reliability and acceptance
+
+The reporter must honor the same user stop/control state, without a separate
+polling daemon. Persist nonsecret event/delivery receipts and deduplicate by
+repository, PR/ticket, revision, SHA and event/role. Claim delivery only after
+Slack acknowledges the intended channel/message; HTTP success alone does not
+make an `ok: false` response successful. Surface missing configuration,
+permission failures and delivery errors explicitly, without exposing tokens.
+Respect rate-limit retry instructions with bounded attempts. An uncertain
+send is not proof of failure: record it for reconciliation instead of blindly
+reposting or promising exactly-once Slack delivery.
+
+Validate formatting, redaction, event deduplication, partial QA/merge labels,
+stop behavior, Slack API errors, rate limits and uncertain outcomes with a
+mocked transport. Before live enablement, verify the rotated secret, bot channel
+membership and a deliberately authorized test message. Notification failure
+remains visible but never changes a QA verdict, invents delivery or bypasses a
+merge/release gate. No live Slack request is authorized by a synthetic test.
+
 ## Feature pull requests and merge tracking
 
 Use one pull request per independently testable feature ticket. Keep its repair
