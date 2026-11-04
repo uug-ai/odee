@@ -141,10 +141,15 @@ test(`D013/D014 actual finding/capability packet: revision, handoff, failure, st
     for (const capabilityId of change.capabilityIds) {
       const capability = matrix.capabilities.find((item) => item.id === capabilityId);
       assert.ok(capability, `${capabilityId} must resolve to the actual matrix`);
-      assert.equal(capability.pmDecisionId, change.decisionId);
       const historicalChange = change.ticketChanges.find((item) => capability.tickets.includes(item.ticket));
-      assert.equal(capability.plannedTicketRevision, historicalChange.toRevision);
-      assert.ok(manifest.tickets.find((ticket) => ticket.id === historicalChange.ticket).revision >= historicalChange.toRevision);
+      const plannedDecision = manifest.planningChanges.find((item) =>
+        item.decisionId === capability.pmDecisionId && item.capabilityIds?.includes(capabilityId));
+      assert.ok(plannedDecision, `${capabilityId} must name a recorded planning decision`);
+      const plannedChange = plannedDecision.ticketChanges.find((item) => item.ticket === historicalChange.ticket);
+      assert.ok(plannedChange, "current capability planning must resolve to the historical ticket");
+      assert.equal(capability.plannedTicketRevision, plannedChange.toRevision);
+      assert.ok(plannedChange.toRevision >= historicalChange.toRevision);
+      assert.ok(manifest.tickets.find((ticket) => ticket.id === plannedChange.ticket).revision >= plannedChange.toRevision);
       assert.equal(capability.deliveredSha, null, "planning cannot invent delivered application evidence");
       assert.deepEqual(capability.qaEvidence, []);
       if (change.findingIds.length) assert.deepEqual(capability.originatingFindingIds, change.findingIds);
@@ -156,7 +161,8 @@ test(`D013/D014 actual finding/capability packet: revision, handoff, failure, st
   assert.equal(source.url, "https://www.odoo.com/documentation/20.0/applications/finance/accounting/customer_invoices/credit_notes.html");
   assert.deepEqual(creditSpec.sourceRefs, creditChange.sourceRefs);
   assert.equal(creditSpec.referenceVersion, source.version);
-  assert.match(creditSpec.acceptance.at(-1), /24200 cents.*10000-cent.*12100 cents.*2100 cents/);
+  // Later decisions append after D014's fifth criterion.
+  assert.match(creditSpec.acceptance[4], /24200 cents.*10000-cent.*12100 cents.*2100 cents/);
 
   const f = fixture(t, baseline);
   f.run("init");

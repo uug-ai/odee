@@ -135,6 +135,34 @@
       "ticketChanges": [{"ticket": "ODEE-008", "fromRevision": 1, "toRevision": 2}],
       "rationale": "Pin immutable-version coexistence, activation/posting race semantics and original-binding payments; add localization dependency and browser/localization QA without weakening existing criteria. Initial source evidence was b17e722; accepted d65d055 retains byte-identical accounting backend rules and translated equivalent historical-account lookup.",
       "candidateBoundary": "Future ODEE-008 only, after ODEE-006 QA/integration and before ODEE-008 dispatch. Preserve serialization, ODEE-006 revision 1 and exact-SHA evidence, execution state and existing QA gates; coordinator alone integrates and reconciles this packet."
+    },
+    {
+      "id": "PM-20261104-009-POLICY-LINEAGE",
+      "recordedOn": "2026-11-04",
+      "decisionId": "D019",
+      "classification": "missing-or-ambiguous-requirement",
+      "findingIds": ["PM-NEXT-009-POLICY-LINEAGE-20261104"],
+      "capabilityIds": ["CAP-EXACT-AMOUNTS"],
+      "evidenceBaseSha": "04562c9e72e513abacf0c90d868f80414b141c3c",
+      "candidateBaseSha": "04562c9e72e513abacf0c90d868f80414b141c3c",
+      "evidenceBaseStatus": "Recovered UNACCEPTED finance-configuration draft PR9, not remote delivery or finance acceptance.",
+      "ticketChanges": [{"ticket": "ODEE-009", "fromRevision": 1, "toRevision": 2}],
+      "rationale": "Pin persisted calculation-policy lineage and recognized legacy verification/payment compatibility independently of immutable chart bindings; require reviewed exact new-policy design without choosing scales, discount order or tax/legal rules. Explicit draft conversion remains optional; recognized legacy drafts remain usable without it.",
+      "candidateBoundary": "Future ODEE-009 only. Coordinator review/final-main reconciliation precede dispatch; preserve all original criteria, metadata, dependencies, QA and serialized leases. No ODEE-008 revision/hash, execution state, grant, acceptance or public-reference pin changes."
+    },
+    {
+      "id": "PM-20261104-011-LOCK-CORRECTION-LINEAGE",
+      "recordedOn": "2026-11-04",
+      "decisionId": "D019",
+      "classification": "missing-or-ambiguous-requirement",
+      "findingIds": ["PM-NEXT-011-LOCK-CORRECTION-LINEAGE-20261104"],
+      "capabilityIds": ["CAP-CREDIT-LOCKS"],
+      "evidenceBaseSha": "04562c9e72e513abacf0c90d868f80414b141c3c",
+      "candidateBaseSha": "04562c9e72e513abacf0c90d868f80414b141c3c",
+      "evidenceBaseStatus": "Recovered UNACCEPTED finance-configuration draft PR9, not remote delivery or finance acceptance.",
+      "ticketChanges": [{"ticket": "ODEE-011", "fromRevision": 2, "toRevision": 3}],
+      "rationale": "Require bounded pre-code operational-lock/correction design, original-history lineage and explicit date/revision/concurrency/uncertain-state recovery across immutable configurations. Retain D014 partial-credit oracles without assuming atomic locks, cross-document transactions, immediate revocation or cash refunds.",
+      "candidateBoundary": "Future ODEE-011 only. Preserve all five original criteria, D014 discovery/history, metadata, dependencies, QA and serialized leases. No duplicate correction/reconciliation feature, ODEE-008 contract change, execution-state change, statutory approval or financial action."
     }
   ],
   "proposedFollowUps": [
@@ -333,7 +361,7 @@
       "pmDecisionId": "D018"
     },
     {
-      "id": "ODEE-009", "revision": 1,
+      "id": "ODEE-009", "revision": 2,
       "title": "Introduce an exact versioned quantity, discount and tax calculation policy",
       "owner": "feature-finance", "priority": 42, "dependsOn": ["ODEE-008"],
       "paths": ["internal/accounting/", "web/src/", "web/tests/", "docs/"],
@@ -341,10 +369,14 @@
         "A documented fixed-scale quantity/price/discount policy rejects overflow and invalid precision and never computes ledger money with binary floating point.",
         "Independent fixtures cover fractional quantities, discount boundaries, mixed rates and explicit line/document rounding adjustments.",
         "The synthetic 2 x EUR100.00 plus 21 percent case yields net 20000, VAT 4200, total 24200 cents consistently in API and UI.",
-        "Existing posted totals and prior rounding policy are preserved; changing policy cannot recalculate historical records."
+        "Existing posted totals and prior rounding policy are preserved; changing policy cannot recalculate historical records.",
+        "Persist an identifiable calculation-policy/schema version for new drafts and posted results independently of the selected chart configuration. Define the quantity, price, discount, tax and rounding interpretation for each supported policy. Existing drafts retain their recognized calculation policy through ordinary save/post and chart activation; any supported policy conversion is an explicit expected-document-version-checked draft operation with a reviewed exact recalculation result, never a refresh of captured partner/company data or a chart rebind. A recognized legacy document without new metadata retains the declared original integer-quantity, integer-cent, per-line half-up policy without migration. Unsupported or genuinely unknown policy/history returns an explicit unresolved outcome without mutation; do not relabel recognized legacy history as unknown merely because the new arithmetic schema differs. Before implementation, document a reviewed exact new-policy design for fixed scales, discount order, rounding/adjustment representation and supported bounds; this refinement chooses none of them and establishes no statutory rule.",
+        "Prove compatibility through the historical verification and payment paths as well as read/display: a recognized legacy invoice with two separate lines, each quantity 1, unit price 1 cent and tax 5000 basis points, has original net 2, tax 2 and total 4 cents. After installing the new calculation policy and activating a different chart version, it remains interpretable and a valid 1-cent manual payment leaves 3 cents outstanding using its original bank/receivable meanings. Preserve its original lines, totals, posted entries and partner/company captures; retain existing payment date, amount, idempotency, version/conflict and uncertain-write rules. Independently prove stale/failed policy conversion leaves the draft unchanged and that calculation-policy metadata, posted financial snapshot/state/version and existing financial audit commit in the same scoped document write."
       ],
       "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-localization"],
-      "epic": "ODEE-F3", "capabilities": ["CAP-EXACT-AMOUNTS"], "risk": "high"
+      "epic": "ODEE-F3", "capabilities": ["CAP-EXACT-AMOUNTS"], "risk": "high",
+      "originatingFindingIds": ["PM-NEXT-009-POLICY-LINEAGE-20261104"],
+      "pmDecisionId": "D019"
     },
     {
       "id": "ODEE-010", "revision": 1,
@@ -361,7 +393,7 @@
       "epic": "ODEE-F3", "capabilities": ["CAP-NUMBERING"], "risk": "high"
     },
     {
-      "id": "ODEE-011", "revision": 2,
+      "id": "ODEE-011", "revision": 3,
       "title": "Correct one posted invoice through linked credit/reversal and fiscal-lock rules",
       "owner": "feature-finance", "priority": 44, "dependsOn": ["ODEE-009", "ODEE-010"],
       "paths": ["internal/accounting/", "web/src/", "web/tests/", "docs/"],
@@ -370,14 +402,18 @@
         "For a 24200-cent invoice paid 10000 cents, credit/refund/allocation fixtures reconcile the remaining 14200 cents without creating an accidental bank transfer or duplicate refund.",
         "A closed-period mutation is rejected server-side; only the declared capability can perform an audited reopen/correction transition.",
         "Duplicate correction requests cannot over-credit; debit-note scenarios outside the accepted initial policy return an explicit unsupported outcome.",
-        "For an immutable posted invoice of two EUR100.00 units plus 21 percent VAT (24200 cents), after a 10000-cent payment, one reviewed credit note for one unit is 12100 cents and leaves 2100 cents receivable when allocated. Retrying correction/allocation cannot create another credit or repeat allocation; no automatic cash refund or edit of the original is implied."
+        "For an immutable posted invoice of two EUR100.00 units plus 21 percent VAT (24200 cents), after a 10000-cent payment, one reviewed credit note for one unit is 12100 cents and leaves 2100 cents receivable when allocated. Retrying correction/allocation cannot create another credit or repeat allocation; no automatic cash refund or edit of the original is implied.",
+        "Before implementation, record a bounded operational fiscal-lock/correction design separate from immutable published fiscal-period support flags. Define effective tenant scope, inclusive date boundaries and the accounting date tested for posting, manual payment, credit and allocation, including undated allocation behavior. A supported closed date cannot be bypassed by selecting another configuration version or activating a new default. An otherwise valid payment dated in a supported open period against an invoice from a closed period retains the original frozen bank/receivable bindings and existing payment-date-on-or-after-invoice rule; do not silently move its date, require chart rebind or edit the original invoice. Lock/close/reopen settings require read+admin, correction draft mutation read+write and financial correction/allocation read+post, with no capability implication. Specify observed-lock revision, concurrent close/reopen versus financial-commit ordering and uncertain-result reconciliation; independently exercise the chosen documented safety boundary without claiming unimplemented cross-record atomicity or instantaneous revocation.",
+        "A linked correction identifies the original invoice and expected source version, the exact original line/tax amounts and frozen account meanings being corrected, and the original captured partner/company identity; no current contact/company/default lookup may rewrite that original history. Separately declare and capture the correction's reviewed date, supported period, journal, legal-number policy and any distinct corrective identity instead of silently copying an unsupported source date or substituting current chart meanings. With V1 supporting January and February, a January V1 invoice of 24200 cents already paid 10000 cents, January operationally closed and an unrelated V2 default activated, a reviewed February one-unit credit reverses original revenue 10000 and VAT payable 2100 against original receivable 12100 and, when allocated once, leaves 2100 cents receivable. It creates no bank movement; the original posted lines/totals/entries/captures remain unchanged. Unsupported dates, unknown original meanings or unreviewed corrective identity rules fail explicitly rather than guessing or mutating an immutable configuration.",
+        "Keep correction creation/posting/allocation and close/reopen audit/retry semantics explicit. Before implementation, document durable ordering, authoritative incomplete/uncertain states, source/correction linkage, expected-version and request-key checks, over-credit prevention and bounded recovery on standalone MongoDB. Extend only the financial audit actions and bounded history handling needed for this ticket's declared correction/reopen/allocation transitions; do not imply generic contact/draft/settings audit coverage. Within each affected document preserve ownership/version-filtered atomic financial-state/snapshot/version/audit writes. Independently test restart, duplicate/conflicting requests and committed/uncommitted acknowledgement loss between affected records: no duplicate correction/allocation, false success, successful audit for a rejected transition or silent automatic refund. Cross-document all-or-nothing behavior is not assumed; any genuinely required transaction capability must be explicitly reviewed and gated without silently breaking existing standalone-compatible manual flows."
       ],
       "requiredQa": ["qa-api-data", "qa-integration", "qa-ledger", "qa-belgian-peppol"],
       "epic": "ODEE-F3", "capabilities": ["CAP-CREDIT-LOCKS"], "risk": "high",
       "sourceRefs": ["ODOO-CREDIT-NOTES"],
       "referenceVersion": "20.0",
       "originatingDiscoveryId": "G-CREDIT-PARTIAL-20261103",
-      "pmDecisionId": "D014"
+      "originatingFindingIds": ["PM-NEXT-011-LOCK-CORRECTION-LINEAGE-20261104"],
+      "pmDecisionId": "D019"
     },
     {
       "id": "ODEE-012", "revision": 1,
