@@ -1,6 +1,8 @@
 import { expect, test, type APIRequestContext } from '@playwright/test'
 import type { State } from '../src/types'
 
+test.use({ locale: 'en-GB' })
+
 const destinations = [
   ['/accounting', 'Dashboard'],
   ['/accounting/invoices', 'Customer invoices'],
@@ -374,6 +376,6 @@ test.describe('Dutch new route messages', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.getByRole('link', { name: 'Terug naar de werkruimte' }).click()
     await expect(page).toHaveURL('/')
-    await expect(page.getByRole('button', { name: /Open accounting/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Boekhouding openen/ })).toBeVisible()
   })
 })

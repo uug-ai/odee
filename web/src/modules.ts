@@ -11,6 +11,7 @@ import {
 } from 'iconoir-react'
 import { Contacts } from './Contacts'
 import type { APIRequest, State } from './types'
+import type { StaticKey } from './i18n'
 
 export interface ModuleProps {
   state: State
@@ -38,7 +39,7 @@ function ContactsView({ state, request, onRefresh, onStateChange, canWrite = fal
 }
 
 interface ViewDefinition {
-  title: string
+  title: StaticKey
   path: string
   component?: ComponentType<ModuleProps>
 }
@@ -61,25 +62,25 @@ export const views: Readonly<Record<ModuleView, ViewDefinition>> = registeredVie
 interface NavigationItem {
   view: ModuleView
   icon: typeof Book
-  label: string
-  group?: string
+  label: StaticKey
+  group?: StaticKey
   standalone?: boolean
 }
 
 interface ModuleDetails {
   id: string
-  name: string
-  description: string
+  name: StaticKey
+  description: StaticKey
   icon: typeof Book
 }
 
 interface ActiveModule extends ModuleDetails {
   status: 'active'
   entryView: ModuleView
-  openLabel: string
+  openLabel: StaticKey
   iconClassName?: string
-  workspaceDescription: string
-  navigationLabel: string
+  workspaceDescription: StaticKey
+  navigationLabel: StaticKey
   navigation: readonly NavigationItem[]
 }
 

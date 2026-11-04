@@ -1,4 +1,5 @@
 import type { Document, Journal, Line } from './types'
+import { getLocale } from './i18n'
 
 export function cents(value: string): number {
   if (!/^\d{1,11}(\.\d{1,2})?$/.test(value.trim()))
@@ -17,7 +18,8 @@ export function decimal(value: number) {
 export function money(value: number | bigint): string {
   const amount = BigInt(value)
   const absolute = amount < 0n ? -amount : amount
-  return `${amount < 0n ? '-' : ''}€${new Intl.NumberFormat('en-GB').format(absolute / 100n)}.${String(absolute % 100n).padStart(2, '0')}`
+  const dutch = getLocale() === 'nl'
+  return `${amount < 0n ? '-' : ''}€${dutch ? ' ' : ''}${new Intl.NumberFormat(dutch ? 'nl-NL' : 'en-GB').format(absolute / 100n)}${dutch ? ',' : '.'}${String(absolute % 100n).padStart(2, '0')}`
 }
 
 export function lineTotals(line: Line) {
