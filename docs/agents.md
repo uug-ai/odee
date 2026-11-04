@@ -125,7 +125,9 @@ using the configured Slack app. PM, feature and tester handoffs remain the input
 individual workers do not receive Slack credentials or post independently.
 Slack is a reporting surface, not the execution ledger or an approval mechanism.
 Explicitly authorized coordinator-managed messages have been delivered. This
-does not mean an automated reporter or unattended sending service is installed.
+does not mean automation, unattended sending or acceptance is installed or
+proven. `tools/agents/slack.mjs` is an explicit, bounded coordinator command and
+library; it does not subscribe to the ledger or run a daemon.
 
 ### Configuration and activation
 
@@ -142,7 +144,8 @@ does not mean an automated reporter or unattended sending service is installed.
 - Keep credentials out of feature/tester environments and synthetic test
   fixtures. Bounded coordinator sends require explicit authorization. Implement
   and validate an automated reporter separately before enabling it; manual
-  delivery does not prove that automation exists.
+  delivery does not prove that automation exists. The command is not wired into
+  scheduler mutations, agent jobs or workflows.
 
 ### Intermediate updates, milestones and message contract
 
@@ -168,6 +171,69 @@ SHA, PR link, role/CI status, limitations and next action. Publish only sanitize
 summaries: no source dumps, private evidence, credentials, personal/business
 records, real invoice data or private browser captures.
 
+### Bounded command and structured input
+
+Only the authorized coordinator runs `send`. Always pass the **same canonical
+shared control root** used by the loop; do not initialize another ledger. Use
+one stable receipt root for the coordinator, not one per worker or invocation.
+Both roots must be absolute real directories without symlink aliases. Receipt
+and event paths remain confined to the receipt root; no credentials/config file
+is read. Supply the two environment variables above through the protected
+coordinator environment, never command-line arguments.
+
+```sh
+node tools/agents/slack.mjs --help
+node tools/agents/slack.mjs status --root "$PWD" --control-root "$ODEE_CONTROL_ROOT"
+node tools/agents/slack.mjs send --root "$PWD" --control-root "$ODEE_CONTROL_ROOT" \
+  --event .local-data/slack-event.json
+```
+
+The event file is a small JSON object, not a transcript or arbitrary Slack body.
+Example with entirely synthetic provenance:
+
+```json
+{
+  "repo": "synthetic/fixture",
+  "ticket": "ODEESLACK-002",
+  "revision": 1,
+  "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "pr": 12,
+  "event": "progress",
+  "outcome": "in-progress",
+  "role": "api",
+  "qa": { "passed": 1, "required": 2, "status": "partial" },
+  "ci": "pending",
+  "findings": "One independent role is still pending.",
+  "decision": "Keep the gate pending until the exact head is tested.",
+  "currentAction": "Assigning the remaining role.",
+  "nextSteps": "On PASS inspect CI; on FAIL repair and retest.",
+  "limitations": "Feature author tests are not independent acceptance."
+}
+```
+
+- Required: lowercase `owner/repo`, ticket ID, positive integer `revision`, full
+  lowercase 40/64-character `sha`, `event`, `outcome`, `qa` and `ci`.
+  Optional: positive integer `pr`, safe lowercase role identifier and the five
+  summary fields shown above. A PR URL is constructed, never supplied.
+- Events: `progress`, `candidate`, `qa`, `repair`, `integration`, `merge`,
+  `checkpoint`. Outcomes: `in-progress`, `ready-for-qa`, `pass`, `fail`, `blocked`,
+  `local-integration`, `merged`, `paused`, `stopped`. Only `merge` may report
+  `merged`; only `integration` may report `local-integration`. A `pass` outcome
+  requires a `qa` event and role; every `qa` event requires a role.
+- QA has integer `passed`/`required` counts (at most 100 roles) and overall status
+  `pending`, `partial`, `pass`, `fail` or `blocked`. Overall PASS requires all
+  nonzero required roles; partial PASS remains explicitly partial.
+  CI is `not-run`, `pending`, `pass`, `fail`, `blocked` or `unavailable`, and means
+  supplied **remote** CI status, not feature-author local test results.
+- Summaries are optional single-line ASCII prose, at most 220 characters each.
+  Unknown fields, mentions, markup, links, multiline dumps and recognizable
+  credential patterns are rejected, not silently redacted. Do not paste raw
+  source, personal/business records or private evidence even if it would pass
+  these syntactic checks: validation is **not proof of confidentiality**.
+  Messages use Slack plain-text blocks, disable mention/link parsing and previews,
+  and preserve supplied QA/CI/merge distinctions. The reporter records supplied
+  facts; it does not independently verify them or grant acceptance.
+
 ### Reliability and acceptance
 
 The reporter must honor the same user stop/control state, without a separate
@@ -179,6 +245,61 @@ permission failures and delivery errors explicitly, without exposing tokens.
 Respect rate-limit retry instructions with bounded attempts. An uncertain
 send is not proof of failure: record it for reconciliation instead of blindly
 reposting or promising exactly-once Slack delivery.
+
+The command posts only to the official
+`https://slack.com/api/chat.postMessage` endpoint with redirects disabled.
+One delivered parent per repository/PR (or ticket before PR assignment) receives
+subsequent updates in its thread. Moving from ticket-only to a PR creates a new
+PR parent, not an inferred link to the earlier ticket thread. All invocations
+must share the receipt root; using another root can create duplicates.
+
+Nonsecret, mode-0600 atomic receipts live in `.odee/slack/receipts.json`.
+They retain event identity, payload digest, channel/message/thread identifiers,
+timestamps, sanitized failure codes and bounded prior-attempt history, **not**
+tokens, raw message text or response bodies. Identity is repository, PR/ticket,
+revision, full SHA and event/role. Identical replay returns its receipt without
+sending; changed content or destination under that identity fails
+`PAYLOAD_MISMATCH`. Use a new truthful event/role, revision or head for new facts,
+not changes intended to evade deduplication. Channel changes for an existing PR
+scope fail closed as well.
+
+An exclusive **reporter** lock covers durable pre-send intent through receipt
+commit, including the bounded request (10 seconds by default; library maximum
+30 seconds). It never holds the scheduler state lock through a network operation.
+Control is fully read/validated before preparing a send and again immediately
+before the request. Pause/stop suppresses delivery; it cannot recall an in-flight
+request or eliminate the race after the final check. No QA or scheduler state
+is mutated, even when notification fails.
+
+`status` is read-only and exposes receipts plus lock presence. A crashed process
+may leave both a stale exclusive ownership lock and an `intended` receipt.
+Do not delete a live lock or infer failure from process death. After proving the
+exact lock owner has exited, the coordinator must inspect/reconcile it manually;
+there is no automatic stale-lock deletion or uncertain-delivery override here.
+`intended` and `uncertain` identities are never resent, even with `--retry`.
+An uncertain parent blocks new events for that PR until external reconciliation.
+The CLI deliberately provides no automatic reconciliation/receipt rewrite;
+retain evidence and resolve with an authorized operator rather than bypassing
+the safeguard with another root.
+
+Only acknowledged Slack `ok: true` with the intended channel, valid message
+timestamp and (for updates) matching thread acknowledgement is delivered.
+`ok: false` is a sanitized failure. Timeouts (including stalled response bodies),
+lost/malformed/mismatched responses, redirects, HTTP 408 and server errors are
+uncertain. HTTP 4xx rejection and explicit Slack API errors are known failures.
+A 429 records `retryAt` from integer `Retry-After` (60 seconds if invalid); there
+is no automatic retry or wait loop. An explicit later `send ... --retry` may
+retry only known failed/rate-limited/control-cancelled events, after `retryAt`,
+retaining earlier failures (at most 20 retries per identity). Delivered and
+uncertain events cannot be retried. The bounded store accepts 2000 identities;
+exhaustion requires operator planning, never automatic deletion of dedupe state.
+
+Exit codes: 0 for delivery/status/help, 1 for failed/uncertain/invalid commands,
+2 for control-suppressed/cancelled sends. Missing config and auth/permission
+failures remain explicit sanitized errors. Root/symlink/hardlink checks protect
+against accidental path escapes/overwrites; trusted, access-controlled local
+directories are still required. This is not a sandbox against another process
+with filesystem mutation privileges or a substitute for OS permissions.
 
 Validate formatting, redaction, event deduplication, partial QA/merge labels,
 stop behavior, Slack API errors, rate limits and uncertain outcomes with a
