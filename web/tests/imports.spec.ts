@@ -14,7 +14,7 @@ test.afterAll(async () => {
 test('drop a PDF, review beside original, save draft, deduplicate and retain after posting', async ({
   page,
 }) => {
-  await page.goto('/')
+  await page.goto('http://localhost:8099/')
   await page.getByRole('button', { name: /Open accounting/ }).click()
   await page
     .getByRole('navigation')
@@ -84,6 +84,48 @@ test('drop a PDF, review beside original, save draft, deduplicate and retain aft
   expect(downloaded.suggestedFilename()).toBe('digital.pdf')
   const downloadedPath = await downloaded.path()
   expect(await readFile(downloadedPath!)).toEqual(await readFile(join(directory, 'digital.pdf')))
+})
+
+test('prefill paid-bill lines from invoice totals without importing a payment', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: /Open accounting/ }).click()
+  await page
+    .getByRole('navigation')
+    .getByRole('button', { name: /^Bills$/ })
+    .click()
+  await page.getByLabel('Upload bills').setInputFiles(join(directory, 'paid.pdf'))
+  await expect(page.getByText('Ready for review', { exact: true })).toBeVisible()
+  await page
+    .getByRole('row')
+    .filter({ hasText: 'paid.pdf' })
+    .getByRole('button', { name: 'Review original' })
+    .click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByLabel('Line 1 description')).toHaveValue('Managed service')
+  await expect(dialog.getByLabel('Line 1 quantity')).toHaveValue('2')
+  await expect(dialog.getByLabel('Line 1 unit price')).toHaveValue('100.00')
+  await expect(dialog.getByLabel('Line 1 VAT')).toHaveValue('2100')
+  await expect(dialog.getByText(/Verify prior payments separately/)).toBeVisible()
+  await expect(dialog.locator('.scanned-totals')).toContainText('€242.00')
+  await expect(dialog.locator('.editor-total')).toContainText('€242.00')
+  await expect(dialog.locator('.discrepancy')).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: 'Save draft' })).toBeDisabled()
+  await dialog.getByRole('checkbox', { name: /I checked the original, supplier/ }).check()
+  await dialog.getByRole('button', { name: 'Save draft' }).click()
+  await expect(dialog).toHaveCount(0)
+  const state = await (await page.request.get('/api/state')).json()
+  const draft = state.documents.find(
+    (doc: { reference: string }) => doc.reference === 'PAID-EXAMPLE-001',
+  )
+  expect(draft.subtotal).toBe(20000)
+  expect(draft.tax).toBe(4200)
+  expect(draft.total).toBe(24200)
+  expect(draft.status).toBe('draft')
+  expect(draft.paid).toBe(0)
+  expect(draft.payments).toEqual([])
+  expect(draft.entries).toEqual([])
 })
 
 test('browse an image batch, surface failures, and keep mobile review usable', async ({ page }) => {

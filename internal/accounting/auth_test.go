@@ -37,7 +37,11 @@ func authHandler(auth *GitHubAuth) http.Handler {
 }
 
 func authRequest(handler http.Handler, method, path, body string, cookies []*http.Cookie, csrf, origin string) *httptest.ResponseRecorder {
-	r := httptest.NewRequest(method, path, strings.NewReader(body))
+	target := path
+	if strings.HasPrefix(path, "/") {
+		target = "https://odee.example" + path
+	}
+	r := httptest.NewRequest(method, target, strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("X-CSRF-Token", csrf)
 	r.Header.Set("Origin", origin)
@@ -305,9 +309,24 @@ func TestGitHubOAuthRejectsInvalidState(t *testing.T) {
 
 func TestGitHubLoopbackCookies(t *testing.T) {
 	auth := testGitHubAuth(t)
-	auth.config.Origin = "http://localhost:8098"
-	login := authRequest(authHandler(auth), "GET", "/auth/github", "", nil, "", "")
+	auth.config.Origin = "http://127.0.0.1:8098"
+	login := authRequest(authHandler(auth), "GET", "http://127.0.0.1:8098/auth/github", "", nil, "", "")
 	if auth.cookieName() != "odee_session" || login.Result().Cookies()[0].Secure {
 		t.Fatal("loopback cookies cannot be used over local HTTP")
+	}
+}
+
+func TestGitHubLoginUsesCanonicalCookieHost(t *testing.T) {
+	auth := testGitHubAuth(t)
+	auth.config.Origin = "http://127.0.0.1:8098"
+	handler := authHandler(auth)
+	rec := authRequest(handler, "GET", "http://localhost:8098/auth/github", "", nil, "", "")
+	if rec.Code != 302 || rec.Header().Get("Location") != auth.config.Origin+"/auth/github" || len(rec.Result().Cookies()) != 0 {
+		t.Fatal("alias host must redirect before creating the OAuth state cookie")
+	}
+	rec = authRequest(handler, "GET", auth.config.Origin+"/auth/github", "", nil, "", "")
+	target, err := url.Parse(rec.Header().Get("Location"))
+	if err != nil || target.Host != "github.com" || target.Query().Get("redirect_uri") != auth.config.Origin+"/auth/github/callback" || len(rec.Result().Cookies()) != 1 {
+		t.Fatal("canonical origin did not start OAuth with a same-host callback cookie")
 	}
 }

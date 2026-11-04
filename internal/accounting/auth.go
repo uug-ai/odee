@@ -71,10 +71,11 @@ type oauthState struct {
 }
 
 type GitHubAuth struct {
-	config   AuthConfig
-	client   *http.Client
-	oauthURL string
-	apiURL   string
+	config       AuthConfig
+	client       *http.Client
+	authorizeURL string
+	oauthURL     string
+	apiURL       string
 }
 
 func NewGitHubAuth(config AuthConfig) (*GitHubAuth, error) {
@@ -86,8 +87,9 @@ func NewGitHubAuth(config AuthConfig) (*GitHubAuth, error) {
 		client: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		}},
-		oauthURL: "https://github.com/login/oauth/access_token",
-		apiURL:   "https://api.github.com",
+		authorizeURL: "https://github.com/login/oauth/authorize",
+		oauthURL:     "https://github.com/login/oauth/access_token",
+		apiURL:       "https://api.github.com",
 	}, nil
 }
 
@@ -182,6 +184,15 @@ func (a *GitHubAuth) Authorize(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (a *GitHubAuth) login(w http.ResponseWriter, r *http.Request) {
+	origin, err := url.Parse(a.config.Origin)
+	if err != nil {
+		a.fail(w, err)
+		return
+	}
+	if !strings.EqualFold(r.Host, origin.Host) {
+		http.Redirect(w, r, a.config.Origin+"/auth/github", http.StatusFound)
+		return
+	}
 	state, err := authRandomToken()
 	if err != nil {
 		a.fail(w, err)
@@ -204,7 +215,7 @@ func (a *GitHubAuth) login(w http.ResponseWriter, r *http.Request) {
 		"scope": {"read:user read:org"}, "state": {state},
 		"code_challenge": {base64.RawURLEncoding.EncodeToString(challenge[:])}, "code_challenge_method": {"S256"},
 	}
-	http.Redirect(w, r, "https://github.com/login/oauth/authorize?"+query.Encode(), http.StatusFound)
+	http.Redirect(w, r, a.authorizeURL+"?"+query.Encode(), http.StatusFound)
 }
 
 func (a *GitHubAuth) callback(w http.ResponseWriter, r *http.Request) {

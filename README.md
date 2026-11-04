@@ -20,6 +20,9 @@ an Odoo code fork. No live Odoo records, balances, or assets are bundled.
 - Company-scoped MongoDB reads/writes and optimistic concurrency: stale writes
   return HTTP 409 instead of overwriting another change.
 - Responsive layout, accessible native dialogs, and keyboard dismissal.
+- Light/dark appearance toggle in the header, including the login screen.
+  Until a choice is saved, appearance follows the system setting. The choice
+  is stored in this browser and synchronized across tabs, not in MongoDB.
 - Drag/drop or browse multiple vendor bills (PDF, PNG, JPEG), scan locally,
   review suggestions alongside the original, and save attached bill drafts.
 - Contacts application: company/person cards, search and filters, create/edit,
@@ -65,7 +68,7 @@ set +a
 GOWORK=off go run ./cmd/odee
 ```
 
-Open **http://localhost:8098** (matching `ODEE_ORIGIN`). The backend serves the compiled frontend and API
+Open **http://127.0.0.1:8098** (matching `ODEE_ORIGIN`). The backend serves the compiled frontend and API
 on the same origin. Environment files are not loaded automatically.
 
 Normal mode requires `MONGODB_URI`; there is **no automatic memory fallback**.
@@ -76,8 +79,8 @@ operations for this interactive OLTP workload; monitor pool wait time,
 connection counts, and operation latency before tuning the pool.
 Import requests have a separate 180-second context for local scanning.
 
-The app creates `accounting_documents`, `contacts`, the `bill_imports` GridFS bucket
-(`bill_imports.files` / `bill_imports.chunks`), and required indexes. Use a
+The app creates `accounting_documents`, `contacts`, `bill_imports.files` metadata,
+GridFS `bill_imports.chunks` when used, and required indexes. Use a
 dedicated database, least-privilege credentials, TLS for nonlocal MongoDB,
 backups, and a tested recovery process. Never point unattended tests at your
 production database. Application validation enforces this release's schema;
@@ -98,16 +101,26 @@ This is not a persistence mode and is never selected because a database failed.
 From the monorepo VS Code workspace, **Tasks: Run Task → odee: run demo**
 starts the same temporary demo at **http://localhost:8098** in a dedicated terminal.
 
-### Persistent local workspace
+### Persistent workspace
 
-Copy `.env.example` to `.env.local` and configure GitHub OAuth credentials
-and a random persistent `SESSION_SECRET` first. The callback must permit
-`http://localhost:8098/auth/github/callback`. Then build the frontend and run
+Copy `.env.example` to `.env.local` and configure `MONGODB_URI`,
+`MONGODB_DATABASE_ODEE` and the company scope first. Then run
 **Tasks: Run Task > odee: run local** from the monorepo workspace.
-It starts a dedicated standalone MongoDB on loopback port 27028 and the app at
-**http://localhost:8098**, using database `odee_local`. Stop any existing Odee
-demo on that port first; temporary demo records are not transferred.
+It builds the frontend and starts the app with authentication bypassed at
+**http://127.0.0.1:8098**, using the saved MongoDB connection and database.
+In this explicit development mode, `localhost` and loopback IP aliases work on
+the same scheme and port when the request host matches the browser origin.
+Production/token and GitHub-authenticated modes still require the exact origin.
+Only this task overrides `ODEE_AUTH_MODE=token` and `ODEE_DEV_MODE=true`;
+the saved GitHub settings remain unchanged for normal authenticated runs.
+It does not start MongoDB or override the configured database. Stop any existing
+Odee instance on that port first; temporary demo records are not transferred.
+With a cloud MongoDB connection, this workspace accesses live cloud data, not a
+local copy. Keep the app port and any editor port forwarding private.
 
+For optional local storage, run **Tasks: Run Task > odee: local MongoDB** and
+configure `MONGODB_URI=mongodb://127.0.0.1:27028` and
+`MONGODB_DATABASE_ODEE=odee_local` in `.env.local` before starting the app.
 The MongoDB binary is cached/downloaded using the existing development tooling.
 Database and original-file data live in the ignored `.local-data/mongo` directory
 and survive app/database restarts. Do not delete that directory to restart the
@@ -134,7 +147,8 @@ The container serves both the Go API and built frontend on port 8098. It runs
 as UID/GID 10001 and includes Poppler, Tesseract and the English, Dutch and French
 language packs. Runtime application credentials are not built into the image.
 Provide a writable private `/tmp` for scanning when using a read-only filesystem;
-original documents remain in MongoDB GridFS, not the container filesystem.
+original documents use MongoDB GridFS. To also save new uploads on a mounted
+volume, set `ODEE_DOCUMENTS_DIR` to its absolute writable path.
 
 GitHub Actions runs backend race tests/vet, frontend tests/build, isolated MongoDB
 tests, native scanner tests and browser tests. Both Linux amd64 and arm64 runtime
@@ -177,12 +191,18 @@ rows are proposed when possible; otherwise a reconciled summary line or manual
 completion is required. Missing/ambiguous fields are flagged. Non-EUR documents
 are retained but cannot be converted into EUR bills. A difference between the
 entered and scanned total needs explicit acknowledgement.
+Invoice totals take precedence over a remaining balance due, including on
+already-paid bills. VAT amounts must follow their own labels; table headers
+cannot borrow amounts from adjacent payment columns. A different payment balance
+is flagged for review and never creates a payment automatically. After a parser
+update, use **Retry scan** on an unconverted original to refresh its proposed lines.
 
 Limits: 20 MiB/file, 20 files/batch, 10 PDF pages, and 20 million pixels/image
 (maximum 20,000 pixels per dimension). Batches process serially; the server
 accepts two concurrent uploads/scans. Scanning is bounded to 120 seconds and
 preview rendering to 20 seconds. Private temporary scan files are removed after
-processing; originals remain in company-scoped GridFS.
+processing; originals remain in company-scoped GridFS, with additional copies on
+the explicitly configured document volume.
 
 Byte-identical duplicates reuse the existing original. A matching supplier and
 invoice number on an existing bill produces a warning, not an automatic
@@ -193,8 +213,41 @@ stable original ID so retrying cannot create a second bill.
 
 In **demo mode**, both bills and original files are temporary (200 MiB total
 original-file memory limit) and disappear on restart. Use MongoDB for real
-documents and include both GridFS collections in backups. Missing OCR tools
+documents and include the MongoDB records, both GridFS collections and any
+configured document volume in backups. Missing OCR tools
 disable scanning, not original storage or manual draft creation.
+
+### Persistent document volume
+
+Set `ODEE_DOCUMENTS_DIR=/data/documents` and mount a persistent filesystem at that
+path to also store new original uploads on disk. The directory must already exist and
+be writable by UID/GID 10001 in the container; missing, read-only or relative paths
+fail startup. The read-only container root remains enabled, and OCR scratch stays
+separate in `/tmp`. Do not point this setting at an `emptyDir` or the image layer.
+
+Accounting, contacts, import metadata and shared original downloads still use
+the configured MongoDB/GridFS database. This preserves access from a local
+workspace sharing the database without access to the staging PVC. Existing
+originals remain readable without migration; historical files and duplicates
+are not automatically backfilled onto the volume.
+
+The configured volume is mandatory for each new upload on that deployment:
+Odee syncs and atomically publishes a disk copy before committing GridFS bytes
+and metadata. A missing/unwritable volume or inconsistent existing copy fails
+the upload, never silently skips the copy. Disk copies are scoped by BSON
+organisation/project IDs and a SHA-256 content key, never by user filenames;
+concurrent duplicates share one verified file. Scan/review metadata updates
+cannot change its path. A failed MongoDB acknowledgement never deletes a
+published copy: an unreferenced file may remain for retry/recovery.
+
+GridFS remains the authoritative source for downloads and scanning, not a
+fallback for disk reads. Keep the same PVC and a volume-aware image on rollback
+to continue making disk copies; an older image would leave them incomplete.
+
+Back up MongoDB and the volume together, quiescing uploads for a coordinated
+snapshot; retain GridFS backups for historical originals. A PVC is persistence,
+not a backup. Uploaded supplier invoices/bills remain originals, not generated
+customer-invoice PDFs.
 
 ## Contacts and copying from Odoo
 
@@ -273,6 +326,7 @@ Keep local development access private and back up the database.
 | `ODEE_COMPANY_ID` | Stable nonzero BSON ObjectID used for both ownership axes. |
 | `MONGODB_URI` | MongoDB connection string. Keep credentials out of Git. |
 | `MONGODB_DATABASE_ODEE` | Dedicated database; default `odee`. |
+| `ODEE_DOCUMENTS_DIR` | Optional absolute writable persistent directory for additional original copies; GridFS remains shared and authoritative. |
 | `ODEE_DEV_MODE=true` | Explicit unauthenticated local mode; loopback bind only. |
 | `ODEE_DEMO=true` | Temporary memory store; requires development mode. |
 | `ODEE_AUTH_MODE` | `github` for team login; `token` (legacy default) for access-token/local development mode. |
@@ -292,9 +346,14 @@ unverifiable team membership, provider failures and pending memberships fail
 closed. GitHub mode never accepts a company access token or development bypass.
 
 Create a GitHub OAuth app with callback
-`http://localhost:8098/auth/github/callback` for local use, or
+`http://127.0.0.1:8098/auth/github/callback` for local use, or
 `https://<your-odee-host>/auth/github/callback` for deployment. Keep `ODEE_ORIGIN`
-equal to the browser's exact origin. Use a separate OAuth app for Odee if
+equal to the browser's exact origin. Prefer a literal loopback IP rather than
+`localhost` for local OAuth, as recommended by GitHub. Login redirects to the
+configured origin before setting its state cookie, so opening the app through a
+`localhost` alias cannot lose that cookie on an IP-based callback. A reverse
+proxy must preserve the browser's Host header.
+Use a separate OAuth app for Odee if
 Calendar's registered callback does not also permit this redirect; do not
 change Calendar's callback to Odee's. Store credentials in ignored `.env.local`
 or a secret manager, never in the frontend or Git. Generate an Odee-specific
@@ -310,13 +369,14 @@ not on every request. Rotate the session key and restart to revoke all existing
 sessions immediately. Sign out removes this browser's session; a copied signed
 cookie remains valid until expiry or key rotation.
 
-All workspace APIs, including contacts, uploads, previews and original PDFs,
+In GitHub mode, all workspace APIs, including contacts, uploads, previews and original PDFs,
 require a valid session. Writes and logout additionally require the exact
 origin and per-session CSRF token. `/api/session` exposes only login status and
 access policy before login; the frontend does not fetch workspace data until
 authenticated, and clears cached data/dialogs on logout or an expired session.
 Use HTTPS outside loopback. The root `odee: run local` task loads `.env.local`,
-uses the existing persistent local MongoDB and runs with GitHub authentication.
+retains its MongoDB connection/database and explicitly bypasses authentication
+on loopback for local development. Normal runs use the configured authentication mode.
 The Vite development proxy also forwards `/auth`; for OAuth use the configured
 `ODEE_ORIGIN`, not a different development-server port.
 
@@ -362,6 +422,7 @@ npm run test:mongo
 npx playwright install chromium
 npm run test:scans
 npm run test:e2e
+npm run test:oauth
 ```
 
 `test:mongo` provisions a disposable local MongoDB binary via
@@ -371,6 +432,10 @@ live database URI. GridFS tests cover original bytes, reconnects, scoped reads,
 duplicate races, stale metadata writes, and runtime legacy ownership.
 It also restarts the disposable MongoDB daemon and verifies that a bill and its
 unchanged original survive on disk under the same stable company ID.
+Filesystem tests additionally verify actual volume bytes alongside GridFS chunks,
+atomic concurrent deduplication, checksum/path guards, legacy GridFS reads,
+metadata updates, HTTP draft/download flows and separate-process restart
+persistence of both filesystem originals and their MongoDB metadata.
 The binary is downloaded on the first run. Linux ARM64 uses
 MongoDB's Ubuntu 22.04 archive (requires libssl3), because MongoDB does not publish
 a Debian ARM64 archive. The Go-only suite
@@ -384,3 +449,12 @@ warnings, failed-scan manual drafts, previews and original downloads after
 posting. `test:scans` generates synthetic PNG/JPEG/image-only and hybrid PDF
 fixtures locally, and asserts actual OCR fields and exact integer totals. Poppler/Tesseract and
 configured language packs are required. No real financial records are fixtures.
+
+`test:oauth` starts an isolated, protected Go server and a controlled GitHub
+provider on different loopback hosts. Chromium completes the real HTTP redirect
+and callback chain, including canonical-host normalization, PKCE token exchange,
+active-team verification, HttpOnly/SameSite cookies, an authenticated contact
+write, CSRF rejection and logout. It does not mock frontend session responses,
+use real GitHub credentials or connect to a real MongoDB database. Build the
+frontend and install Chromium first. The ordinary Go-only suite skips this
+browser integration unless `ODEE_TEST_BROWSER=true`.

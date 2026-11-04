@@ -10,6 +10,7 @@
     "format:check": "prettier --check src tests tools '*.ts' '*.json' index.html",
     "test": "vitest run src",
     "test:e2e": "playwright test",
+    "test:oauth": "cd .. && ODEE_TEST_BROWSER=true GOWORK=off go test ./internal/accounting -run '^TestGitHubBrowserOAuth$' -count=1",
     "test:mongo": "node tests/mongo.mjs",
     "test:scans": "node tests/scans.mjs"
   },

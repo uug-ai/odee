@@ -25,6 +25,26 @@ export async function billFixtures() {
     await page.screenshot({ path: join(directory, 'bill.png') })
     await page.screenshot({ path: join(directory, 'bill.jpg'), type: 'jpeg', quality: 100 })
     await page.pdf({ path: join(directory, 'digital.pdf'), format: 'A4', scale: 0.7 })
+    const paidText = [
+      'Supplier: Example Services Ltd',
+      'Invoice number: PAID-EXAMPLE-001',
+      'Invoice date: 03/11/2026',
+      'Currency: EUR',
+      '',
+      'Omschrijving                  Aantal       Prijs        BTW       Bedrag',
+      'Managed service               2            100,00       21%       200,00',
+      '',
+      '                                           Totaal excl. BTW      200,00',
+      '                                           Totaal BTW             42,00',
+      '                                           Totaal incl. BTW    \u20ac 0.242,00',
+      'BTW       Basis       Bedrag               Reeds betaald         -242,00',
+      '21 %      200,00       42,00',
+      '                                           Te betalen         \u20ac 0.000,00',
+    ].join('\n')
+    await page.setContent(
+      `<html><body style="margin:40px;background:white"><pre style="font:20px/1.7 monospace;color:black">${paidText}</pre></body></html>`,
+    )
+    await page.pdf({ path: join(directory, 'paid.pdf'), format: 'A4', scale: 0.7 })
     const image = await readFile(join(directory, 'bill.png'))
     await page.setContent(
       `<html><body style="margin:0"><img style="width:100%" src="data:image/png;base64,${image.toString('base64')}"></body></html>`,

@@ -47,6 +47,7 @@ import type {
 import { BillImports, OriginalPreview } from './BillImports'
 import { Contacts } from './Contacts'
 import { Modal } from './Modal'
+import { ThemeToggle } from './ThemeToggle'
 
 const titles: Record<View, string> = {
   apps: 'Your workspace',
@@ -328,6 +329,7 @@ export default function App() {
             <span />
             Open source
           </span>
+          <ThemeToggle onError={setError} />
           <span className="company">
             <Building />
             {state?.company ?? 'Odee'}
