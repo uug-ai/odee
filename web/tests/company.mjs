@@ -1,54 +1,23 @@
-import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { mkdir, readdir, copyFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { safeTestEnvironment, reserveTestPort } from '../../tools/agents/workspace.mjs'
 import { repositoryRoot as root } from './test-environment.mjs'
 import { createLocalTransport } from './local-transport.mjs'
+import { requireCompanyResults } from './company-test-results.mjs'
+import {
+  command,
+  run,
+  bounded,
+  installFixtureSignals,
+  provisionMongoBinary,
+  cleanFixtureData,
+} from './owned-fixture.mjs'
 
-const children = new Set()
-function run(command, args, env) {
-  const child = spawn(command, args, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
-  children.add(child)
-  let log = ''
-  for (const stream of [child.stdout, child.stderr])
-    stream.on('data', (data) => {
-      log += data
-    })
-  const done = new Promise((resolve, reject) => {
-    child.once('error', reject)
-    child.once('exit', (code) => {
-      children.delete(child)
-      resolve(code)
-    })
-  })
-  return {
-    child,
-    done,
-    log: () => log,
-    async stop() {
-      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
-      await done
-    },
-  }
-}
-async function command(program, args, env, file) {
-  const task = run(program, args, env)
-  const code = await task.done
-  if (file) await writeFile(file, task.log())
-  if (code !== 0)
-    throw new Error(
-      `${program} ${args.join(' ')} (${code})\n${file ? `Full output: ${file}\n${task.log().slice(-3500)}` : task.log()}`,
-    )
-  if (!file) console.log(task.log())
-  return task.log()
-}
-for (const signal of ['SIGINT', 'SIGTERM'])
-  process.on(signal, () => {
-    for (const child of children) child.kill('SIGTERM')
-  })
+const browserOnly = process.argv.includes('--browser-only')
+installFixtureSignals()
 
 async function isolated() {
   const { MongoMemoryServer } = await import('mongodb-memory-server')
@@ -73,27 +42,29 @@ async function isolated() {
   try {
     const uri = mongo.getUri()
     if (!uri.startsWith('mongodb://127.0.0.1:')) throw new Error('Nonlocal MongoDB')
-    const goLog = await command(
-      'go',
-      ['test', '-race', '-json', '-count=1', './internal/accounting', './cmd/odee'],
-      { ...env, ODEE_TEST_MONGODB_URI: uri },
-      join(scratch, 'go-results.jsonl'),
-    )
-    const events = goLog
-      .split('\n')
-      .filter((s) => s.startsWith('{'))
-      .map((s) => JSON.parse(s))
-    for (const action of ['pass', 'skip', 'fail']) {
-      const top = events.filter((e) => e.Test && !e.Test.includes('/') && e.Action === action)
-      const sub = events.filter((e) => e.Test?.includes('/') && e.Action === action)
-      console.log(
-        `Go ${action}: ${top.length} top-level, ${sub.length} subcases`,
-        action === 'skip' ? top.map((e) => e.Test) : '',
+    if (!browserOnly) {
+      const goLog = await command(
+        'go',
+        ['test', '-race', '-json', '-count=1', './internal/accounting', './cmd/odee'],
+        { ...env, ODEE_TEST_MONGODB_URI: uri },
+        join(scratch, 'go-results.jsonl'),
       )
+      const events = goLog
+        .split('\n')
+        .filter((s) => s.startsWith('{'))
+        .map((s) => JSON.parse(s))
+      for (const action of ['pass', 'skip', 'fail']) {
+        const top = events.filter((e) => e.Test && !e.Test.includes('/') && e.Action === action)
+        const sub = events.filter((e) => e.Test?.includes('/') && e.Action === action)
+        console.log(
+          `Go ${action}: ${top.length} top-level, ${sub.length} subcases`,
+          action === 'skip' ? top.map((e) => e.Test) : '',
+        )
+      }
+      await command('go', ['vet', './internal/accounting', './cmd/odee'], env)
     }
     const binary = join(scratch, 'odee')
     await command('go', ['build', '-o', binary, './cmd/odee'], env)
-    await command('go', ['vet', './internal/accounting', './cmd/odee'], env)
     const reservation = await reserveTestPort()
     const origin = `http://127.0.0.1:${reservation.port}`
     transport = await createLocalTransport([origin])
@@ -144,14 +115,20 @@ async function isolated() {
         'tests/company.config.ts',
         '--grep-invert',
         'read-only',
+        '--reporter=line,json',
       ],
       {
         ...env,
         ODEE_COMPANY_TEST_ORIGIN: origin,
         ODEE_COMPANY_TEST_TOKEN: token,
+        PLAYWRIGHT_JSON_OUTPUT_NAME: join(scratch, 'browser-results.json'),
       },
       join(scratch, 'browser.log'),
     )
+    const browserChildren = requireCompanyResults(
+      JSON.parse(await readFile(join(scratch, 'browser-results.json'), 'utf8')),
+    )
+    console.log('Executed browser children:', browserChildren)
     console.log('Protected EN/NL browser journeys and 10 destination guard tests passed.')
     api = await request.newContext({ proxy: transport.proxy })
     const state = async () => {
@@ -228,14 +205,21 @@ async function isolated() {
         'tests/company.config.ts',
         '--grep',
         'read-only',
+        '--reporter=line,json',
       ],
       {
         ...env,
         ODEE_COMPANY_TEST_ORIGIN: origin,
         ODEE_COMPANY_TEST_TOKEN: token,
+        PLAYWRIGHT_JSON_OUTPUT_NAME: join(scratch, 'readonly-browser-results.json'),
       },
       join(scratch, 'readonly-browser.log'),
     )
+    const readonlyChildren = requireCompanyResults(
+      JSON.parse(await readFile(join(scratch, 'readonly-browser-results.json'), 'utf8')),
+      true,
+    )
+    console.log('Executed read-only children:', readonlyChildren)
     if (JSON.stringify(await state()) !== JSON.stringify(before))
       throw new Error('Read-only requests changed persisted state')
     console.log('Read-only EN/NL settings and HTTP 403/session/no-write proof passed.')
@@ -252,17 +236,28 @@ async function isolated() {
           readonlyBrowserTests: 1,
           origin,
           mongo: '8.0.16 standalone',
+          browserChildren,
+          readonlyChildren,
+          browserOnly,
         },
         null,
         2,
       ),
     )
   } finally {
-    if (api) await api.dispose()
-    if (client) await client.close()
-    if (app) await app.stop()
-    if (transport) await transport.close()
-    await mongo.stop()
+    const cleanup = await Promise.allSettled([
+      api && bounded(api.dispose(), 10000, 'Company API shutdown'),
+      client && bounded(client.close(), 10000, 'Company Mongo client shutdown'),
+      app && app.stop(),
+      transport && bounded(transport.close(), 10000, 'Company transport shutdown'),
+      bounded(mongo.stop(), 20000, 'Company MongoDB shutdown'),
+    ])
+    const errors = cleanup.filter((result) => result.status === 'rejected')
+    if (errors.length)
+      throw new AggregateError(
+        errors.map((result) => result.reason),
+        'Owned company cleanup failed',
+      )
   }
 }
 
@@ -271,17 +266,23 @@ if (process.argv.includes('--isolated')) {
 } else {
   const scratch = join(root, '.local-data', 'odee007', randomUUID())
   const env = safeTestEnvironment({ ODEE_TEST_SCRATCH_DIR: scratch })
-  const cache = join(scratch, 'mongodb-binaries')
-  await mkdir(cache)
-  const existing = join(homedir(), '.cache', 'mongodb-binaries')
-  for (const name of await readdir(existing).catch(() => []))
-    if (/^mongod-[a-zA-Z0-9._-]+-8\.0\.16$/.test(name))
-      await copyFile(join(existing, name), join(cache, name))
-  console.log(`ODEE-007 evidence: ${scratch}`)
-  await command(process.execPath, ['web/tests/company.mjs', '--isolated'], {
-    ...env,
-    MONGOMS_DOWNLOAD_DIR: cache,
-    MONGOMS_MAX_RETRIES: '1',
-    PLAYWRIGHT_BROWSERS_PATH: join(homedir(), '.cache', 'ms-playwright'),
-  })
+  try {
+    const cache = await provisionMongoBinary(scratch)
+    console.log(`ODEE-007 evidence: ${scratch}`)
+    await command(
+      process.execPath,
+      ['web/tests/company.mjs', '--isolated', ...process.argv.slice(2)],
+      {
+        ...env,
+        MONGOMS_DOWNLOAD_DIR: cache,
+        MONGOMS_MAX_RETRIES: '1',
+        PLAYWRIGHT_BROWSERS_PATH:
+          process.env.PLAYWRIGHT_BROWSERS_PATH || join(homedir(), '.cache', 'ms-playwright'),
+      },
+      undefined,
+      browserOnly ? 300000 : 600000,
+    )
+  } finally {
+    await cleanFixtureData(scratch)
+  }
 }

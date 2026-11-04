@@ -23,7 +23,7 @@ func snapshotServer(t *testing.T, persistent bool) *Server {
 	if persistent {
 		uri := os.Getenv("ODEE_TEST_MONGODB_URI")
 		if uri == "" {
-			t.Skip("requires disposable MongoDB: node web/tests/company.mjs")
+			t.Skip("requires disposable MongoDB: npm --prefix web run test:mongo")
 		}
 		store, err := OpenMongo(context.Background(), uri, "odee_test_snapshots_"+primitive.NewObjectID().Hex(), company)
 		if err != nil {

@@ -1,44 +1,90 @@
-import { MongoMemoryServer } from 'mongodb-memory-server'
-import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { repositoryRoot, safeTestEnvironment } from './test-environment.mjs'
+import { mongoSelector, requireMongoResults } from './company-test-results.mjs'
+import {
+  bounded,
+  command,
+  installFixtureSignals,
+  provisionMongoBinary,
+  cleanFixtureData,
+} from './owned-fixture.mjs'
 
-// Always provision a disposable local instance, never read a live database URI.
-const binary = {
-  version: '8.0.16',
-  ...(process.platform === 'linux' && process.arch === 'arm64'
-    ? { os: { os: 'linux', dist: 'ubuntu', release: '22.04' } }
-    : {}),
-}
-const server = await MongoMemoryServer.create({ binary })
-async function verify(selector, phase = '') {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      'go',
-      ['test', '-race', '-count=1', '-run', selector, './internal/accounting'],
-      {
-        cwd: '..',
-        stdio: 'inherit',
-        env: {
-          ...process.env,
-          GOWORK: 'off',
-          ODEE_TEST_MONGODB_URI: server.getUri(),
-          ODEE_TEST_RESTART_PHASE: phase,
-        },
-      },
-    )
-    child.on('error', reject)
-    child.on('exit', (code) => resolve(code ?? 1))
+installFixtureSignals()
+
+async function isolated() {
+  const { MongoMemoryServer } = await import('mongodb-memory-server')
+  const scratch = process.env.ODEE_TEST_SCRATCH_DIR
+  const dbPath = join(scratch, 'mongo')
+  await mkdir(dbPath)
+  const server = await MongoMemoryServer.create({
+    binary: {
+      version: '8.0.16',
+      downloadDir: process.env.MONGOMS_DOWNLOAD_DIR,
+      ...(process.platform === 'linux' && process.arch === 'arm64'
+        ? { os: { os: 'linux', dist: 'ubuntu', release: '22.04' } }
+        : {}),
+    },
+    instance: { ip: '127.0.0.1', dbPath },
+    spawn: { env: process.env },
   })
-}
-try {
-  process.exitCode = await verify('TestMongo')
-  if (!process.exitCode) {
-    process.exitCode = await verify('TestMongoDiskPersistence', 'write')
-    if (!process.exitCode) {
-      await server.stop({ doCleanup: false })
-      await server.start()
-      process.exitCode = await verify('TestMongoDiskPersistence', 'read')
-    }
+  async function verify(selector, phase = '') {
+    const uri = server.getUri()
+    if (!uri.startsWith('mongodb://127.0.0.1:')) throw new Error('Nonlocal MongoDB')
+    const output = await command(
+      'go',
+      ['test', '-race', '-json', '-count=1', '-run', selector, './internal/accounting'],
+      {
+        ...process.env,
+        ODEE_TEST_MONGODB_URI: uri,
+        ODEE_TEST_RESTART_PHASE: phase,
+      },
+      join(scratch, `${phase || 'matrix'}-results.jsonl`),
+    )
+    const events = output
+      .split('\n')
+      .filter((line) => line.startsWith('{'))
+      .map((line) => JSON.parse(line))
+    const result = requireMongoResults(events, phase)
+    console.log(JSON.stringify(result, null, 2))
+    return result
   }
-} finally {
-  await server.stop()
+  try {
+    const matrix = await verify(mongoSelector)
+    const write = await verify('^TestMongoDiskPersistence$', 'write')
+    await bounded(server.stop({ doCleanup: false }), 20000, 'MongoDB disk restart stop')
+    await bounded(server.start(), 20000, 'MongoDB disk restart start')
+    const read = await verify('^TestMongoDiskPersistence$', 'read')
+    await writeFile(
+      join(scratch, 'summary.json'),
+      JSON.stringify(
+        { mongo: '8.0.16 standalone', diskRestart: true, matrix, write, read },
+        null,
+        2,
+      ),
+    )
+  } finally {
+    await bounded(server.stop(), 20000, 'MongoDB shutdown')
+  }
+}
+
+if (process.argv.includes('--isolated')) {
+  await isolated()
+} else {
+  const scratch = join(repositoryRoot, '.local-data', 'mongo', randomUUID())
+  const env = safeTestEnvironment({ ODEE_TEST_SCRATCH_DIR: scratch })
+  try {
+    const cache = await provisionMongoBinary(scratch)
+    console.log(`Mongo regression evidence: ${scratch}`)
+    await command(
+      process.execPath,
+      ['web/tests/mongo.mjs', '--isolated'],
+      { ...env, MONGOMS_DOWNLOAD_DIR: cache, MONGOMS_MAX_RETRIES: '1' },
+      undefined,
+      600000,
+    )
+  } finally {
+    await cleanFixtureData(scratch)
+  }
 }

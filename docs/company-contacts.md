@@ -43,12 +43,12 @@ values; an explicit empty string clears an editable value.
 
 ## API and capability boundary
 
-| Route / operation | Explicit capabilities |
-| --- | --- |
-| `GET /api/company-profile` (profile or `null`), profile in `GET /api/state` | `read` |
-| `PUT /api/company-profile` with `{version, data}` | `read` + `admin` |
-| Contact create/edit/archive, draft create/edit/review conversion | `read` + `write` |
-| Post / manual payment | `read` + `post` |
+| Route / operation                                                           | Explicit capabilities |
+| --------------------------------------------------------------------------- | --------------------- |
+| `GET /api/company-profile` (profile or `null`), profile in `GET /api/state` | `read`                |
+| `PUT /api/company-profile` with `{version, data}`                           | `read` + `admin`      |
+| Contact create/edit/archive, draft create/edit/review conversion            | `read` + `write`      |
+| Post / manual payment                                                       | `read` + `post`       |
 
 Version `0` creates the singleton profile; later mutations require its current
 version. Concurrent creation/edit returns 409. No capability implies another.
@@ -97,21 +97,52 @@ standalone MongoDB. Settings/contact edits do not broaden financial audit.
 
 ## Focused self-validation
 
-Run `node web/tests/company.mjs` after the production frontend build. It creates
+Normal `npm --prefix web run test:e2e -- company.spec.ts` discovers one parent
+adapter, without `ODEE_COMPANY_TEST_*` opt-in. The adapter launches the protected
+disposable fixture with `--browser-only`: two EN/NL lifecycle children plus ten
+destination-guard children, then one read-only child covering both locales.
+All thirteen children must execute and pass; skipped/missing children or a
+nonzero child process fail the parent. The fixture bodies live in
+`company.fixture.ts`, selected only by `company.config.ts`; the child cannot
+recursively select the parent adapter. The ordinary CI browser selection
+therefore enforces the company journeys, rather than silently skipping them.
+
+Run `node web/tests/company.mjs` after the production frontend build for the
+additional full Go diagnostic. Both entry paths create
 a sanitized unique environment, disposable MongoDB 8.0.16 standalone, owned
-loopback port, synthetic token/grants and guarded Chromium/API contexts. It runs
-Go race tests, vet/build, ten permanent destination-guard tests, protected EN/NL
+loopback port, synthetic token/grants and guarded Chromium/API contexts. Each runs
+the app build, ten permanent destination-guard tests, protected EN/NL
 browser lifecycles, raw stored snapshot assertions and an actual application
 stop/restart comparison. Evidence is retained in the printed ignored
-`.local-data/odee007/<run>/` path; children and MongoDB are stopped on exit.
-The browser specs are also normally discovered but explicitly skip without the
-owned fixture variables; never point them at shared data.
+`.local-data/odee007/<run>/` path; bounded child termination is awaited, MongoDB
+is stopped, and owned databases/caches are removed on exit. Only the diagnostic
+without `--browser-only` additionally runs the full package Go race tests/vet.
+Child browser artifacts use the owned fixture scratch, not the normal parent's
+output directory, so child startup cannot erase parent failure evidence.
+
+Normal `npm --prefix web run test:mongo` also provisions an isolated disposable
+MongoDB and executes `^(TestMongo|TestSnapshot|TestCompanyProfile|TestReview)`.
+It verifies passing JSON test events for the historical Mongo tests and the
+required persistent snapshot/profile/review branches, rejecting unexpected
+fixture skips. The initial matrix explicitly skips only `TestMongoDiskPersistence`
+because that test requires a phase; the runner then requires its real `write`
+and `read` passes on either side of an actual MongoDB daemon disk restart.
+JSON events and a selected-case summary remain under the printed ignored
+`.local-data/mongo/<run>/` path. No inherited application/database credentials
+or caller database URI are used.
 
 Go selectors: `TestSnapshotLifecycleMemory`, `TestSnapshotLifecycleMongo`,
 `TestCompanyProfilePermissionsAndValidation`, `TestSnapshotCanonicalAndLegacyScope`,
-`TestSnapshotReadVersionNotCrossDocumentLock`. Mongo-dependent selectors skip
+`TestSnapshotReadVersionNotCrossDocumentLock`,
+`TestCompanyProfileLegacyScopeAndConflicts`, `TestReviewDraftCapturesCompanyAndPartner`
+and `TestReviewRetryRejectsForeignCanonicalDocument`. Mongo-dependent selectors skip
 without `ODEE_TEST_MONGODB_URI`; a skip is not Mongo validation. The historical
 broad browser launcher still requires its separately disclosed owned launch-only
-guard; this feature runner does not claim to repair that launcher.
+guard; this feature runner does not claim to repair that launcher. For safe
+normal-selector verification, a launch-only config overlay may import the
+committed normal config and disable only its historical `webServer`; keep its
+normal test selection, bodies and environment defaults unchanged. The company
+adapter and all its children protect their own HTTP destinations independently
+of that overlay.
 The runner also restarts with a synthetic read-only grant and proves EN/NL
 disabled settings, HTTP 403, retained authenticated session and zero state changes.
