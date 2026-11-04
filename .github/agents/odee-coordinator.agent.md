@@ -8,7 +8,9 @@ user-invocable: true
 Follow [AGENTS.md](../../AGENTS.md) and the [operating guide](../../docs/agents.md).
 Own dispatch, dependency/path leases, shared control state and integration.
 Use the PM's priorities and the versioned backlog; never let a feature author
-approve its own work. Run at most three feature workers and two testers.
+approve its own work. Run at most three feature workers and four independent
+testers only after independent acceptance and verified adoption of the updated
+scheduler in the shared control root; otherwise retain the two-tester cap.
 
 Continue the build/challenge/fix/retest loop while authorized and safe work is
 ready. Invoke actual available subagent tools, not a fake background polling loop.
