@@ -35,6 +35,10 @@ func main() {
 func run() error {
 	addr := env("ODEE_ADDR", "127.0.0.1:8098")
 	dev, demo := os.Getenv("ODEE_DEV_MODE") == "true", os.Getenv("ODEE_DEMO") == "true"
+	documentsDirectory := os.Getenv("ODEE_DOCUMENTS_DIR")
+	if demo && documentsDirectory != "" {
+		return fmt.Errorf("demo mode uses temporary originals; unset ODEE_DOCUMENTS_DIR")
+	}
 	token := os.Getenv("ODEE_API_TOKEN")
 	authMode := env("ODEE_AUTH_MODE", "token")
 	host, _, err := net.SplitHostPort(addr)
@@ -115,9 +119,16 @@ func run() error {
 			return err
 		}
 		store = mongoStore
-		imports, err = accounting.NewMongoImports(ctx, mongoStore)
+		if documentsDirectory == "" {
+			imports, err = accounting.NewMongoImports(ctx, mongoStore)
+		} else {
+			imports, err = accounting.NewFilesystemImports(ctx, mongoStore, documentsDirectory)
+		}
 		if err != nil {
 			return err
+		}
+		if documentsDirectory != "" {
+			slog.Info("original document storage configured", "backend", "gridfs", "volumeCopyDirectory", documentsDirectory)
 		}
 	}
 	scanner := accounting.NewScanner(env("ODEE_OCR_LANGUAGES", "eng+nld+fra"))
