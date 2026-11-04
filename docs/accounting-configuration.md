@@ -34,8 +34,8 @@ Use two new collections, not a version array in the company/document:
 
 | Collection / identity | BSON fields (JSON ObjectIDs are hex strings) |
 | --- | --- |
-| `accounting_configuration`, singleton `_id = configured company ObjectID` | Canonical ObjectID axes and optional legacy owner; `schemaVersion: 1`; `stage: {version: int64, publicationId: ObjectID, data, digest, updatedAt}`; `default: {revision: int64, versionId: ObjectID-or-null}`; bounded `publicationFence: {nonce: ObjectID, versionId: ObjectID}`. Stage version and default revision are independent CAS counters. |
-| `accounting_configuration_versions`, `_id = stage.publicationId` | Canonical axes/optional legacy owner; `schemaVersion: 1`; `sourceStageId: ObjectID`, `sourceStageVersion: int64`, `digest`, `publishedAt`, complete `data`. This record is insert-only: no update/delete API or internal normalization write. |
+| `accounting_configuration`, singleton `_id = configured company ObjectID` | Canonical ObjectID axes and optional legacy owner; `schemaVersion: 1`; `stage: {version: int64, publicationId: ObjectID, data, digest, updatedAt}`; `default: {revision: int64, versionId: ObjectID-or-null}`. Stage version and default revision are independent CAS counters. |
+| `accounting_configuration_versions`, `_id = stage.publicationId` | Immutable canonical axes/optional legacy owner and immutable business `payload: {schemaVersion:1, sourceStageId:ObjectID, sourceStageVersion:int64, digest, publishedAt, data}`. Outside that payload, one fixed-size private `_durabilityNonce:ObjectID` permits the per-target acknowledgement operation below. No configuration edit/delete API or internal business-payload/ownership normalization write. |
 | Existing `accounting_documents` | Add server-owned `configurationSelection` (published ID/digest, or explicit `legacy-starter-v1` policy) and `journalCode` for drafts; add `financialSnapshot` at post. Existing draft `version` remains the CAS counter; ordinary save cannot change selection or posted meaning. |
 
 `data` contains bounded account definitions `{code,name,type,active}`, seven
@@ -66,11 +66,15 @@ Validation choices:
   required accounts/journals and absent supported periods are readiness errors.
 - Chosen activation guard: require ready invoice, bill **and original-payment**
   bindings/journals, plus at least one enabled supported period. Inactive unused
-  accounts can coexist. This conservative software-readiness check is not
-  statutory eligibility. Explicit draft rebind to an unready published version
-  remains possible and visibly blocks posting; no silent repair occurs.
+  accounts can coexist. This conservative software-readiness check is a
+  **current-engine limitation**, not Belgian law, a tax obligation or statutory
+  eligibility. Preserve valid legacy/V1 flows. Explicit draft rebind to an
+  unready published version remains possible and visibly blocks posting; no
+  silent repair occurs.
   Required invoice roles are bank/AR/revenue/VAT-payable; bill roles are
   bank/AP/expense/VAT-recoverable, including the VAT role on zero-tax documents.
+  Requiring role definitions never fabricates VAT entries or changes the
+  existing zero-tax calculation/entry rules.
   Sales/purchase and payment journals must support their declared operation.
 
 Generate a fresh server `publicationId` on each successful stage revision.
@@ -78,8 +82,8 @@ Digest canonical, deterministically serialized validated data (fixed field
 ordering, code/date-sorted collections); never trust a client digest. The `_id`
 unique indexes suffice for singleton identity and one publication per stage
 revision. Add only published-list indexes:
-`{organisationId:1,projectId:1,publishedAt:-1,_id:-1}` and
-`{ownerId:1,publishedAt:-1,_id:-1}` for the compatibility branch.
+`{organisationId:1,projectId:1,"payload.publishedAt":-1,_id:-1}` and
+`{ownerId:1,"payload.publishedAt":-1,_id:-1}` for the compatibility branch.
 Use scoped keyset pagination (50 maximum), not an all-history state response.
 No TTL, automatic deletion or retention trimming of published versions.
 Capacity growth/backup retention requires operational monitoring and later
@@ -88,18 +92,25 @@ reviewed archival; it must not remove historical references.
 Bound the posted projection to at most seven relevant account meanings, post
 and payment journal identities, the selected period/range, schema/policy and
 configuration identity/digest. Do not embed the full chart or every version.
-Keep existing 100-line, 200-payment and 201-event limits; validate final BSON
-size below 2 MiB before a new mutation (well below MongoDB's 16 MiB ceiling).
-Oversize historical data remains readable and gets an explicit mutation error,
-not pruning. Memory storage must copy every nested configuration/projection.
+Bound this **new** projection to 16 KiB BSON, with the configuration field/count
+limits above; the 96 KiB configuration cap applies only to new stage/published
+payloads, not entire financial documents. Retain existing request/domain limits,
+including 100 lines, 200 payments and 201 events. Validate resulting financial
+BSON against MongoDB's actual 16 MiB ceiling and return an explicit pre-dispatch
+oversize error; impose no lower global cap that could newly block valid legacy
+manual flows. No pruning or rewritten history. Memory storage must copy every
+nested configuration/projection.
 
 **No-backfill scope:** use existing `ScopeFilter(company)` for every collection
 read/write and ID resolution, including singleton and published-history reads.
-Each missing/null/empty/zero axis independently uses a valid nonzero BSON
-`ownerId`; a nonempty canonical axis wins, including a foreign one. Unknown BSON
-types are not coerced into ownership. Normalize decoded compatible empties
-before domain checks, without rewriting nonempty fields. Mutable successful
-writes can fill only missing axes under the same scoped CAS; immutable version
+Each absent/null/zero-ObjectID canonical axis independently uses a valid nonzero
+BSON ObjectID `ownerId`; a nonempty canonical axis wins, including a foreign
+one. Here “empty” means only declared ObjectID zero/absence/null, not BSON
+string-empty. The known legacy BSON string-empty decoder diagnostic remains
+baseline/out of scope: no string-to-ObjectID coercion or newly promised arbitrary
+BSON schema support. Normalize compatible decoded missing/zero axes before
+domain checks, without rewriting nonempty fields. Mutable successful writes can
+fill only missing axes under the same scoped CAS; immutable ownership/payload
 reads need no normalization write. Test both partially missing axes as well as
 both missing. No new index or migration is a prerequisite for compatibility.
 
@@ -126,29 +137,52 @@ consistency or HA certification is claimed. Reads use the authoritative
 standalone/primary, not a secondary cache. Memory mode has equivalent visibility,
 immutability/CAS/copy semantics but explicitly no restart durability.
 
-**Uncertain publication recovery needs more than a read.** Before *every*
-default-pointer update, resolve the immutable version, then perform an actual
-write of a fresh `publicationFence.nonce` and its target ID in the singleton
-with the above concern; await its successful acknowledgement, and re-resolve
-the target before the pointer CAS. This fixed-size internal fence changes no
-published bytes, stage revision or default revision. It uses ordinary document
-write privileges, not `fsync`, a transaction or an admin lock.
-[MongoDB journaling](https://www.mongodb.com/docs/manual/core/journaling/)
-describes journal records and crash replay; the write-concern manual specifies
-that `j:true` causes immediate journal synchronization. The design relies on
-the same authoritative server's ordered journal: synchronizing this **real**
-write also makes the previously completed, observed immutable insert durable.
-Do not substitute a no-op update, duplicate-key response or sleep for the fence.
-If failover/re-resolution loses the target, or the fence times out, do not
-attempt the pointer write. Independently fault-test this assumption on the
-supported standalone Mongo version before accepting implementation.
+**Per-target durable reassertion:** a fresh successful journaled insert already
+establishes that publication's own durability. A readable existing publication,
+duplicate-key response or uncertain insert acknowledgement does not. Before
+*every* activation, and before reporting an existing/duplicate publication as
+durable during reconciliation:
+
+1. Read the scoped published target and validate its immutable business payload,
+   requested source identity/version and recomputed data digest.
+2. Generate a fresh `_durabilityNonce`, different from the observed value.
+   Issue **one actual update on that same published target**, filtered by
+   `ScopeFilter(company)`, `_id`, `payload.schemaVersion`, source stage ID/version,
+   `payload.publishedAt` and `payload.digest`. Set only `_durabilityNonce`;
+   **no upsert**, payload edit, ownership rewrite or singleton write.
+3. Use `{w:"majority",j:true,wtimeout:5000}` and require an acknowledged,
+   error-free result with **matched = 1 and modified = 1**. A failed/lost/
+   timed-out acknowledgement or unexpected zero modification returns 503
+   `reconciliation_required` and issues **no pointer write**. A known zero-match
+   identifies a missing/changed/scoped-out target and also forbids activation.
+4. Reread the target and verify its complete immutable payload/digest against
+   the pre-update copy before the guarded default CAS. If resolution or integrity
+   fails, stop. A concurrent reassertion may overwrite the private nonce; it does
+   not change business identity or invalidate an already acknowledged target
+   operation. Each retry uses a fresh nonce, never a no-op.
+
+The private nonce is fixed-size operational metadata only: exclude it from API
+responses, digests, financial meaning/snapshots and history grouping. Business
+payload bytes (including source identity/version, `publishedAt`, data and digest)
+never change, and public APIs still cannot edit/delete published configuration.
+Only ordinary collection-write privileges are needed. No extra collection,
+generalized fencing framework, admin `fsync`, sleep or replica-set prerequisite.
+
+The [write-concern manual](https://www.mongodb.com/docs/manual/reference/write-concern/)
+defines `j:true` acknowledgement for **that operation**; the actual target
+document update is this design's durable acknowledgement boundary.
+[Journaling documentation](https://www.mongodb.com/docs/manual/core/journaling/)
+supplies crash/replay context, not a cross-document/client-prefix durability
+guarantee. No such prefix guarantee is assumed. Fault tests verify the specified
+operations and recovery; finite crash experiments cannot establish an
+undocumented API guarantee.
 
 | Operation | Reads, validation, writes, response/reconciliation |
 | --- | --- |
 | Stage | `read+admin`; read scoped singleton, compare `expectedStageVersion`. Absent singleton means stage/default revisions 0 and no configured default. Insert on first save with stage version 1 and default `{revision:0,versionId:null}` (duplicate `_id` → 409); otherwise scoped `_id + stage.version` update of **stage only**, with new publication ID/digest and stage version +1. Concurrent activation does not lose either subdocument. Success only after durable ack. Dispatch/ack uncertainty → 503; reread stage revision/digest; do not blindly resend an old stage over a newer edit. |
-| Publish | `read+admin`; request includes `expectedStageVersion` and observed `publicationId`. First check a matching scoped published ID for reconciliation; otherwise read one complete stage revision and require both values to match. Freeze that copy, validate, insert immutable version with that ID and durable concern. No head-pointer change. For an existing ID verify requested scope/source identity and recomputed content digest; after duplicate insert also compare the attempted snapshot to the winner (excluding `publishedAt`). An idempotent durable result additionally requires the fresh durability fence; mismatch → conflict/integrity error. An uncertain insert returns 503 with target ID; scoped lookup reconciles presence, and activation still requires the durability fence. Never report “durably published” solely because an uncertain insert was readable. A successful fresh insert ack establishes durability directly. |
+| Publish | `read+admin`; request includes `expectedStageVersion` and observed `publicationId`. First check a matching scoped published ID for reconciliation; otherwise read one complete stage revision and require both values to match. Freeze that copy, validate, insert immutable business payload with that ID and durable concern. No head-pointer change. For an existing ID verify requested scope/source identity and recomputed content digest; after duplicate insert also compare the attempted business snapshot to the winner (excluding the winner's first-insert `publishedAt`). An idempotent durable result additionally requires successful **per-target nonce update/ack and immutable-payload reread** above; mismatch → conflict/integrity error. An uncertain insert returns 503 with target ID; lookup alone reconciles only presence, not durability. A successful fresh insert ack establishes durability directly. |
 | Publish vs edit | A later stage edit can win before publication's insert: publishing the **complete previously read revision** is allowed, and response names that source revision. It never means “published the latest stage.” A stale version detected at the stage read is 409. No cross-record lock or atomic stage-validation claim. Same-revision publishers converge on one immutable `_id`; edits generate another ID. A retry can resolve the earlier ID even after staging moves on. |
-| Activate | `read+admin`; request `{versionId, expectedDefaultRevision}`. Resolve/validate scoped published target, not stage; require readiness. Read/compare default revision, run the fresh durable fence, re-resolve target, then scoped singleton `_id + default.revision` CAS of `default.versionId` and revision +1. Stage edits/fences do not affect that counter. A competing activation → 409, including stale same-target activation. Reply only after pointer ack. On uncertainty, return 503 and require authoritative pointer/revision read: desired target at expected+1 reconciles the desired state, not actor attribution. A later revision may already supersede it; require a new explicit decision with that revision, never an automatic overwrite. |
+| Activate | `read+admin`; request `{versionId, expectedDefaultRevision}`. Resolve/validate scoped published target, not stage; require readiness. Read/compare default revision, perform the real per-target nonce update and require matched+modified durable ack, reread/verify immutable payload/digest, then scoped singleton `_id + default.revision` CAS of `default.versionId` and revision +1. Stage edits/target nonce updates do not affect that counter. A competing activation → 409, including stale same-target activation. Reply only after pointer ack. On uncertainty, return 503 and require authoritative pointer/revision read: desired target at expected+1 reconciles the desired state, not actor attribution. A later revision may already supersede it; require a new explicit decision with that revision, never an automatic overwrite. |
 | Create draft (including review) | `read+write`; server observes default once, resolves that immutable target and returns/persists its selection with document creation. No configured default means explicit `legacy-starter-v1`; an existing but broken pointer is an error, **not** starter fallback. Activation during selection may yield either actually observed complete version. Preserve submitted line codes. Initial journal is the selected version's declared kind-specific journal, or visibly unresolved. Existing contact/own-company capture semantics remain. Creation ack uncertainty returns the generated document ID with 503; reconcile via scoped state before creating another draft. Review retains its existing deterministic document ID = import ID and source-link reconciliation, so retries return the already-bound draft, not a newly selected default. |
 | Edit / explicit rebind | Ordinary expected-document-version edits retain selection and journal. Dedicated `POST /api/documents/{id}/configuration` requires `read+write`, `{version, targetVersionId, journalCode?}`; server resolves a scoped published target, updates selection only (journal only if explicitly supplied), and saves with document CAS. It never rewrites lines, totals or legal captures. A mismatch between existing line codes/journal and target becomes a visible readiness error, not substitution. Draft saves retain syntactically valid unresolved codes for explicit correction; posting remains blocked. Metadata-free drafts stay legacy on ordinary save. Rebind of posted/paid docs is rejected. |
 | Post | `read+post`; load scoped document at expected version; resolve **its selection** (legacy only when identified), validate its immutable active flags, required mappings incl. later bank/AR-or-AP, journal/kind and document date in an enabled supported period. Validate line codes against that selected revenue/expense mapping. Use unchanged integer calculation/balance rules. Construct entries and bounded frozen projection, attach existing financial event, then one scoped `_id + version + status:draft` write for state/entries/snapshot/version +1/event append. No reread of the default. Neither success nor event exists for a validation rejection. |
@@ -174,9 +208,10 @@ These are required assertions, not claims that tests have already run.
 | Boundary / injected failure | Required stored/visible state and recovery |
 | --- | --- |
 | Before publication dispatch, or rejected stage/publication | No new published target or pointer change. Staging may exist independently. Retry only with observed stage identity/version. |
-| Insert dispatched, ack lost; process/Mongo crashes before confirmed durability | Published target may be absent or whole; never partial. Old default remains. Return/read reconciliation, not success. If present, activation must fence before CAS; if absent, matching retained stage may republish the same ID, otherwise stage conflict requires review. |
-| Durable publication ack, crash before any activation | Published bytes survive hard restart, old default remains. Historical list exposes the inactive version; explicitly activate using current default revision. |
-| Fence before/after ack, crash before pointer CAS | Old default remains. Fence is not activation or public approval. A lost fence ack never authorizes pointer CAS; a retry uses a fresh nonce and checks the current pointer. |
+| Insert dispatched, ack lost; process/Mongo crashes before confirmed durability | Published target may be absent or whole; never partial. Old default remains. Return/read reconciliation, not success. If present, an existing-publication durable result or activation requires the real target nonce write/ack and immutable-payload verification; if absent, matching retained stage may republish the same ID, otherwise stage conflict requires review. |
+| Durable publication insert/reassertion ack, crash before any activation | Immutable business payload survives hard restart, old default remains. Historical list exposes the inactive version; explicitly activate using current default revision and a fresh target reassertion. |
+| Target nonce update before/after ack, crash before pointer CAS | Old default remains. Private metadata may be old/new; immutable business payload/digest are unchanged. Lost/failed nonce-write ack never authorizes pointer CAS; retry uses a fresh nonce on that target and checks the current pointer. |
+| Target reassertion matches zero / unexpectedly modifies zero | No pointer command. Missing/changed/scoped-out target is explicit; a no-op is not accepted as a durability acknowledgement. Reread/reconcile and use a fresh nonce, never upsert or mutate business payload to force success. |
 | Target missing, invalid/unready, foreign, or replaced/mutated outside application | No pointer update; explicit integrity/not-found/readiness error. No starter/stage fallback. External writes/deletion are outside application authority, not silently repaired. |
 | Pointer CAS stale, including ABA V1→V2→V1 | Revision is monotonic, so old expected revision conflicts even if ID matches. Neither stage nor immutable data changes. |
 | Pointer write commits but ack lost / app exits before response | Pointer may be old or new; read exact revision/ID. Successful durable pointer must never survive restart with a missing target. Later activation is not overwritten by an old retry. |
@@ -193,8 +228,14 @@ disk path, without database cleanup between phases. Assert raw BSON plus HTTP
 state after restart, successful journaled publication before pointer, and no
 partial financial write. A graceful stop/reconnect, successful shutdown handler,
 mock-only memory test or immediate readback is insufficient crash evidence.
-Observe actual command concern/fresh fence writes; test fence uncertainty and
-that no pointer command is issued after it fails.
+Observe actual target `_id`/scope/identity/digest filters, fresh nonce changes,
+`upsert:false`, matched+modified counts and command `j:true` concern. Compare
+business-payload bytes/digest before/after reassertion, duplicate publication,
+activation, acknowledgement loss and restart; assert nonce absence from public/
+financial projections. Inject committed/uncommitted target-update ack loss and
+zero-match/no-op results; no pointer command may follow failed/uncertain/no-op
+reassertion. These assert per-target acknowledgement semantics, not an inferred
+global journal-prefix guarantee.
 
 ## E. Frozen meaning and historical coexistence
 
@@ -355,9 +396,9 @@ After coordinator design review, continue **the same retained feature**:
 | --- | --- |
 | Ledger: invoice V1 → V2 | Net **20000**, VAT **4200**, total **24200 cents**: DR `1100` 24200; CR `4000` 20000; CR `2100` 4200. After V2 changes AR/bank, pay **10000**: DR original `1000` 10000; CR original `1100` 10000; outstanding **14200**. Original entries unchanged, both journals balanced, frozen meanings survive restart. |
 | Ledger: bill counterpart | DR `5000` 20000; DR `1200` 4200; CR `2000` 24200. After V2, payment DR original `2000` 10000; CR original `1000` 10000; payable **14200**. Same-code/different-name/type V2 entries stay separate in detail/journal/trial balance/CSV, no lost entries. |
-| API/data | Exact BSON scope matrix on stage/head/history/doc/rebind/post/pay: missing/null/empty/zero canonical axes independently, valid owner, invalid/missing owner, nonempty foreign canonical precedence. Wrong IDs/types/snapshots denied; historical reads require no backfill. Size limits/deep-copy immutability and no published update/delete surface. |
-| Configuration / binding | Invalid types/overlaps; missing/inactive role/account/journal, unsupported selected journal/date. Publish unready is visible; activation rejects it. Explicit rebind can expose unresolved lines without changing them. V1 drafts/post remain valid after V2 default; absent metadata stays named legacy until rebind; unknown meaning fails financial actions but retains report entries. |
-| Concurrency / faults | Every row in section D, including publication/edit overlap, same-revision duplicate publish, stale/ABA activation, real durability fence and no-pointer-after-fence-error, V1-post/V2 race, two payments/edit/rebind CAS; actual committed/uncommitted uncertain writes plus hard app and Mongo disk restart. No rejected operation creates an event. |
+| API/data | Exact declared BSON ObjectID scope matrix on stage/head/history/doc/rebind/post/pay: absent/null/zero canonical axes independently, valid owner, invalid/missing owner, nonempty canonical precedence. No string-empty coercion/arbitrary BSON-schema promise; baseline decoder diagnostic remains out of scope. Wrong request IDs/types/snapshots denied; historical reads require no backfill. Bound new configuration/projection fields without a lower global financial-document cap; preserve valid legacy manual flows and pre-dispatch actual-BSON-limit errors. Deep-copy business-payload immutability, private-nonce non-disclosure and no published configuration edit/delete surface. |
+| Configuration / binding | Invalid types/overlaps; missing/inactive role/account/journal, unsupported selected journal/date. Publish unready is visible; activation rejects it as a current-engine limitation, not statutory policy. Zero-tax entries/amounts remain unchanged despite required role definitions. Explicit rebind can expose unresolved lines without changing them. V1 drafts/post remain valid after V2 default; absent metadata stays named legacy until rebind; unknown meaning fails financial actions but retains report entries. |
+| Concurrency / faults | Every row in section D, including publication/edit overlap, same-revision duplicate publish, stale/ABA activation, real matched+modified target nonce write with `j:true`, unchanged business bytes/digest, no-pointer-after-failed/uncertain/no-op reassertion, V1-post/V2 race, two payments/edit/rebind CAS; actual committed/uncommitted uncertain writes plus hard app and Mongo disk restart. No rejected operation creates an event. |
 | Permissions/browser | Direct HTTP capability combinations (including admin-only), read-only configuration/history, real EN/NL stage→publish→activate→draft→rebind→post→partial pay, stale conflicts, 403 without logout and 401 regression, accessible keyboard/mobile flows and preserved company/contact captures. |
 | Localization | Exact cents/BigInt/CSV/ISO invariance; both locale catalogs and invalid-money source-locale provenance on existing draft/review/payment forms after repeated switches; custom historical account names never translated as starter merely by matching code. |
 | Belgian/Peppol | Independently inspect source notes, unverified references/open decisions, explicit synthetic labels and statutory/live gates; verify no inferred tax applicability, Peppol transmission, bank transfer or statutory approval. |
@@ -412,9 +453,12 @@ with **at most two active**, exact-candidate evidence and independent expected
 calculations. Existing dependencies are 005+006; accepted 007 precedes this
 work by priority/shared leases, not a newly invented graph dependency.
 
-**Review points, not implementation authorization:** verify the journal-fence
-assumption and conservative activation-readiness choice above. No known
-out-of-lease code wiring blocker; if implementation disproves that, return a
-narrow proposal before touching excluded paths. Missing verified Belgian
-annex/accountant mapping remains an explicit statutory-use gate, not authority
-to invent mappings and not a blocker to synthetic software implementation.
+**Review points, not implementation authorization:** review the corrected
+per-target durable reassertion, private-metadata/business-immutability boundary
+and explicit current-engine readiness limitation. No cross-document durability
+assumption or lower global financial-document cap remains; no known
+out-of-lease code wiring blocker. If implementation disproves the chosen
+per-target contract, return a narrow source-backed reason before coding an
+alternative or touching excluded paths. Missing verified Belgian annex/
+accountant mapping remains an explicit statutory-use gate, not authority to
+invent mappings and not a blocker to synthetic software implementation.
