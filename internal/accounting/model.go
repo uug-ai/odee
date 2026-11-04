@@ -38,11 +38,12 @@ var Accounts = []Account{
 }
 
 type Line struct {
-	Description string `json:"description" bson:"description"`
-	Quantity    int64  `json:"quantity" bson:"quantity"`
-	UnitCents   int64  `json:"unitCents" bson:"unitCents"`
-	TaxBPS      int64  `json:"taxBps" bson:"taxBps"`
-	AccountCode string `json:"accountCode" bson:"accountCode"`
+	Description string          `json:"description" bson:"description"`
+	Quantity    int64           `json:"quantity" bson:"quantity"`
+	UnitCents   int64           `json:"unitCents" bson:"unitCents"`
+	TaxBPS      int64           `json:"taxBps" bson:"taxBps"`
+	AccountCode string          `json:"accountCode" bson:"accountCode"`
+	Calculation *PolicyLineData `json:"calculation,omitempty" bson:"calculation,omitempty"`
 }
 
 type Entry struct {
@@ -60,50 +61,53 @@ type Payment struct {
 }
 
 type Document struct {
-	ConfigurationSelection *ConfigurationSelection `json:"configurationSelection,omitempty" bson:"configurationSelection,omitempty"`
-	JournalCode            string                  `json:"journalCode,omitempty" bson:"journalCode,omitempty"`
-	FinancialSnapshot      *FinancialSnapshot      `json:"financialSnapshot,omitempty" bson:"financialSnapshot,omitempty"`
-	FinancialMeaning       *FinancialSnapshot      `json:"financialMeaning,omitempty" bson:"-"`
-	MeaningError           string                  `json:"meaningError,omitempty" bson:"-"`
-	PartnerSnapshot        *PartnerSnapshot        `json:"partnerSnapshot,omitempty" bson:"partnerSnapshot,omitempty"`
-	OwnCompanySnapshot     *CompanySnapshot        `json:"ownCompanySnapshot,omitempty" bson:"ownCompanySnapshot,omitempty"`
-	ID                     primitive.ObjectID      `json:"id" bson:"_id"`
-	OrganisationID         primitive.ObjectID      `json:"organisationId" bson:"organisationId"`
-	ProjectID              primitive.ObjectID      `json:"projectId" bson:"projectId"`
-	OwnerID                primitive.ObjectID      `json:"-" bson:"ownerId,omitempty"`
-	SourceID               *primitive.ObjectID     `json:"sourceId,omitempty" bson:"sourceId,omitempty"`
-	Version                int64                   `json:"version" bson:"version"`
-	Number                 string                  `json:"number" bson:"number"`
-	Kind                   string                  `json:"kind" bson:"kind"`
-	Partner                string                  `json:"partner" bson:"partner"`
-	Email                  string                  `json:"email" bson:"email"`
-	Reference              string                  `json:"reference" bson:"reference"`
-	Date                   string                  `json:"date" bson:"date"`
-	DueDate                string                  `json:"dueDate" bson:"dueDate"`
-	Currency               string                  `json:"currency" bson:"currency"`
-	Status                 string                  `json:"status" bson:"status"`
-	Lines                  []Line                  `json:"lines" bson:"lines"`
-	Subtotal               int64                   `json:"subtotal" bson:"subtotal"`
-	Tax                    int64                   `json:"tax" bson:"tax"`
-	Total                  int64                   `json:"total" bson:"total"`
-	Paid                   int64                   `json:"paid" bson:"paid"`
-	Entries                []Entry                 `json:"entries" bson:"entries"`
-	Payments               []Payment               `json:"payments" bson:"payments"`
-	CreatedAt              time.Time               `json:"createdAt" bson:"createdAt"`
-	UpdatedAt              time.Time               `json:"updatedAt" bson:"updatedAt"`
+	ConfigurationSelection *ConfigurationSelection    `json:"configurationSelection,omitempty" bson:"configurationSelection,omitempty"`
+	JournalCode            string                     `json:"journalCode,omitempty" bson:"journalCode,omitempty"`
+	FinancialSnapshot      *FinancialSnapshot         `json:"financialSnapshot,omitempty" bson:"financialSnapshot,omitempty"`
+	CalculationPolicy      *CalculationPolicyMetadata `json:"calculationPolicy,omitempty" bson:"calculationPolicy,omitempty"`
+	Calculation            *CalculationResult         `json:"calculation,omitempty" bson:"calculation,omitempty"`
+	FinancialMeaning       *FinancialSnapshot         `json:"financialMeaning,omitempty" bson:"-"`
+	MeaningError           string                     `json:"meaningError,omitempty" bson:"-"`
+	PartnerSnapshot        *PartnerSnapshot           `json:"partnerSnapshot,omitempty" bson:"partnerSnapshot,omitempty"`
+	OwnCompanySnapshot     *CompanySnapshot           `json:"ownCompanySnapshot,omitempty" bson:"ownCompanySnapshot,omitempty"`
+	ID                     primitive.ObjectID         `json:"id" bson:"_id"`
+	OrganisationID         primitive.ObjectID         `json:"organisationId" bson:"organisationId"`
+	ProjectID              primitive.ObjectID         `json:"projectId" bson:"projectId"`
+	OwnerID                primitive.ObjectID         `json:"-" bson:"ownerId,omitempty"`
+	SourceID               *primitive.ObjectID        `json:"sourceId,omitempty" bson:"sourceId,omitempty"`
+	Version                int64                      `json:"version" bson:"version"`
+	Number                 string                     `json:"number" bson:"number"`
+	Kind                   string                     `json:"kind" bson:"kind"`
+	Partner                string                     `json:"partner" bson:"partner"`
+	Email                  string                     `json:"email" bson:"email"`
+	Reference              string                     `json:"reference" bson:"reference"`
+	Date                   string                     `json:"date" bson:"date"`
+	DueDate                string                     `json:"dueDate" bson:"dueDate"`
+	Currency               string                     `json:"currency" bson:"currency"`
+	Status                 string                     `json:"status" bson:"status"`
+	Lines                  []Line                     `json:"lines" bson:"lines"`
+	Subtotal               int64                      `json:"subtotal" bson:"subtotal"`
+	Tax                    int64                      `json:"tax" bson:"tax"`
+	Total                  int64                      `json:"total" bson:"total"`
+	Paid                   int64                      `json:"paid" bson:"paid"`
+	Entries                []Entry                    `json:"entries" bson:"entries"`
+	Payments               []Payment                  `json:"payments" bson:"payments"`
+	CreatedAt              time.Time                  `json:"createdAt" bson:"createdAt"`
+	UpdatedAt              time.Time                  `json:"updatedAt" bson:"updatedAt"`
 
 	FinancialEvents []FinancialEvent `json:"-" bson:"financialEvents,omitempty"`
 	pendingEvent    *FinancialEvent
 }
 
 type Draft struct {
-	Kind      string `json:"kind" bson:"kind"`
-	Partner   string `json:"partner" bson:"partner"`
-	Email     string `json:"email" bson:"email"`
-	Reference string `json:"reference" bson:"reference"`
-	Date      string `json:"date" bson:"date"`
-	DueDate   string `json:"dueDate" bson:"dueDate"`
-	Lines     []Line `json:"lines" bson:"lines"`
+	Kind              string                     `json:"kind" bson:"kind"`
+	Partner           string                     `json:"partner" bson:"partner"`
+	Email             string                     `json:"email" bson:"email"`
+	Reference         string                     `json:"reference" bson:"reference"`
+	Date              string                     `json:"date" bson:"date"`
+	DueDate           string                     `json:"dueDate" bson:"dueDate"`
+	Lines             []Line                     `json:"lines" bson:"lines"`
+	CalculationPolicy *CalculationPolicyMetadata `json:"calculationPolicy,omitempty" bson:"calculationPolicy,omitempty"`
 }
 
 func invalid(message string) error { return fmt.Errorf("%w: %s", ErrInvalid, message) }
@@ -150,6 +154,16 @@ func (d *Document) NormalizeOwnership() {
 }
 
 func (d *Document) SetDraft(input Draft) error {
+	if input.CalculationPolicy != nil {
+		return d.setCalculationPolicyDraft(input)
+	}
+	if d.CalculationPolicy != nil || d.Calculation != nil {
+		return invalid("recognized calculation policy cannot be removed or converted implicitly")
+	}
+	return d.setLegacyDraft(input)
+}
+
+func (d *Document) setLegacyDraft(input Draft) error {
 	if d.Status != "draft" {
 		return invalid("posted documents are immutable")
 	}
@@ -180,6 +194,9 @@ func (d *Document) SetDraft(input Draft) error {
 	lines := append([]Line(nil), input.Lines...)
 	for i := range lines {
 		line := &lines[i]
+		if line.Calculation != nil {
+			return invalid("calculation line data requires an explicit calculation policy")
+		}
 		line.Description = strings.TrimSpace(line.Description)
 		if line.Description == "" || utf8.RuneCountInString(line.Description) > 500 {
 			return invalid("each line needs a description of at most 500 characters")
@@ -220,15 +237,16 @@ func (d *Document) Post(config ...ConfigurationData) error {
 	if d.Status != "draft" {
 		return invalid("only drafts can be posted")
 	}
-	if err := d.SetDraft(Draft{d.Kind, d.Partner, d.Email, d.Reference, d.Date, d.DueDate, d.Lines}); err != nil {
+	if err := d.SetDraft(d.draftValue()); err != nil {
 		return err
 	}
 	data := starterConfiguration()
 	if len(config) > 0 {
 		data = config[0]
-	} else if !legacyShape(*d) {
+	} else if !legacyShape(*d) && !recognizedCalculationPolicy(*d) {
 		return invalid("financial meaning is unknown; reconcile before changing this document")
 	}
+
 	if d.ConfigurationSelection == nil {
 		selection := starterSelection()
 		d.ConfigurationSelection = &selection
@@ -254,6 +272,14 @@ func (d *Document) Post(config ...ConfigurationData) error {
 	return nil
 }
 
+func (d Document) draftValue() Draft {
+	return Draft{
+		Kind: d.Kind, Partner: d.Partner, Email: d.Email, Reference: d.Reference,
+		Date: d.Date, DueDate: d.DueDate, Lines: d.Lines,
+		CalculationPolicy: d.CalculationPolicy,
+	}
+}
+
 func Balanced(entries []Entry) bool {
 	var debit, credit int64
 	for _, entry := range entries {
@@ -269,6 +295,9 @@ func Balanced(entries []Entry) bool {
 func (d *Document) RecordPayment(payment Payment) error {
 	if d.Status != "posted" {
 		return invalid("payments require a posted document with an outstanding balance")
+	}
+	if (d.CalculationPolicy != nil || d.Calculation != nil) && !recognizedCalculationPolicy(*d) {
+		return invalid("calculation policy history is unresolved")
 	}
 	if len(d.Payments) >= 200 {
 		return invalid("this document has reached the 200-payment limit")

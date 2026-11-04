@@ -352,18 +352,31 @@ func (s *Server) post(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) payment(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Version   int64  `json:"version"`
-		ID        string `json:"id"`
-		Date      string `json:"date"`
-		Amount    int64  `json:"amount"`
-		Reference string `json:"reference"`
+		Version   int64           `json:"version"`
+		ID        string          `json:"id"`
+		Date      string          `json:"date"`
+		Amount    json.RawMessage `json:"amount"`
+		Reference string          `json:"reference"`
 	}
 	if !decode(w, r, &input) {
 		return
 	}
 	doc, ok := s.load(w, r, input.Version)
 	if ok {
-		err := doc.RecordPayment(Payment{ID: input.ID, Date: input.Date, Amount: input.Amount, Reference: input.Reference})
+		var amount int64
+		var err error
+		if doc.CalculationPolicy != nil || doc.Calculation != nil {
+			var scaled ScaledInteger
+			err = json.Unmarshal(input.Amount, &scaled)
+			amount = int64(scaled)
+		} else {
+			err = json.Unmarshal(input.Amount, &amount)
+		}
+		if err != nil {
+			apiError(w, invalid("payment amount must use the document's canonical minor-unit encoding"))
+			return
+		}
+		err = doc.RecordPayment(Payment{ID: input.ID, Date: input.Date, Amount: amount, Reference: input.Reference})
 		if err == nil {
 			err = doc.attribute(r.Context(), "manual-payment.record")
 		}

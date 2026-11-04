@@ -44,42 +44,45 @@ type CalculationInput struct {
 
 // ExactRational stores a reduced exact value as canonical base-10 integers.
 type ExactRational struct {
-	Numerator   string
-	Denominator string
+	Numerator   string `json:"numerator" bson:"numerator"`
+	Denominator string `json:"denominator" bson:"denominator"`
 }
+
+// MinorUnits uses canonical decimal-string JSON and BSON int64 storage.
+type MinorUnits = ScaledInteger
 
 // CalculationLineResult is calculated from one input line. TaxMinor is the
 // line's largest-remainder allocation from its tax-rate group.
 type CalculationLineResult struct {
-	LineID             string
-	NetMinor           int64
-	TaxMinor           int64
-	GrossMinor         int64
-	NetRoundingResidue ExactRational
+	LineID             string        `json:"lineId" bson:"lineId"`
+	NetMinor           MinorUnits    `json:"netMinor" bson:"netMinor"`
+	TaxMinor           MinorUnits    `json:"taxMinor" bson:"taxMinor"`
+	GrossMinor         MinorUnits    `json:"grossMinor" bson:"grossMinor"`
+	NetRoundingResidue ExactRational `json:"netRoundingResidue" bson:"netRoundingResidue"`
 }
 
 // CalculationTaxGroupResult records the grouped tax and its explicit
 // difference from independent half-up rounding of each settled line net.
 type CalculationTaxGroupResult struct {
-	TaxRateBPS         int64
-	NetMinor           int64
-	TaxMinor           int64
-	IndependentLineTax int64
-	RoundingAdjustment int64
+	TaxRateBPS         ScaledInteger `json:"taxRateBps" bson:"taxRateBps"`
+	NetMinor           MinorUnits    `json:"netMinor" bson:"netMinor"`
+	TaxMinor           MinorUnits    `json:"taxMinor" bson:"taxMinor"`
+	IndependentLineTax MinorUnits    `json:"independentLineTax" bson:"independentLineTax"`
+	RoundingAdjustment MinorUnits    `json:"roundingAdjustment" bson:"roundingAdjustment"`
 }
 
 // CalculationResult contains settled minor-unit values in stable line-ID and
 // tax-rate order. It has no side effects and does not apply to legacy records.
 type CalculationResult struct {
-	PolicyID         string
-	SchemaVersion    int
-	Currency         string
-	CurrencyExponent int
-	NetMinor         int64
-	TaxMinor         int64
-	GrossMinor       int64
-	Lines            []CalculationLineResult
-	TaxGroups        []CalculationTaxGroupResult
+	PolicyID         string                      `json:"policyId" bson:"policyId"`
+	SchemaVersion    int                         `json:"schemaVersion" bson:"schemaVersion"`
+	Currency         string                      `json:"currency" bson:"currency"`
+	CurrencyExponent int                         `json:"currencyExponent" bson:"currencyExponent"`
+	NetMinor         MinorUnits                  `json:"netMinor" bson:"netMinor"`
+	TaxMinor         MinorUnits                  `json:"taxMinor" bson:"taxMinor"`
+	GrossMinor       MinorUnits                  `json:"grossMinor" bson:"grossMinor"`
+	Lines            []CalculationLineResult     `json:"lines" bson:"lines"`
+	TaxGroups        []CalculationTaxGroupResult `json:"taxGroups" bson:"taxGroups"`
 }
 
 // ParseCanonicalScaledInteger accepts only canonical signed base-10 int64
@@ -178,11 +181,13 @@ func CalculatePolicy(input CalculationInput) (CalculationResult, error) {
 
 		lineResult := CalculationLineResult{
 			LineID:             line.LineID,
-			NetMinor:           netMinor,
+			NetMinor:           MinorUnits(netMinor),
 			NetRoundingResidue: exactRational(residue),
 		}
-		result.NetMinor, err = checkedAdd(result.NetMinor, netMinor)
-		if err != nil || result.NetMinor > MaxAmount {
+		netTotal, addErr := checkedAdd(int64(result.NetMinor), netMinor)
+		err = addErr
+		result.NetMinor = MinorUnits(netTotal)
+		if err != nil || int64(result.NetMinor) > MaxAmount {
 			return CalculationResult{}, invalid("document net exceeds the supported amount")
 		}
 		lines = append(lines, lineResult)
@@ -218,18 +223,20 @@ func CalculatePolicy(input CalculationInput) (CalculationResult, error) {
 			if err != nil {
 				return CalculationResult{}, invalid("tax group net overflows")
 			}
-			lineByID[item.id].TaxMinor = item.allocatedTax
+			lineByID[item.id].TaxMinor = MinorUnits(item.allocatedTax)
 		}
-		result.TaxMinor, err = checkedAdd(result.TaxMinor, tax)
-		if err != nil || result.TaxMinor > MaxAmount {
+		taxTotal, addErr := checkedAdd(int64(result.TaxMinor), tax)
+		err = addErr
+		result.TaxMinor = MinorUnits(taxTotal)
+		if err != nil || int64(result.TaxMinor) > MaxAmount {
 			return CalculationResult{}, invalid("document tax exceeds the supported amount")
 		}
 		result.TaxGroups = append(result.TaxGroups, CalculationTaxGroupResult{
-			TaxRateBPS:         rate,
-			NetMinor:           groupNet,
-			TaxMinor:           tax,
-			IndependentLineTax: independentTax,
-			RoundingAdjustment: adjustment,
+			TaxRateBPS:         ScaledInteger(rate),
+			NetMinor:           MinorUnits(groupNet),
+			TaxMinor:           MinorUnits(tax),
+			IndependentLineTax: MinorUnits(independentTax),
+			RoundingAdjustment: MinorUnits(adjustment),
 		})
 	}
 
@@ -237,14 +244,18 @@ func CalculatePolicy(input CalculationInput) (CalculationResult, error) {
 	result.Lines = lines
 	for i := range result.Lines {
 		var err error
-		result.Lines[i].GrossMinor, err = checkedAdd(result.Lines[i].NetMinor, result.Lines[i].TaxMinor)
+		gross, addErr := checkedAdd(int64(result.Lines[i].NetMinor), int64(result.Lines[i].TaxMinor))
+		err = addErr
+		result.Lines[i].GrossMinor = MinorUnits(gross)
 		if err != nil {
 			return CalculationResult{}, invalid("line gross overflows")
 		}
 	}
 	var err error
-	result.GrossMinor, err = checkedAdd(result.NetMinor, result.TaxMinor)
-	if err != nil || result.GrossMinor > MaxAmount || result.GrossMinor == 0 {
+	gross, addErr := checkedAdd(int64(result.NetMinor), int64(result.TaxMinor))
+	err = addErr
+	result.GrossMinor = MinorUnits(gross)
+	if err != nil || int64(result.GrossMinor) > MaxAmount || result.GrossMinor == 0 {
 		return CalculationResult{}, invalid("document gross is zero or exceeds the supported amount")
 	}
 	return result, nil

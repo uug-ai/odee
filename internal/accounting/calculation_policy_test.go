@@ -210,7 +210,7 @@ func TestCalculatePolicyDocumentAmountBound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.GrossMinor != MaxAmount {
+	if int64(result.GrossMinor) != MaxAmount {
 		t.Fatalf("maximum document total = %d, want %d", result.GrossMinor, MaxAmount)
 	}
 	assertInvalidCalculation(t, policyInput(append(lines, policyLine("overflow", calculationMaxQuantityUnits, 1_000_000_000, 0))...))

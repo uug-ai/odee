@@ -32,6 +32,13 @@ func TestMongoPersistenceIsolationAndAtomicity(t *testing.T) {
 	if err := store.Create(ctx, doc); err != nil {
 		t.Fatal(err)
 	}
+	policyDoc, err := NewDocument(exactPolicyDraft("invoice"), company)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Create(ctx, policyDoc); err != nil {
+		t.Fatal(err)
+	}
 	if err := store.Client.Disconnect(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -47,6 +54,13 @@ func TestMongoPersistenceIsolationAndAtomicity(t *testing.T) {
 	reloaded, err := store.Get(ctx, doc.ID)
 	if err != nil || reloaded.Total != 24200 {
 		t.Fatalf("persisted reload: %v %+v", err, reloaded)
+	}
+	policyReloaded, err := store.Get(ctx, policyDoc.ID)
+	if err != nil || !recognizedCalculationPolicy(policyReloaded) ||
+		policyReloaded.CalculationPolicy.PolicyID != CalculationPolicyID ||
+		policyReloaded.Calculation.GrossMinor != MinorUnits(policyReloaded.Total) ||
+		policyReloaded.Lines[0].Calculation.LineID != policyDoc.Lines[0].Calculation.LineID {
+		t.Fatalf("calculation policy did not survive Mongo reconnect: %v %+v", err, policyReloaded)
 	}
 	foreign := &MongoStore{store.Client, name, other}
 	if _, err := foreign.Get(ctx, doc.ID); !errors.Is(err, ErrNotFound) {
@@ -129,7 +143,7 @@ func TestMongoPersistenceIsolationAndAtomicity(t *testing.T) {
 		t.Fatal(err)
 	}
 	docs, err = store.List(ctx)
-	if err != nil || len(docs) != 2 {
+	if err != nil || len(docs) != 3 {
 		t.Fatalf("canonical ownership precedence failed: %d docs, %v", len(docs), err)
 	}
 }
