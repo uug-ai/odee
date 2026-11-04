@@ -1,5 +1,68 @@
 // English source messages are stable, typed catalog IDs. Business data never passes through t().
 export const nl = {
+  'Enterprise identifier': 'Ondernemingsnummer',
+  'Bank account / IBAN': 'Bankrekening / IBAN',
+  BIC: 'BIC',
+  'Payment terms': 'Betalingsvoorwaarden',
+  'Tax applicability': 'Fiscale toepasselijkheid',
+  'Unknown / not assessed': 'Onbekend / niet beoordeeld',
+  Unsupported: 'Niet ondersteund',
+  'Incomplete / unknown': 'Onvolledig / onbekend',
+  'Identifier checks cover Belgian checksums only; registration, tax eligibility and legal completeness are not assessed.':
+    'Identificatiecontroles dekken alleen Belgische controlegetallen; registratie, fiscale voorwaarden en wettelijke volledigheid worden niet beoordeeld.',
+  'Legal company profile': 'Juridisch bedrijfsprofiel',
+  'New documents capture this profile as invoice seller or bill buyer. Existing captures change only through explicit draft refresh.':
+    'Nieuwe documenten leggen dit profiel vast als verkoper bij klantfacturen of koper bij leveranciersfacturen. Bestaande vastleggingen wijzigen alleen door uitdrukkelijk vernieuwen in een concept.',
+  'Read-only. Company profile changes require read and admin capabilities.':
+    'Alleen-lezen. Voor wijzigingen aan het bedrijfsprofiel zijn lees- en beheerdersrechten vereist.',
+  'Company profile saved.': 'Bedrijfsprofiel opgeslagen.',
+  'Save company profile': 'Bedrijfsprofiel opslaan',
+  'Accounting captures': 'Boekhoudkundige vastleggingen',
+  'Partner capture': 'Vastgelegde relatiegegevens',
+  'Own company capture': 'Vastgelegde eigen bedrijfsgegevens',
+  'Captured version {version}': 'Vastgelegde versie {version}',
+  'Manual / incomplete history': 'Handmatig / onvolledige historiek',
+  Seller: 'Verkoper',
+  Buyer: 'Koper',
+  'Posting freezes existing captures; it does not fetch current contact or company data.':
+    'Boeken bevriest bestaande vastleggingen; huidige contact- of bedrijfsgegevens worden niet opgehaald.',
+  'Refresh own company capture': 'Eigen bedrijfsgegevens vernieuwen',
+  'Refresh saved contact': 'Opgeslagen contact vernieuwen',
+  'Convert to manual entry': 'Omzetten naar handmatige invoer',
+  'Refresh will apply on save.': 'Vernieuwing wordt toegepast bij opslaan.',
+  'Selection or conversion will apply on save.':
+    'Selectie of omzetting wordt toegepast bij opslaan.',
+  'accounting metadata must contain at most 300 valid characters':
+    'Boekhoudkundige metadata mag maximaal 300 geldige tekens bevatten',
+  'tax applicability must be unknown or unsupported':
+    'Fiscale toepasselijkheid moet onbekend of niet ondersteund zijn',
+  'invalid Belgian enterprise identifier checksum':
+    'Ongeldig controlegetal voor Belgisch ondernemingsnummer',
+  'invalid Belgian VAT identifier checksum': 'Ongeldig controlegetal voor Belgisch btw-nummer',
+  'invalid Belgian IBAN checksum': 'Ongeldig controlegetal voor Belgische IBAN',
+  'explicit contact selection or refresh is required':
+    'Uitdrukkelijke contactselectie of vernieuwing is vereist',
+  'convert the saved contact to manual entry before editing captured fields':
+    'Zet het opgeslagen contact om naar handmatige invoer voordat je vastgelegde velden bewerkt',
+  'manual conversion cannot include a saved contact selection':
+    'Handmatige omzetting mag geen opgeslagen contactselectie bevatten',
+  'contactId and expectedContactVersion are required for saved contact selection':
+    'contactId en expectedContactVersion zijn vereist voor selectie van een opgeslagen contact',
+  'refresh must select the captured contact': 'Vernieuwen moet het vastgelegde contact selecteren',
+  'archived contacts cannot be selected or refreshed':
+    'Gearchiveerde contacten kunnen niet worden geselecteerd of vernieuwd',
+  'unsupported partner action': 'Niet-ondersteunde relatiebewerking',
+  'own company refresh is only available for existing drafts':
+    'Eigen bedrijfsgegevens vernieuwen is alleen beschikbaar voor bestaande concepten',
+  'explicit own company refresh and expectedCompanyVersion are required':
+    'Uitdrukkelijke vernieuwing van eigen bedrijfsgegevens en expectedCompanyVersion zijn vereist',
+  'Company profile storage is not configured.':
+    'Opslag voor het bedrijfsprofiel is niet ingesteld.',
+  'BIC must contain 8 or 11 valid characters': 'BIC moet 8 of 11 geldige tekens bevatten',
+  'Current profile will be captured on creation.':
+    'Het huidige profiel wordt bij aanmaken vastgelegd.',
+  'Saved profile version {version}': 'Opgeslagen profielversie {version}',
+  'Reload saved profile': 'Opgeslagen profiel opnieuw laden',
   Language: 'Taal',
   English: 'English',
   Nederlands: 'Nederlands',

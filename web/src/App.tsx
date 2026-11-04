@@ -52,6 +52,7 @@ import type {
 } from './types'
 import { BillImports, OriginalPreview } from './BillImports'
 import { Modal } from './Modal'
+import { AccountingSummary } from './Company'
 import { AppLauncher } from './AppLauncher'
 import { createAPIRequest, responseStatus } from './api'
 import { can } from './permissions'
@@ -515,6 +516,7 @@ export default function App() {
               onRefresh={refresh}
               onStateChange={setState}
               canWrite={canWrite}
+              canAdmin={canAudit}
             />
           ) : (
             <>
@@ -1059,6 +1061,7 @@ export default function App() {
         <DraftEditor
           onSessionExpired={expireSession}
           contacts={state?.contacts ?? []}
+          companyProfile={state?.companyProfile}
           initial={editor}
           busy={busy}
           error={error}
@@ -1087,6 +1090,7 @@ export default function App() {
         <DraftEditor
           onSessionExpired={expireSession}
           contacts={state?.contacts ?? []}
+          companyProfile={state?.companyProfile}
           initial={review.scan.draft}
           review={review}
           token={token}
@@ -1349,6 +1353,22 @@ function DocumentDetail({
             <strong>{doc.reference || '—'}</strong>
           </div>
         </div>
+        <section aria-label={t('Accounting captures')}>
+          <h3>{t('Partner capture')}</h3>
+          <p>
+            {doc.partnerSnapshot?.sourceVersion
+              ? t('Captured version {version}', { version: doc.partnerSnapshot.sourceVersion })
+              : t('Manual / incomplete history')}
+          </p>
+          {doc.partnerSnapshot && <AccountingSummary data={doc.partnerSnapshot.data} />}
+          <h3>{t('Own company capture')}</h3>
+          <p>
+            {doc.ownCompanySnapshot
+              ? `${doc.ownCompanySnapshot.role === 'seller' ? t('Seller') : t('Buyer')} · ${t('Captured version {version}', { version: doc.ownCompanySnapshot.sourceVersion })}`
+              : t('Incomplete / unknown')}
+          </p>
+          {doc.ownCompanySnapshot && <AccountingSummary data={doc.ownCompanySnapshot.data} />}
+        </section>
         <div className="table-scroll">
           <table>
             <thead>
@@ -1450,6 +1470,7 @@ function DraftEditor({
   review,
   token = '',
   contacts = [],
+  companyProfile,
   onSessionExpired,
 }: {
   initial: Kind | Draft
@@ -1460,9 +1481,13 @@ function DraftEditor({
   review?: BillImport
   token?: string
   contacts?: Contact[]
+  companyProfile?: import('./types').CompanyProfile | null
   onSessionExpired: () => void
 }) {
   const kind = typeof initial === 'string' ? initial : initial.kind
+  const captured = typeof initial === 'string' ? undefined : (initial as Document).partnerSnapshot
+  const ownCapture =
+    typeof initial === 'string' ? undefined : (initial as Document).ownCompanySnapshot
   const blank: Line = {
     description: '',
     quantity: 1,
@@ -1499,6 +1524,9 @@ function DraftEditor({
     setPrices((values) => values.map((value) => switchMoneyEdit(value, locale)))
   }, [locale])
   const [localError, setLocalError] = useState('')
+  const savedSelection =
+    draft.partnerAction === 'manual' ? undefined : (draft.contactId ?? captured?.contactId)
+  const isCaptured = Boolean(savedSelection && savedSelection !== '000000000000000000000000')
   const [reviewed, setReviewed] = useState(false)
   const [acceptMismatch, setAcceptMismatch] = useState(false)
   const setField = (key: 'partner' | 'email' | 'reference' | 'date' | 'dueDate', value: string) =>
@@ -1574,11 +1602,48 @@ function DraftEditor({
               <p className="dialog-intro">
                 {t('Start with a draft. You can review and edit it before posting.')}
               </p>
+              <p role="status">
+                {t('Partner capture')}:{' '}
+                {captured?.sourceVersion
+                  ? t('Captured version {version}', { version: captured.sourceVersion })
+                  : t('Manual / incomplete history')}
+              </p>
+              {captured && <AccountingSummary data={captured.data} />}
+              <p role="status">
+                {t('Own company capture')}:{' '}
+                {ownCapture
+                  ? `${ownCapture.data.name} · ${t('Captured version {version}', { version: ownCapture.sourceVersion })}`
+                  : companyProfile && (typeof initial === 'string' || !('id' in initial))
+                    ? `${companyProfile.data.name} · ${t('Current profile will be captured on creation.')}`
+                    : t('Incomplete / unknown')}
+              </p>
+              <p>
+                {t(
+                  'Posting freezes existing captures; it does not fetch current contact or company data.',
+                )}
+              </p>
+              {companyProfile && typeof initial !== 'string' && 'id' in initial && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() =>
+                    setDraft((d) => ({
+                      ...d,
+                      ownCompanyAction: 'refresh',
+                      expectedCompanyVersion: companyProfile.version,
+                    }))
+                  }
+                >
+                  {t('Refresh own company capture')}
+                </button>
+              )}
+              {draft.ownCompanyAction && <p role="status">{t('Refresh will apply on save.')}</p>}
               <div className="form-grid">
                 <label>
                   {t('Choose a saved contact')}
                   <select
-                    defaultValue=""
+                    aria-label={t('Choose a saved contact')}
+                    value={isCaptured ? savedSelection : ''}
                     onChange={(event) => {
                       const contact = contacts.find((item) => item.id === event.target.value)
                       if (contact)
@@ -1586,10 +1651,18 @@ function DraftEditor({
                           ...current,
                           partner: contact.name,
                           email: contact.email,
+                          partnerAction: 'select',
+                          contactId: contact.id,
+                          expectedContactVersion: contact.version,
                         }))
                     }}
                   >
-                    <option value="">{t('Enter details manually')}</option>
+                    <option value="" disabled={isCaptured}>
+                      {t('Enter details manually')}
+                    </option>
+                    {isCaptured && !contacts.some((c) => c.active && c.id === savedSelection) && (
+                      <option value={savedSelection}>{captured?.data.name ?? draft.partner}</option>
+                    )}
                     {contacts
                       .filter((contact) => contact.active)
                       .sort((a, b) => a.name.localeCompare(b.name))
@@ -1601,6 +1674,43 @@ function DraftEditor({
                       ))}
                   </select>
                 </label>
+                {isCaptured && (
+                  <>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      onClick={() => {
+                        const contact = contacts.find((c) => c.id === savedSelection)
+                        setDraft((d) => ({
+                          ...d,
+                          partnerAction:
+                            captured?.contactId === savedSelection ? 'refresh' : 'select',
+                          contactId: savedSelection,
+                          expectedContactVersion: contact?.version ?? captured?.sourceVersion,
+                        }))
+                      }}
+                    >
+                      {t('Refresh saved contact')}
+                    </button>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      onClick={() =>
+                        setDraft((d) => ({
+                          ...d,
+                          partnerAction: 'manual',
+                          contactId: undefined,
+                          expectedContactVersion: undefined,
+                        }))
+                      }
+                    >
+                      {t('Convert to manual entry')}
+                    </button>
+                  </>
+                )}
+                {draft.partnerAction && (
+                  <p role="status">{t('Selection or conversion will apply on save.')}</p>
+                )}
                 <label>
                   {kind === 'bill' ? t('Vendor name') : t('Customer name')}
                   <input
@@ -1608,6 +1718,7 @@ function DraftEditor({
                     required
                     maxLength={200}
                     value={draft.partner}
+                    readOnly={isCaptured}
                     onChange={(e) => setField('partner', e.target.value)}
                     placeholder={t('Company or person')}
                   />
@@ -1618,6 +1729,7 @@ function DraftEditor({
                     type="email"
                     maxLength={254}
                     value={draft.email}
+                    readOnly={isCaptured}
                     onChange={(e) => setField('email', e.target.value)}
                     placeholder="finance@example.com"
                   />

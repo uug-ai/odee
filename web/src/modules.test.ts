@@ -30,6 +30,7 @@ describe('workspace registration', () => {
       ['journal', 'Journal entries', 'ACCOUNTING'],
       ['accounts', 'Chart of accounts', undefined],
       ['reports', 'Trial balance', 'REPORTING'],
+      ['settings', 'Legal company profile', 'WORKSPACE'],
       ['contacts', 'Contacts', 'WORKSPACE'],
     ])
     expect(new Set(navigation.map((item) => item.view)).size).toBe(Object.keys(views).length)
@@ -41,6 +42,7 @@ describe('workspace registration', () => {
       'Chart of accounts',
       'Trial balance',
       'Contacts',
+      'Legal company profile',
     ])
     for (const module of activeModules)
       for (const item of module.navigation) expect(moduleForView(item.view)).toBe(module)

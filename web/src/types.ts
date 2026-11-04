@@ -20,6 +20,11 @@ export interface Payment {
   entries: Entry[]
 }
 export interface Draft {
+  partnerAction?: 'select' | 'refresh' | 'manual'
+  contactId?: string
+  expectedContactVersion?: number
+  ownCompanyAction?: 'refresh'
+  expectedCompanyVersion?: number
   kind: Kind
   partner: string
   email: string
@@ -29,6 +34,8 @@ export interface Draft {
   lines: Line[]
 }
 export interface Document extends Draft {
+  partnerSnapshot?: PartnerSnapshot
+  ownCompanySnapshot?: CompanySnapshot
   id: string
   number: string
   version: number
@@ -50,6 +57,7 @@ export interface Account {
   type: string
 }
 export interface State {
+  companyProfile?: CompanyProfile | null
   company: string
   currency: string
   demo: boolean
@@ -127,6 +135,11 @@ export interface Journal {
 }
 
 export interface ContactData {
+  enterpriseId?: string
+  bankAccount?: string
+  bic?: string
+  paymentTerms?: string
+  taxApplicability?: '' | 'unknown' | 'unsupported'
   name: string
   isCompany: boolean
   companyName: string
@@ -149,6 +162,25 @@ export interface ContactData {
   customer: boolean
   vendor: boolean
   active: boolean
+}
+export interface CompanyProfile {
+  id: string
+  data: ContactData
+  version: number
+  updatedAt: string
+}
+export interface PartnerSnapshot {
+  contactId?: string
+  sourceVersion: number
+  schemaVersion: number
+  data: ContactData
+}
+export interface CompanySnapshot {
+  profileId: string
+  sourceVersion: number
+  schemaVersion: number
+  role: 'seller' | 'buyer'
+  data: ContactData
 }
 export interface Contact extends ContactData {
   id: string

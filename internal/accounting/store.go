@@ -128,6 +128,7 @@ func (s *MongoStore) Save(ctx context.Context, doc Document, version int64) erro
 		"email": doc.Email, "reference": doc.Reference, "date": doc.Date, "dueDate": doc.DueDate,
 		"lines": doc.Lines, "subtotal": doc.Subtotal, "tax": doc.Tax, "total": doc.Total,
 		"status": doc.Status, "entries": doc.Entries, "payments": doc.Payments, "paid": doc.Paid,
+		"partnerSnapshot": doc.PartnerSnapshot, "ownCompanySnapshot": doc.OwnCompanySnapshot,
 	}}
 	if doc.pendingEvent != nil {
 		if doc.pendingEvent.Version != version+1 || doc.pendingEvent.TargetID != doc.ID {
@@ -156,6 +157,16 @@ func NewMemoryStore() *MemoryStore {
 }
 
 func clone(doc Document) Document {
+	if doc.PartnerSnapshot != nil {
+		copy := *doc.PartnerSnapshot
+		copy.Data = cloneData(copy.Data)
+		doc.PartnerSnapshot = &copy
+	}
+	if doc.OwnCompanySnapshot != nil {
+		copy := *doc.OwnCompanySnapshot
+		copy.Data = cloneData(copy.Data)
+		doc.OwnCompanySnapshot = &copy
+	}
 	doc.FinancialEvents = append([]FinancialEvent{}, doc.FinancialEvents...)
 	if doc.pendingEvent != nil {
 		event := *doc.pendingEvent

@@ -29,6 +29,7 @@ type Server struct {
 	Imports       ImportStore
 	Scanner       *Scanner
 	Contacts      ContactStore
+	Profiles      CompanyStore
 	uploadSlots   chan struct{}
 }
 
@@ -36,6 +37,8 @@ func (s *Server) Handler() http.Handler {
 	s.uploadSlots = make(chan struct{}, 2)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/state", s.require(s.state, Read))
+	mux.HandleFunc("GET /api/company-profile", s.require(s.getCompany, Read))
+	mux.HandleFunc("PUT /api/company-profile", s.require(s.saveCompany, Read, Admin))
 	mux.HandleFunc("GET /api/contacts", s.require(s.listContacts, Read))
 	mux.HandleFunc("POST /api/contacts", s.require(s.createContact, Read, Write))
 	mux.HandleFunc("PUT /api/contacts/{id}", s.require(s.editContact, Read, Write))
@@ -163,6 +166,17 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 	docs = scoped
 	imports := []BillImport{}
 	contacts := []Contact{}
+	var profile *CompanyProfile
+	if s.Profiles != nil {
+		p, profileErr := s.Profiles.Get(r.Context())
+		if profileErr != nil && !errors.Is(profileErr, ErrNotFound) {
+			apiError(w, profileErr)
+			return
+		}
+		if profileErr == nil {
+			profile = &p
+		}
+	}
 	if s.Contacts != nil {
 		contacts, err = s.Contacts.List(r.Context())
 		if err != nil {
@@ -188,17 +202,18 @@ func (s *Server) state(w http.ResponseWriter, r *http.Request) {
 	reply(w, http.StatusOK, map[string]any{
 		"company": s.Name, "currency": "EUR", "demo": s.Demo, "development": s.Dev,
 		"accounts": Accounts, "documents": docs,
-		"contacts": contacts,
-		"imports":  imports, "scannerReady": scannerReady, "scannerError": scannerError,
+		"contacts":       contacts,
+		"companyProfile": profile,
+		"imports":        imports, "scannerReady": scannerReady, "scannerError": scannerError,
 	})
 }
 
 func (s *Server) create(w http.ResponseWriter, r *http.Request) {
-	var input Draft
+	var input draftRequest
 	if !decode(w, r, &input) {
 		return
 	}
-	doc, err := NewDocument(input, s.Company)
+	doc, err := s.newDraft(r.Context(), input)
 	if err == nil {
 		err = s.Store.Create(r.Context(), doc)
 	}
@@ -248,14 +263,24 @@ func (s *Server) save(w http.ResponseWriter, r *http.Request, doc Document, err 
 func (s *Server) edit(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Version int64 `json:"version"`
-		Draft
+		draftRequest
 	}
 	if !decode(w, r, &input) {
 		return
 	}
 	doc, ok := s.load(w, r, input.Version)
 	if ok {
-		err := doc.SetDraft(input.Draft)
+		err := s.applyPartner(r.Context(), &doc, &input.draftRequest)
+		if err == nil {
+			if input.OwnCompanyAction == "refresh" && input.ExpectedCompanyVersion > 0 {
+				err = s.captureCompany(r.Context(), &doc, input.ExpectedCompanyVersion)
+			} else if input.OwnCompanyAction != "" || input.ExpectedCompanyVersion != 0 {
+				err = invalid("explicit own company refresh and expectedCompanyVersion are required")
+			}
+		}
+		if err == nil {
+			err = doc.SetDraft(input.Draft)
+		}
 		s.save(w, r, doc, err)
 	}
 }

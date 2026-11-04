@@ -17,6 +17,8 @@ var protectedRoutes = []struct {
 	required     []Capability
 }{
 	{"GET", "/api/state", []Capability{Read}},
+	{"GET", "/api/company-profile", []Capability{Read}},
+	{"PUT", "/api/company-profile", []Capability{Read, Admin}},
 	{"GET", "/api/contacts", []Capability{Read}},
 	{"POST", "/api/contacts", []Capability{Read, Write}},
 	{"PUT", "/api/contacts/000000000000000000000002", []Capability{Read, Write}},
@@ -89,6 +91,7 @@ func authorizationServer(t *testing.T, mode string) (*Server, func(string, strin
 	s := &Server{
 		Company: testCompany, Store: NewMemoryStore(), Contacts: NewMemoryContacts(testCompany),
 		Imports: NewMemoryImports(testCompany), Origin: "https://odee.example", Token: strings.Repeat("t", 32),
+		Profiles: NewMemoryCompany(testCompany),
 	}
 	if mode == "github" {
 		s.Auth = testGitHubAuth(t)

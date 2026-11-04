@@ -37,7 +37,8 @@ production. This implementation changes no real grants or data.
 
 | Required capabilities | Routes |
 | --- | --- |
-| `read` | `GET /api/state`, `GET /api/contacts`, `GET /api/imports/{id}`, `GET /api/imports/{id}/original`, `GET /api/imports/{id}/preview` |
+| `read` | `GET /api/state`, `GET /api/company-profile`, `GET /api/contacts`, `GET /api/imports/{id}`, `GET /api/imports/{id}/original`, `GET /api/imports/{id}/preview` |
+| `read`, `admin` | `PUT /api/company-profile` |
 | `read`, `write` | `POST /api/documents`, `PUT /api/documents/{id}`, `POST /api/contacts`, `PUT /api/contacts/{id}` (including archive), `POST /api/contacts/import`, `POST /api/imports`, `POST /api/imports/{id}/scan`, `POST /api/imports/{id}/draft` |
 | `read`, `post` | `POST /api/documents/{id}/post`, `POST /api/documents/{id}/payments` |
 | `read`, `admin`, target ownership | `GET /api/documents/{id}/audit` |
@@ -45,6 +46,8 @@ production. This implementation changes no real grants or data.
 Capabilities imply nothing else. A poster cannot edit, an editor cannot post,
 and an audit administrator cannot make financial changes without `post`.
 Checks precede protected work; disabling browser controls is not authorization.
+The [legal-company and saved-contact capture contract](company-contacts.md)
+describes profile versions, explicit draft refresh and legacy compatibility.
 Public shell/health/auth routes remain usable. `/api/session` discloses only the
 current authenticated principal's auth mode, authorization mode, membership,
 company and capabilities, plus existing GitHub user/CSRF discovery. Logout keeps

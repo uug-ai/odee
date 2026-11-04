@@ -12,6 +12,7 @@ describe('registered workspace paths', () => {
       ['journal', '/accounting/journal'],
       ['accounts', '/accounting/accounts'],
       ['reports', '/accounting/reports'],
+      ['settings', '/accounting/settings'],
       ['contacts', '/contacts'],
     ])
     expect(pathForView('apps')).toBe('/')
