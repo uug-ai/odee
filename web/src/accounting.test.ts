@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { balances, cents, csvCell, decimal, journals, lineTotals, money } from './accounting'
+import {
+  balances,
+  cents,
+  csvCell,
+  decimal,
+  journals,
+  lineTotals,
+  money,
+  entryMeaning,
+  financialMeaningConflicts,
+} from './accounting'
 import type { Document } from './types'
 
 describe('exact accounting amounts', () => {
@@ -126,5 +136,50 @@ describe('posted ledger', () => {
     expect(rows.filter((row) => !row.known)).toHaveLength(5)
     expect(rows.reduce((sum, row) => sum + row.debit - row.credit, 0n)).toBe(0n)
     expect(rows.reduce((sum, row) => sum + row.debit, 0n)).toBe(51300n)
+  })
+  it.each(['name', 'type', 'active', 'role'])(
+    'marks conflicting frozen %s unresolved without merging or losing cents',
+    (field) => {
+      const original = structuredClone(doc)
+      original.financialMeaning!.selection = { versionId: 'v1', digest: 'same-digest' }
+      const changed = structuredClone(original)
+      changed.id = 'contradictory'
+      const account = changed.financialMeaning!.accounts.find((a) => a.code === '1100')!
+      if (field === 'name') account.name = 'Contradictory receivable'
+      if (field === 'type') account.type = 'expense'
+      if (field === 'active') account.active = false
+      if (field === 'role') changed.financialMeaning!.mappings.other = '1100'
+      for (const documents of [
+        [original, changed],
+        [changed, original],
+      ]) {
+        const conflicts = financialMeaningConflicts(documents)
+        const rows = [...balances(documents).values()]
+        const receivable = rows.filter((row) => row.code === '1100')
+        expect(receivable).toHaveLength(4)
+        expect(receivable.every((row) => !row.known && row.type === 'unknown')).toBe(true)
+        expect(receivable.reduce((sum, row) => sum + row.debit, 0n)).toBe(24200n)
+        expect(receivable.reduce((sum, row) => sum + row.credit, 0n)).toBe(10000n)
+        expect(rows.reduce((sum, row) => sum + row.debit - row.credit, 0n)).toBe(0n)
+        expect(rows.filter((row) => row.code === '4000').every((row) => row.known)).toBe(true)
+        for (const document of documents)
+          expect(entryMeaning(document, document.entries[0], document.id, conflicts).known).toBe(
+            false,
+          )
+      }
+    },
+  )
+  it('still aggregates identical frozen definitions and mapping order', () => {
+    const second = structuredClone(doc)
+    second.id = 'same-meaning'
+    second.financialMeaning!.mappings = Object.fromEntries(
+      Object.entries(second.financialMeaning!.mappings).reverse(),
+    )
+    expect(financialMeaningConflicts([doc, second]).size).toBe(0)
+    expect([...balances([doc, second]).values()].find((row) => row.code === '1100')).toMatchObject({
+      known: true,
+      debit: 24200n,
+      credit: 10000n,
+    })
   })
 })

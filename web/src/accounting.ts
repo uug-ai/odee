@@ -74,13 +74,14 @@ export function journals(documents: Document[]): Journal[] {
 }
 
 export function balances(documents: Document[]) {
+  const conflicts = financialMeaningConflicts(documents)
   const result = new Map<
     string,
     ReturnType<typeof entryMeaning> & { debit: bigint; credit: bigint }
   >()
   for (const journal of journals(documents)) {
     for (const [index, entry] of journal.entries.entries()) {
-      const meaning = entryMeaning(journal.document, entry, `${journal.key}/${index}`)
+      const meaning = entryMeaning(journal.document, entry, `${journal.key}/${index}`, conflicts)
       const current = result.get(meaning.key) ?? { debit: 0n, credit: 0n }
       result.set(meaning.key, {
         ...meaning,
@@ -90,6 +91,21 @@ export function balances(documents: Document[]) {
     }
   }
   return result
+}
+
+export function financialMeaningConflicts(documents: Document[]) {
+  const definitions = new Map<string, string>()
+  const conflicts = new Set<string>()
+  for (const journal of journals(documents)) {
+    for (const [index, entry] of journal.entries.entries()) {
+      const meaning = entryMeaning(journal.document, entry, `${journal.key}/${index}`)
+      if (!meaning.known) continue
+      const previous = definitions.get(meaning.key)
+      if (previous !== undefined && previous !== meaning.definition) conflicts.add(meaning.key)
+      definitions.set(meaning.key, meaning.definition)
+    }
+  }
+  return conflicts
 }
 
 export function selectionLabel(
@@ -102,26 +118,37 @@ export function selectionLabel(
     (doc.meaningError ? t('Financial meaning unknown') : 'legacy-starter-v1')
   )
 }
-export function entryMeaning(doc: Document, entry: Entry, identity: string) {
+export function entryMeaning(
+  doc: Document,
+  entry: Entry,
+  identity: string,
+  conflicts: ReadonlySet<string> = new Set(),
+) {
   const frozen = doc.financialSnapshot ?? doc.financialMeaning
   const account = frozen?.accounts.find((a) => a.code === entry.accountCode)
   const scope = `${doc.organisationId ?? ''}/${doc.projectId ?? ''}/${doc.currency}`
   if (account && !doc.meaningError) {
     const selection = frozen!.selection
     const version = selection.versionId ?? selection.policy ?? ''
-    return {
-      key: `${scope}/${version}/${selection.digest}/${account.code}`,
-      code: account.code,
-      name:
-        selection.policy === 'legacy-starter-v1'
-          ? accountName(account.code, account.name)!
-          : account.name,
-      type: account.type,
-      version,
-      currency: doc.currency,
-      known: true,
-      role: Object.keys(frozen!.mappings).filter((role) => frozen!.mappings[role] === account.code),
-    }
+    const key = `${scope}/${version}/${selection.digest}/${account.code}`
+    const role = Object.keys(frozen!.mappings)
+      .filter((role) => frozen!.mappings[role] === account.code)
+      .sort()
+    if (!conflicts.has(key))
+      return {
+        key,
+        code: account.code,
+        name:
+          selection.policy === 'legacy-starter-v1'
+            ? accountName(account.code, account.name)!
+            : account.name,
+        type: account.type,
+        version,
+        currency: doc.currency,
+        known: true,
+        role,
+        definition: JSON.stringify([account.name, account.type, account.active, role]),
+      }
   }
   return {
     key: `${scope}/unresolved/${identity}`,
@@ -131,6 +158,7 @@ export function entryMeaning(doc: Document, entry: Entry, identity: string) {
     version: doc.configurationSelection?.versionId ?? 'unresolved',
     currency: doc.currency,
     known: false,
+    definition: '',
     role: [] as string[],
   }
 }

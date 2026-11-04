@@ -507,3 +507,44 @@ unfiltered discovery, complete failure/recovery coverage and all eleven
 criteria, not infer completion from the counts above. Belgian mapping and
 professional approval gates in section G remain unresolved; software activation
 is not statutory approval.
+
+### Current company/main reconciliation
+
+The reconciliation candidate preserves both GridFS and filesystem original
+storage through the finance store's native-client adapter. Its normal Mongo
+runner requires both disk-persistence tests and the configuration child in
+each write/read phase, with no phase skips, over the same disk after an owned
+MongoDB hard crash. The matrix still permits only the two phase-only disk
+tests to skip. These combined requirements do not replace the historical
+validation counts above or establish independent acceptance of this candidate.
+The company prerequisite must actually merge before final-main reconciliation
+and all six exact-candidate specialist verdicts.
+
+Coordinator preparation against company candidate
+`1ac380af4433267901c3a960007ed3fac3f3b73b` passed the 75 root contracts with no
+skips. The combined normal Mongo runner passed 19 matrix cases and 276
+subcases, with exactly the two phase-only disk skips. Both disk cases and the
+configuration child then passed in both write/read phases, with no phase skips,
+across the actual owned MongoDB hard crash and same-disk recovery. An initial
+runner attempt failed because the locked Mongo fixture dependency was absent;
+the existing lockfile was restored before rerunning. This is coordinator
+validation of reconciliation, not any of the six independent verdicts or
+statutory approval.
+
+### LEDGER-001: conflicting historical definitions
+
+Independent ledger testing of prepared candidate `41197ef` found that two
+injected historical documents sharing scope/version/digest/code but disagreeing
+on the frozen account name were merged as resolved in trial balance and CSV.
+The numerical amounts remained balanced; the false resolution still violated
+section E. That failed candidate and the Mongo/CSV reproducer are retained.
+
+Historical resolution now compares the original account name, type, active flag
+and mapped roles before aggregating. Conflicting identities are unresolved
+per original/payment entry in both balances/CSV and journal detail, preserving
+all cents and not selecting either conflicting name as authoritative. Identical
+definitions still aggregate, independently of mapping-key order. This does not
+rewrite stored documents or substitute the current chart. Regression coverage
+includes both document orders, each conflicting field and unchanged totals.
+Coordinator frontend validation passed 129 tests and the production type/build
+checks; independent exact-head retesting remains required.
