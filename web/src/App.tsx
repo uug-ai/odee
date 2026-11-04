@@ -38,6 +38,7 @@ import {
   overdue,
   today,
   entryMeaning,
+  financialMeaningConflicts,
 } from './accounting'
 import type {
   BillImport,
@@ -267,6 +268,7 @@ export default function App() {
   const sumOpen = (docs: Document[]) =>
     docs.filter((d) => d.status === 'posted').reduce((sum, d) => sum + BigInt(d.total - d.paid), 0n)
   const ledger = balances(documents)
+  const meaningConflicts = financialMeaningConflicts(documents)
   const accountBalance = (role: string) =>
     [...ledger.values()]
       .filter((row) => row.currency === 'EUR' && row.role.includes(role))
@@ -981,8 +983,12 @@ export default function App() {
                                 <td>
                                   <span className="account-code">{entry.accountCode}</span>
                                   {
-                                    entryMeaning(journal.document, entry, `${journal.key}/${index}`)
-                                      .name
+                                    entryMeaning(
+                                      journal.document,
+                                      entry,
+                                      `${journal.key}/${index}`,
+                                      meaningConflicts,
+                                    ).name
                                   }
                                   <small>
                                     {
@@ -990,6 +996,7 @@ export default function App() {
                                         journal.document,
                                         entry,
                                         `${journal.key}/${index}`,
+                                        meaningConflicts,
                                       ).version
                                     }
                                   </small>

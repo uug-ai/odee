@@ -530,3 +530,21 @@ runner attempt failed because the locked Mongo fixture dependency was absent;
 the existing lockfile was restored before rerunning. This is coordinator
 validation of reconciliation, not any of the six independent verdicts or
 statutory approval.
+
+### LEDGER-001: conflicting historical definitions
+
+Independent ledger testing of prepared candidate `41197ef` found that two
+injected historical documents sharing scope/version/digest/code but disagreeing
+on the frozen account name were merged as resolved in trial balance and CSV.
+The numerical amounts remained balanced; the false resolution still violated
+section E. That failed candidate and the Mongo/CSV reproducer are retained.
+
+Historical resolution now compares the original account name, type, active flag
+and mapped roles before aggregating. Conflicting identities are unresolved
+per original/payment entry in both balances/CSV and journal detail, preserving
+all cents and not selecting either conflicting name as authoritative. Identical
+definitions still aggregate, independently of mapping-key order. This does not
+rewrite stored documents or substitute the current chart. Regression coverage
+includes both document orders, each conflicting field and unchanged totals.
+Coordinator frontend validation passed 129 tests and the production type/build
+checks; independent exact-head retesting remains required.
