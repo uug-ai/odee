@@ -199,7 +199,10 @@ in-progress state belongs only to the coordinator, not this planning document.
   verdicts and leases live in ignored `.odee/loop.json`, with the coordinator as
   single writer. Epic `status` is planning metadata, not execution state.
   State uses JSON rather than requiring SQLite. Session chat/todos alone are
-  not durable execution records.
+  not durable execution records. The explicitly adopted
+  [temporary app-managed execution mode](../agents.md#temporary-app-managed-execution-authority-revision-1)
+  is a bounded recovery exception for current assignments/control, not a
+  replacement ledger or reconstruction of historical acceptance.
 
 ## QA and integration gates
 

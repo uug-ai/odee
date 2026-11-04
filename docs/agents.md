@@ -27,7 +27,62 @@ Open the ODEE folder in the editor, or use `odee.code-workspace`, to make ODEE
 the customization root. The monorepo's existing workspace also includes ODEE;
 no global profile changes or neighboring project configuration are required.
 
-## Local controls
+## Temporary app-managed execution authority (revision 1)
+
+When the historical shared control root cannot be recovered, the user may
+designate one persistent Project as temporary coordinator authority. This is
+an explicit exception to the local-ledger requirement below, not a filesystem
+root, replacement ledger, scheduler implementation or ticket acceptance.
+The [baseline recovery proposal](baseline-odee-001.md) preserves the historical
+context; this reviewed operating amendment defines the fallback.
+
+Activation requires this amendment to land through normal protected review and
+integration, followed by a coordinator adoption handoff recording the user
+designation, parent Project/session ID, adopted guide commit, current
+running/paused/stopped state and reconciled active assignments. Until that
+handoff, no new feature dispatch is authorized by this fallback.
+
+- The parent is the single writer for current assignments, ownership, control
+  and handoffs. Do not initialize a ledger in any coordinator or worker tree,
+  reconstruct historical claims/verdicts, or infer acceptance from missing
+  state. Preserve existing merged PR evidence at its tested/merged SHAs.
+- Before dispatch, reconcile active child sessions, open PRs and preserved
+  unfinished work. Each assignment records ticket/revision, dependencies and
+  evidence of their satisfaction, exact base SHA, allowed paths, owner/child
+  session ID, branch/worktree, acceptance criteria, required independent roles,
+  validation and stop condition. Unknown ownership or dependencies block that
+  assignment; do not silently reassign or discard existing work.
+- App-managed cloud worktrees may use the host-assigned isolated path instead
+  of `/home/vscode/worktrees`. Verify repository identity, exact base, unique
+  branch/path and current changes before editing; preserve unrelated work.
+  This exception does not claim the ODEE-002 workspace tool passed its own
+  path contract. Use synthetic data, isolated ports/storage and no live secrets
+  or `.env.local`; never edit the primary checkout.
+- The parent serializes assignment decisions and forbids overlapping write
+  paths while work is active: this mode has no atomic cross-host leases.
+  Retain the three-feature cap and the existing QA-cap adoption gate above;
+  without verified four-QA adoption evidence, use at most two testers.
+- Record candidate SHAs, repair attempts, independent PASS/FAIL/BLOCKED reports,
+  outstanding prerequisites and actual PR/merge outcomes in parent handoffs.
+  Required QA remains independent and bound to the exact candidate and contract
+  revision; changed candidates/contracts need renewed affected verdicts.
+  Preserve the three-unsuccessful-repair-round limit.
+- Check current control before dispatch and integration. STOP/PAUSE prevents
+  both; explicit resume must reconcile unfinished assignments and changes.
+  If parent history, authority, ownership or stop state is unavailable or
+  ambiguous, pause new dispatch/integration and preserve work.
+- Required CI, enforceable repository protections and normal protected
+  integration remain mandatory. No merge, release, deployment or business
+  authority is granted by designation or adoption alone.
+
+If the historical root becomes accessible, do not operate two authorities.
+Pause dispatch/integration, compare it read-only with current handoffs, resolve
+claims without rewriting old acceptance, and explicitly checkpoint a reviewed
+switch before resuming either mode. Local ledger/Slack CLI commands still
+require an actual valid filesystem control root; a Project ID cannot replace
+their `--root` or `--control-root` argument.
+
+## Local controls (default ledger mode)
 
 Run these commands from the ODEE repository root. Read `--help` for assignment,
 QA, reconciliation and recovery flags:
@@ -404,7 +459,10 @@ Every worker receives:
 
 - Ticket ID and specification revision; allowed outcome and excluded behavior.
 - Current candidate/base SHA, branch, worktree and allowed path prefixes.
-- Absolute shared coordinator control root, not an unrelated per-worker state.
+- In default ledger mode, the absolute shared coordinator control root, not an
+  unrelated per-worker state. In active app-managed fallback mode, the parent
+  Project/session authority and assignment/handoff record instead; do not
+  create a worker ledger or treat a Project ID as a filesystem root.
 - Synthetic data/database/ports, permitted integration mode and test selectors.
 - Required tester roles, expected financial/state results and acceptance cases.
 - A bounded stop condition and known blockers.
