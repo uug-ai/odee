@@ -1021,6 +1021,7 @@ export default function App() {
                   request={request}
                   onRefresh={refresh}
                   canAdmin={canAudit}
+                  refreshing={loading}
                 />
               ) : (
                 <section className="panel">
