@@ -181,6 +181,9 @@ func (d Document) snapshot(data ConfigurationData) (*FinancialSnapshot, error) {
 	return frozen, nil
 }
 func (d Document) frozenConfiguration() (ConfigurationData, error) {
+	if (d.CalculationPolicy != nil || d.Calculation != nil) && !recognizedCalculationPolicy(d) {
+		return ConfigurationData{}, invalid("calculation policy history is unresolved")
+	}
 	if d.FinancialSnapshot == nil {
 		if !legacyShape(d) && !recognizedCalculationPolicy(d) {
 			return ConfigurationData{}, invalid("financial meaning is unknown; reconcile before changing this document")

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func exactPolicyDraft(kind string) Draft {
@@ -166,5 +167,84 @@ func TestCalculationPolicyDocumentBSONAndJSONRoundTrip(t *testing.T) {
 	groups := result["taxGroups"].([]any)
 	if groups[1].(map[string]any)["taxRateBps"] != "2100" {
 		t.Fatalf("tax rate result was not a canonical string: %s", jsonBytes)
+	}
+}
+
+func versionedPostedPolicyDocument(t *testing.T) Document {
+	t.Helper()
+	data := syntheticV2()
+	versionID := primitive.NewObjectID()
+	selection := ConfigurationSelection{
+		VersionID: &versionID,
+		Digest:    configurationDigest(data),
+	}
+	doc, err := NewDocument(exactPolicyDraft("invoice"), testCompany, selection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.Post(data); err != nil {
+		t.Fatal(err)
+	}
+	return doc
+}
+
+func TestCalculationPolicyUnknownHistoryOnVersionedSnapshotIsUnresolved(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Document)
+	}{
+		{
+			name: "unknown policy",
+			mutate: func(doc *Document) {
+				doc.CalculationPolicy.PolicyID = "unknown-policy"
+			},
+		},
+		{
+			name: "corrupt result",
+			mutate: func(doc *Document) {
+				doc.Calculation.GrossMinor++
+			},
+		},
+		{
+			name: "inconsistent result lineage",
+			mutate: func(doc *Document) {
+				doc.Calculation.SchemaVersion++
+			},
+		},
+		{
+			name: "missing result",
+			mutate: func(doc *Document) {
+				doc.Calculation = nil
+			},
+		},
+		{
+			name: "missing policy",
+			mutate: func(doc *Document) {
+				doc.CalculationPolicy = nil
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			doc := versionedPostedPolicyDocument(t)
+			if doc.FinancialSnapshot == nil || doc.FinancialSnapshot.Selection.VersionID == nil {
+				t.Fatal("fixture is not bound to a non-starter versioned snapshot")
+			}
+			test.mutate(&doc)
+			if _, err := doc.frozenConfiguration(); !errors.Is(err, ErrInvalid) {
+				t.Fatalf("malformed calculation history was accepted: %v", err)
+			}
+			doc.displayFinancialMeaning()
+			if doc.MeaningError == "" || doc.FinancialMeaning != nil {
+				t.Fatalf("malformed calculation history was displayed as understood: %+v", doc)
+			}
+			before := clone(doc)
+			if err := doc.RecordPayment(Payment{ID: "blocked-payment", Date: doc.Date, Amount: 1}); !errors.Is(err, ErrInvalid) {
+				t.Fatalf("payment accepted for unresolved policy history: %v", err)
+			}
+			if !reflect.DeepEqual(before, clone(doc)) {
+				t.Fatal("unresolved policy payment rejection mutated the document")
+			}
+		})
 	}
 }

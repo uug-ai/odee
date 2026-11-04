@@ -1,6 +1,7 @@
 package accounting
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"reflect"
@@ -244,5 +245,88 @@ func TestLegacyCalculationAndPaymentRemainUnchanged(t *testing.T) {
 	}
 	if _, err := doc.frozenConfiguration(); err != nil {
 		t.Fatalf("legacy historical verification failed after payment: %v", err)
+	}
+}
+
+func TestLegacyFractionalTaxInvoiceKeepsOriginalChartAcrossActivationAndPayment(t *testing.T) {
+	ctx := t.Context()
+	store := NewMemoryStore()
+	configuration := store.Configuration(testCompany)
+	v1 := stageAndPublish(t, store, starterConfiguration(), 0)
+	if err := configuration.Activate(ctx, v1, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	input := draft("invoice")
+	input.Lines = []Line{
+		{Description: "One cent A", Quantity: 1, UnitCents: 1, TaxBPS: 5000, AccountCode: "4000"},
+		{Description: "One cent B", Quantity: 1, UnitCents: 1, TaxBPS: 5000, AccountCode: "4000"},
+	}
+	doc, err := NewDocument(input, testCompany, ConfigurationSelection{
+		VersionID: &v1.ID, Digest: v1.Payload.Digest,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.Subtotal != 2 || doc.Tax != 2 || doc.Total != 4 ||
+		doc.CalculationPolicy != nil || doc.Calculation != nil {
+		t.Fatalf("legacy fixture arithmetic changed: %+v", doc)
+	}
+	if err := store.Create(ctx, doc); err != nil {
+		t.Fatal(err)
+	}
+
+	v2 := stageAndPublish(t, store, syntheticV2(), 1)
+	if err := configuration.Activate(ctx, v2, 1); err != nil {
+		t.Fatal(err)
+	}
+	doc, err = store.Get(ctx, doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := selectedConfiguration(ctx, store, doc)
+	if err != nil || !reflect.DeepEqual(selected, v1.Payload.Data) {
+		t.Fatalf("draft did not retain its original chart after activation: %v", err)
+	}
+	if err := doc.Post(selected); err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.attribute(context.WithValue(ctx, principalKey{}, "development:local"), "document.post"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Save(ctx, doc, doc.Version); err != nil {
+		t.Fatal(err)
+	}
+
+	doc, err = store.Get(ctx, doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalEntries := []Entry{{"1100", 4, 0}, {"4000", 0, 2}, {"2100", 0, 2}}
+	if doc.Total-doc.Paid != 4 || doc.Status != "posted" ||
+		!reflect.DeepEqual(doc.Entries, originalEntries) ||
+		doc.FinancialSnapshot == nil || doc.FinancialSnapshot.Selection.VersionID == nil ||
+		*doc.FinancialSnapshot.Selection.VersionID != v1.ID {
+		t.Fatalf("posting changed legacy arithmetic or chart capture: %+v", doc)
+	}
+	if err := doc.RecordPayment(Payment{ID: "legacy-one-cent", Date: doc.Date, Amount: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.attribute(context.WithValue(ctx, principalKey{}, "development:local"), "manual-payment.record"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Save(ctx, doc, doc.Version); err != nil {
+		t.Fatal(err)
+	}
+	paid, err := store.Get(ctx, doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if paid.Paid != 1 || paid.Total-paid.Paid != 3 ||
+		!reflect.DeepEqual(paid.Entries, originalEntries) ||
+		!reflect.DeepEqual(paid.Payments[0].Entries, []Entry{{"1000", 1, 0}, {"1100", 0, 1}}) ||
+		paid.FinancialSnapshot == nil || paid.FinancialSnapshot.Selection.VersionID == nil ||
+		*paid.FinancialSnapshot.Selection.VersionID != v1.ID {
+		t.Fatalf("payment changed legacy outstanding balance or original chart meaning: %+v", paid)
 	}
 }
