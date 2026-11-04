@@ -129,9 +129,16 @@ func (s *MongoStore) Save(ctx context.Context, doc Document, version int64) erro
 		"lines": doc.Lines, "subtotal": doc.Subtotal, "tax": doc.Tax, "total": doc.Total,
 		"status": doc.Status, "entries": doc.Entries, "payments": doc.Payments, "paid": doc.Paid,
 	}}
+	if doc.pendingEvent != nil {
+		if doc.pendingEvent.Version != version+1 || doc.pendingEvent.TargetID != doc.ID {
+			return invalid("invalid financial event version or target")
+		}
+		filter["$expr"] = bson.M{"$lt": bson.A{bson.M{"$size": bson.M{"$ifNull": bson.A{"$financialEvents", bson.A{}}}}, MaxFinancialEvents}}
+		update["$push"] = bson.M{"financialEvents": *doc.pendingEvent}
+	}
 	result, err := s.Client.UpdateOne(ctx, s.Name, "accounting_documents", filter, update)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrUncertain, err)
 	}
 	if result.MatchedCount() == 0 {
 		return ErrConflict
@@ -149,6 +156,11 @@ func NewMemoryStore() *MemoryStore {
 }
 
 func clone(doc Document) Document {
+	doc.FinancialEvents = append([]FinancialEvent{}, doc.FinancialEvents...)
+	if doc.pendingEvent != nil {
+		event := *doc.pendingEvent
+		doc.pendingEvent = &event
+	}
 	doc.Lines = append([]Line{}, doc.Lines...)
 	doc.Entries = append([]Entry{}, doc.Entries...)
 	doc.Payments = append([]Payment{}, doc.Payments...)
@@ -163,6 +175,7 @@ func (s *MemoryStore) List(context.Context) ([]Document, error) {
 	defer s.mu.Unlock()
 	docs := []Document{}
 	for _, doc := range s.docs {
+		doc.NormalizeOwnership()
 		docs = append(docs, clone(doc))
 	}
 	return docs, nil
@@ -175,6 +188,7 @@ func (s *MemoryStore) Get(_ context.Context, id primitive.ObjectID) (Document, e
 	if !ok {
 		return Document{}, ErrNotFound
 	}
+	doc.NormalizeOwnership()
 	return clone(doc), nil
 }
 
@@ -198,6 +212,22 @@ func (s *MemoryStore) Save(_ context.Context, doc Document, version int64) error
 	if current.Version != version {
 		return ErrConflict
 	}
+	current.NormalizeOwnership()
+	doc.NormalizeOwnership()
+	if current.OrganisationID != doc.OrganisationID || current.ProjectID != doc.ProjectID {
+		return ErrNotFound
+	}
+	doc.FinancialEvents = append([]FinancialEvent{}, current.FinancialEvents...)
+	if doc.pendingEvent != nil {
+		if len(current.FinancialEvents) >= MaxFinancialEvents {
+			return ErrConflict
+		}
+		if doc.pendingEvent.Version != version+1 || doc.pendingEvent.TargetID != doc.ID {
+			return invalid("invalid financial event version or target")
+		}
+		doc.FinancialEvents = append(doc.FinancialEvents, *doc.pendingEvent)
+	}
+	doc.pendingEvent = nil
 	doc.Version, doc.UpdatedAt = version+1, time.Now().UTC()
 	s.docs[doc.ID] = clone(doc)
 	return nil

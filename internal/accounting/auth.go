@@ -146,9 +146,17 @@ func (a *GitHubAuth) readSession(r *http.Request) (loginSession, bool) {
 }
 
 func (a *GitHubAuth) Register(mux *http.ServeMux) {
+	a.register(mux, nil)
+}
+
+func (a *GitHubAuth) register(mux *http.ServeMux, discovery http.HandlerFunc) {
 	mux.HandleFunc("GET /auth/github", a.login)
 	mux.HandleFunc("GET /auth/github/callback", a.callback)
 	mux.HandleFunc("GET /api/session", func(w http.ResponseWriter, r *http.Request) {
+		if discovery != nil {
+			discovery(w, r)
+			return
+		}
 		session, ok := a.readSession(r)
 		response := map[string]any{
 			"authMode": "github", "authenticated": ok,

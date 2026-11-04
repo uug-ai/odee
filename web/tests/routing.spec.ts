@@ -12,6 +12,13 @@ const destinations = [
 ] as const
 const session = {
   authMode: 'github',
+  access: {
+    principal: 'github:42',
+    authorizationMode: 'compatibility',
+    member: true,
+    companyId: '000000000000000000000001',
+    capabilities: ['read', 'write', 'post'],
+  },
   authenticated: true,
   organisation: 'uug-ai',
   team: 'engineering',

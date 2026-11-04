@@ -25,6 +25,7 @@ export function BillImports({
   onImport,
   onReview,
   onOpen,
+  canWrite = false,
 }: {
   items: BillImport[]
   scannerReady: boolean
@@ -33,6 +34,7 @@ export function BillImports({
   onImport: (item: BillImport) => void
   onReview: (item: BillImport) => void
   onOpen: (id: string) => void
+  canWrite?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)
   const running = useRef(false)
@@ -47,6 +49,10 @@ export function BillImports({
     )
 
   async function upload(files: File[]) {
+    if (!canWrite) {
+      setError('Write capability required. / Schrijfrecht vereist.')
+      return
+    }
     setDragging(false)
     setError('')
     if (running.current) {
@@ -156,7 +162,7 @@ export function BillImports({
         <button
           type="button"
           className="button secondary"
-          disabled={busy}
+          disabled={busy || !canWrite}
           onClick={() => input.current?.click()}
         >
           <Plus />
@@ -169,7 +175,7 @@ export function BillImports({
           aria-label="Upload bills"
           accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
           multiple
-          disabled={busy}
+          disabled={busy || !canWrite}
           onChange={(event) => {
             void upload(Array.from(event.target.files ?? []))
             event.target.value = ''
@@ -260,7 +266,11 @@ export function BillImports({
                               <button
                                 type="button"
                                 className="text-button"
-                                disabled={item.status === 'pending' || item.status === 'scanning'}
+                                disabled={
+                                  !canWrite ||
+                                  item.status === 'pending' ||
+                                  item.status === 'scanning'
+                                }
                                 onClick={() => onReview(item)}
                               >
                                 Review original <ArrowRight />
@@ -268,7 +278,7 @@ export function BillImports({
                               <button
                                 type="button"
                                 className="icon-button"
-                                disabled={rescanning !== '' || busy}
+                                disabled={!canWrite || rescanning !== '' || busy}
                                 aria-label={`Retry scan ${item.filename}`}
                                 onClick={() => void rescan(item)}
                               >

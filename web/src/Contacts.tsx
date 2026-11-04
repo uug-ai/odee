@@ -45,11 +45,13 @@ export function Contacts({
   request,
   onChange,
   onRefresh,
+  canWrite = false,
 }: {
   items: Contact[]
   request: APIRequest
   onChange: (item: Contact) => void
   onRefresh: () => Promise<void>
+  canWrite?: boolean
 }) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('Active')
@@ -120,7 +122,11 @@ export function Contacts({
           >
             <RefreshDouble />
           </button>
-          <button className="button secondary" onClick={() => setImporting(true)}>
+          <button
+            className="button secondary"
+            disabled={!canWrite}
+            onClick={() => setImporting(true)}
+          >
             Import Odoo JSON
           </button>
           <button className="button secondary" disabled={!items.length} onClick={exportContacts}>
@@ -129,6 +135,7 @@ export function Contacts({
           </button>
           <button
             className="button primary"
+            disabled={!canWrite}
             onClick={() => {
               setError('')
               setEditor('new')
@@ -328,6 +335,7 @@ export function Contacts({
             </button>
             <button
               className="button primary"
+              disabled={!canWrite}
               onClick={() => {
                 setEditor(selected)
                 setSelected(null)

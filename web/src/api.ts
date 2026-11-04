@@ -8,6 +8,12 @@ interface Authentication {
   onUnauthorizedError: (message: string) => void
 }
 
+const responseStatuses = new WeakMap<Error, number>()
+
+export function responseStatus(error: unknown): number | undefined {
+  return error instanceof Error ? responseStatuses.get(error) : undefined
+}
+
 export function createAPIRequest(auth: Authentication): APIRequest {
   return async <T>(path: string, body?: unknown, method = 'POST'): Promise<T> => {
     const requestGeneration = auth.generation()
@@ -39,7 +45,9 @@ export function createAPIRequest(auth: Authentication): APIRequest {
           ? data.error
           : `Request failed (${response.status}).`
       if (unauthorized) auth.onUnauthorizedError(message)
-      throw new Error(message)
+      const error = new Error(message)
+      responseStatuses.set(error, response.status)
+      throw error
     }
     return response.status === 204 ? (undefined as T) : response.json()
   }

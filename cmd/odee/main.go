@@ -80,6 +80,10 @@ func run() error {
 	if err != nil || company.IsZero() {
 		return fmt.Errorf("ODEE_COMPANY_ID must be a nonzero BSON ObjectID")
 	}
+	authorization, err := accounting.ParseAuthorization(env("ODEE_AUTHZ_MODE", "compatibility"), os.Getenv("ODEE_CAPABILITY_GRANTS"))
+	if err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	var store accounting.Store
@@ -131,21 +135,12 @@ func run() error {
 	if err := scanner.Ready(); err != nil {
 		slog.Warn("local bill scanning is unavailable", "error", err)
 	}
-	api := (&accounting.Server{Store: store, Company: company, Name: env("ODEE_COMPANY_NAME", "My company"),
-		Token: token, Origin: origin, Demo: demo, Dev: dev, Auth: auth, Imports: imports, Scanner: scanner, Contacts: contacts}).Handler()
+	service := &accounting.Server{Store: store, Company: company, Name: env("ODEE_COMPANY_NAME", "My company"),
+		Token: token, Origin: origin, Demo: demo, Dev: dev, Auth: auth, Authorization: authorization, Imports: imports, Scanner: scanner, Contacts: contacts}
+	api := service.Handler()
 	mux := http.NewServeMux()
 	mux.Handle("/api/", api)
-	if auth != nil {
-		auth.Register(mux)
-	} else {
-		mux.HandleFunc("GET /api/session", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("Cache-Control", "no-store")
-			if _, err := fmt.Fprintf(w, `{"authMode":"token","authenticated":%t}`, dev); err != nil {
-				slog.Error("write session response", "error", err)
-			}
-		})
-	}
+	service.RegisterAuthentication(mux)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("ok")); err != nil {
