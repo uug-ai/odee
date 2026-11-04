@@ -758,7 +758,9 @@ rollback, push, merge, activation or release is performed.
 
 ## D018 — Future company snapshots and immutable finance configuration
 
-**Authority/date:** user-approved future-only specification packet, 2026-11-04.
+**Authority/date:** PM refinement under user-approved roadmap autonomy,
+2026-11-04. This exact packet remains pending final coordinator review/integration;
+professional/human gates and live-activation approval are unchanged.
 Revise existing ODEE-007 and ODEE-008 **1 → 2**, not a new feature, framework,
 extraction or split. The assigned PM worktree starts at accepted application
 `d65d0558c6fbf679fd3f1c7887397d8a8a177cff`. Initial read-only source evidence was
