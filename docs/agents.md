@@ -118,6 +118,66 @@ repeating the same attempt. Continue unrelated safe work. If there is no
 actionable work, checkpoint and wait; do not invent scope or rerun green tests
 indefinitely.
 
+## Feature pull requests and merge tracking
+
+Use one pull request per independently testable feature ticket. Keep its repair
+commits in the same PR so the failed candidate, fix and independent retest remain
+traceable. Split a ticket before implementation when it contains independently
+deliverable outcomes; do not manufacture tiny PRs just to increase the count.
+The coordinator publishes branches and manages PRs; feature workers and testers
+retain their existing ownership and cannot merge their own work.
+
+Open a draft once there is a coherent committed candidate. Each PR records:
+
+- Ticket ID, specification revision, full candidate SHA and base branch/SHA.
+- User outcome, included/excluded scope, dependencies and linked predecessor PRs.
+- Acceptance criteria, required independent roles and their current verdicts.
+- Exact tested SHA, commands, results, skips and unavailable evidence.
+- Failed-candidate findings, repair commits and renewed retest results.
+- Compatibility implications, known limitations and human-only external gates.
+
+Keep published evidence synthetic and sanitized. Do not upload ignored ledgers,
+private handoffs, credentials, real records or private browser captures. A tester
+reports through its isolated QA handoff; the coordinator posts an attributed
+summary with the tested SHA. Do not impersonate a GitHub reviewer or describe
+agents sharing one GitHub account as independent GitHub review identities.
+
+Draft is not acceptance. Mark ready only after all required roles pass for the
+current specification and exact candidate. A changed head or contract invalidates
+the relevant evidence; an earlier green SHA does not approve the new head.
+Required GitHub CI must also succeed. Local test results are not remote CI.
+
+Dependent features may use stacked PRs against their prerequisite branches. Link
+the stack and merge prerequisites first. Keep those branches until dependents
+are retargeted. Recheck the resulting diff, merge candidate and affected tests
+after a base change or conflict resolution; never assume a green lower PR
+approves the complete stack.
+
+Immediately before a GitHub merge, the coordinator must verify running control,
+the exact-SHA/specification ledger gate, required independent verdicts, required
+remote checks, resolved blocking discussions and current repository protections.
+Reconcile changes already on the destination branch without dropping them and
+renew integration evidence on the resulting candidate. Use a normal merge commit
+to retain the original feature and repair commits, with an exact-head guard;
+never force-push, squash away the repair history, use an admin bypass or merge
+an unprotected destination unattended. If protections or required evidence are
+missing, leave the PR open and continue other safe work.
+
+The ledger's `merged` entry records local integration already performed. It is
+not proof that a GitHub PR merged into `main`. Track the PR URL, base/head and
+actual remote merge commit separately, and do not rewrite historical local
+acceptance records to imply a remote merge.
+
+Already-integrated historical work may need an explicitly labelled foundation
+bundle and stacked feature PRs. Preserve its commits and disclose combined scope
+instead of claiming that interleaved historical work was independently developed
+or tested as separate PRs.
+
+Publishing a development branch or merging a verified PR does not authorize a
+release, deployment, provider transmission or production migration. Recheck
+push/PR/merge triggers before publishing. Release tags, GitHub Releases and live
+business actions remain human-controlled.
+
 VS Code must remain active and authorized. Sessions, permissions, quotas and
 context limits can interrupt the loop. Persist state and resume explicitly;
 neither prompt files nor a Node process can promise execution after VS Code
