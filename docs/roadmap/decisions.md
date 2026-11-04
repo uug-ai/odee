@@ -1140,3 +1140,195 @@ No application tests, provider exchange, release, state transition or feature
 completion is asserted by these documentation checks. The proposal's roadmap
 commit is for parent integration, not approval of runtime grants/activation.
 Only the coordinator reconciles authoritative execution state.
+
+## D019 — Future calculation lineage and operational lock/correction design
+
+**Authority/date/status:** 2026-11-04, coordinator-requested bounded PM
+authorship after review of the ignored readiness report. This is a **docs-only
+draft future-contract refinement**, not approval of any application, D018
+re-review, finance acceptance, statutory action or authorization to implement.
+Only existing ODEE-009 **1 → 2**, ODEE-011 **2 → 3** and their corresponding
+CAP-EXACT-AMOUNTS/CAP-CREDIT-LOCKS planning fields change. Coordinator review,
+final-main/dependency reconciliation and fresh independent exact-SHA/revision
+QA remain required before eventual integration/acceptance.
+
+### Evidence authority and current checkpoint
+
+The inspected evidence anchor is
+`04562c9e72e513abacf0c90d868f80414b141c3c`, recovered **UNACCEPTED finance
+configuration draft PR9**, not delivered main. It includes accepted-local
+company snapshot baseline `051747e8defe83632888bddd21105a4b78eb2e99` and D018
+revision 2. Accepted-local is not a remote-merge claim.
+
+The coordinator reports protected remote main
+`e5c501256f191682b46ea37fd4121021eba946e2` after actually merged PR3/4.
+PR8 D018 docs, PR5 company, PR6 policy and PR9 finance remain unmerged.
+Five passing finance CI checks are not the six outstanding independent finance
+roles after final-main reconciliation. No finance role is granted acceptance.
+
+The coordinator further reports fresh PR7 browser/localization **FAIL** at
+`5941a11a8892c2e0b6c6d22791b912684ba8bd24` for the Dutch global Bills
+navigation/card selector despite unchanged retry. PR7's test/docs-only repair is
+`13a0dea6de14d12921ab82aacab85144df6401cd`; both retained QA contexts actively
+renew four roles there, with five CI checks pending at this checkpoint.
+That ordinary test bug remains its existing failure/repair, not a new feature,
+PM finding or PASS. PM launches no application tests, app/Mongo services,
+browsers or agents and does not consume a third application-QA context; the documentation and
+synthetic coordinator checks below are not application tests or acceptance.
+
+Centralized project-memory discovery again exposed no project-list/topic/read
+interface. No obsolete local memory was accessed. The pinned **Odoo 20.0 /
+2026-11-03** baseline, source records, retrieval dates and edition/legal caveats
+are unchanged. No new public-source retrieval or latest-version verification
+was necessary: the questions concern ODEE's own coexistence contracts.
+Public guides do not establish Belgian statutory mappings, lock/numbering rules,
+correction identity or legal readiness; qualified review remains required.
+
+### Findings and deduplication
+
+All line references below are at the **unaccepted 045 evidence anchor**:
+
+| Finding | Evidence and missing boundary | Disposition |
+| --- | --- | --- |
+| `PM-NEXT-009-POLICY-LINEAGE-20261104` | [ODEE-009](backlog.json) original four criteria preserve posted totals but leave persisted draft policy selection and legacy verification/payment compatibility unspecified. [Line/SetDraft/Post](../../internal/accounting/model.go), lines 40–46 and 175–241, define integer historical representation and per-line half-up rounding; [legacyShape/frozenConfiguration](../../internal/accounting/configuration_finance.go), lines 75–126 and 177–205, reach that arithmetic through historical verification; [RecordPayment](../../internal/accounting/model.go), lines 269–311, consumes frozen meaning. | Append to existing ODEE-009/CAP-EXACT-AMOUNTS; prospective missing/ambiguous integration requirement, not an alleged ODEE-008 implementation defect or a new tax/configuration module. |
+| `PM-NEXT-011-LOCK-CORRECTION-LINEAGE-20261104` | [ODEE-011](backlog.json) already owns credit/locks and the exact partial-credit fixture but does not state operational lock authority/date coverage or original-versus-current correction binding. [FiscalPeriod](../../internal/accounting/configuration.go), lines 32–41, declares supported dates/active flags; [financial projection](../../internal/accounting/configuration_finance.go), lines 129–175, freezes original meaning/period; [captures](../../internal/accounting/snapshots.go), lines 13–25, preserve source identities; [audit](../../internal/accounting/audit.go), lines 12–38, is bounded and action-specific; [Save](../../internal/accounting/store.go), lines 140–180, is a single-document atomic unit. | Append to existing ODEE-011/CAP-CREDIT-LOCKS. Keep D014 discovery `G-CREDIT-PARTIAL-20261103`, all original credit oracles and no-auto-refund rule. No duplicate correction/reconciliation feature, fiscal-lock expansion of ODEE-008 or broad nonfinancial audit. |
+
+**No change needed:** ODEE-010 already requires reviewed journal/year sequence
+scope, reservation/cancellation/uncertain-write policy, authoritative posting
+and explicit storage-capability gating. Stable logical sequence identity across
+configuration versions is an example under that contract, not another feature.
+ODEE-012 already requires captured company/partner identity, stored-ledger
+totals, presentation-only locale changes, scoped original-file protection and
+local-only delivery intent. Rerendering after settings changes is an existing
+snapshot oracle. Both complete contracts/capabilities remain unchanged.
+
+### Exact append-only contract and planning deltas
+
+[backlog.json](backlog.json) is the exact criterion text. Preserve every original
+acceptance string verbatim as the prefix: four for ODEE-009, five for ODEE-011.
+Append the readiness report's two P1 and three P2 criteria. At the coordinator's
+explicit request, P1's first appended criterion additionally requires a reviewed
+exact pre-code scales/discount-order/rounding-adjustment/bounds design; no such
+choices or legal rules are selected by this packet.
+
+- ODEE-009 keeps priority **42**, feature-finance, dependency **ODEE-008**,
+  original paths and `qa-api-data`, `qa-integration`, `qa-ledger`,
+  `qa-localization`. Policy identity is independent of chart identity.
+  Ordinary save/post retains recognized policy; any supported conversion is an
+  explicit version-checked draft action, not mandatory new settings UI.
+  Recognized legacy drafts remain usable without conversion/migration. Unknown
+  history fails explicitly, never because a known old schema was discarded.
+- ODEE-011 keeps priority **44**, feature-finance, dependencies **ODEE-009 and
+  ODEE-010**, original paths and `qa-api-data`, `qa-integration`, `qa-ledger`,
+  `qa-belgian-peppol`. Before code, declare effective scoped lock dates, undated
+  allocation behavior, observed revision/concurrent close/reopen boundary and
+  durable source/credit/allocation/audit recovery. Distinguish the old source
+  accounting date/meaning from a separately supported correction/payment date.
+  A new default cannot bypass a closed date. Do not invent an atomic lock,
+  immediate revocation or cross-record all-or-nothing guarantee.
+- Append exactly `PM-20261104-009-POLICY-LINEAGE` and
+  `PM-20261104-011-LOCK-CORRECTION-LINEAGE`, each linking its finding, existing
+  capability, D019, exact evidence anchor and revision transition. All previous
+  planning changes and D014 discovery/source history remain unchanged.
+- Only the two corresponding capability planning assessments/requirements
+  advance. Their `status`, original baseline, public-reference/verification
+  dates, source IDs, `deliveredSha` and `qaEvidence` are unchanged; assessment
+  SHA 045 is explicitly **unaccepted draft evidence**.
+
+**Serialization NO-CHANGE:** retain all existing path prefixes, 70 contracts,
+23 leaves, 47 non-dispatchable epics and the actual accounting/web overlaps.
+No speculative lease narrowing, dependency edge, framework, extraction, new
+feature ticket, tester capacity or fake parallelism is introduced. All other
+contracts, including ODEE-006 revision 1, ODEE-007 revision 2 and active
+ODEE-008 revision 2, remain identical. Only coordinator owns ledger/claims.
+
+### Independent future QA oracles, not tests performed by PM
+
+| Ticket / roles retained | Required future evidence |
+| --- | --- |
+| ODEE-009: ledger + API/data | Two separate quantity-1/unit-1-cent lines at 5000 basis points have original net **2**, VAT **2**, total **4 cents**; payment **1** leaves **3** after calculation/chart change, using original bank/receivable meanings. Retain 20000/4200/24200 and fractional/discount/overflow boundaries. Validate persisted policy, explicit optional conversion, staleness and no silent capture refresh/rebind. |
+| ODEE-009: integration + localization | Real isolated Mongo restart/acknowledgement-loss compatibility, same-document financial policy/snapshot/state/version/audit consistency and EN/NL exact-value/error journeys. Locale never selects arithmetic policy. |
+| ODEE-011: ledger + API/data | Retain **24200 − 10000 = 14200**; one allocated **12100** credit leaves **2100**. Supported January V1 source, January operational close, unrelated V2 default, reviewed February credit: DR original revenue **10000**, DR VAT payable **2100**, CR original AR **12100**, no bank movement. Test closed dates across versions and later-open-date payments, independent read+admin/read+write/read+post capabilities and explicit source/document versions/request keys. |
+| ODEE-011: integration + Belgian/Peppol | Exercise the declared close/financial-commit boundary, restart and committed/uncommitted loss between source/credit/allocation/audit writes. Durable partial/uncertain states must be discoverable without duplicate allocation, over-credit, false successful audit or automatic refund. Review corrective identity/date/journal/numbering and professional/legal limits; no bank-statement reconciliation, live send or transaction capability is assumed. |
+
+For both: BSON ObjectID `organisationId`/`projectId` retain independent runtime
+fallback to valid stable `ownerId` without migration, preserving existing
+nonempty canonical axes. Actors, creators, contacts, imported IDs, payer and
+legal-company provenance never supply ownership. Preserve exact original
+amounts, immutable source captures/posted history, original frozen meanings,
+version-checked operations and idempotent/uncertain financial outcomes. Each
+affected document keeps atomic scoped financial-state/snapshot/version/audit
+updates; a multi-record workflow is not silently a transaction.
+
+### Unresolved design, professional and integration gates
+
+Required before feature implementation: reviewed exact calculation scales,
+discount order, rounding/adjustment representation and supported bounds;
+bounded operational-lock date/revision/concurrency design; correction identity,
+journal/number/period selection; bounded audit and source/credit recovery.
+Optional policy conversion remains optional, with recognized legacy usability.
+Any newly necessary storage/transaction prerequisite must be explicitly
+reviewed/gated without breaking existing standalone manual flows.
+
+Qualified Belgian review remains required for statutory correction identity,
+date/numbering, mappings, close/reopen/exception and tax rules. Human controls
+real grants/live activation, cash refunds/payments, provider registration,
+Peppol/email, filings, deployment and production changes. No such action or
+professional approval is made here.
+
+Coordinator will verify/publish a separate **draft planning PR based on the
+finance draft branch**, reconcile dependencies and protected final main, and
+retain fresh separate tester gates. This draft neither adopts canonical ledger
+state nor authorizes implementation/merge, and grants no application acceptance.
+
+### D019 draft documentation validation and remaining root blocker
+
+Performed in the owned 045-based PM worktree with
+`safeTestEnvironment({NODE_ENV: "test", ODEE_TEST_RUN_ID: <named-run>,
+ODEE_TEST_SCRATCH_DIR: <explicit-worktree-local-owned-directory>})`, never
+the canonical ledger or live environment:
+
+- Actual `validateBacklog` accepts **70 contracts / 23 leaves / 47 epics**.
+  Deep comparison against 045 preserves **68 unaffected contracts**, every
+  original target criterion prefix and all owners/priorities/paths/dependencies/
+  required QA. The two target revisions append two and three criteria.
+- All **nine previous planning changes**, original planning/reference baselines,
+  **14 public-source records**, delivery/QA claims and **16 unaffected
+  capability entries** remain unchanged. Two precise D019 planning mappings
+  are appended. All **52 local Markdown links** in the two roadmap Markdown
+  files resolve. The initial ignored readiness report is byte-unchanged.
+- Exact scheduler specification hashing and the disposable scheduler both
+  confirm unchanged ODEE-006 revision 1
+  `acd5cbbb68a3f3c2e64a4821e13c7956193ae58b6be233e6e1b4b22640bd2df1`
+  and active ODEE-008 revision 2
+  `8247a1e4bd9035d3815b9105e67fdaaf19c715a7f5e4bf7d8deb2da825b01754`.
+  ODEE-007 revision 2 and complete ODEE-010/012 contracts also remain identical.
+- Actual root command:
+  `node --test --test-concurrency=1 tools/agents/customizations.test.mjs tools/agents/qa-contracts.test.mjs tools/agents/loop.test.mjs tools/agents/qa-loop.test.mjs tools/agents/loop-planning.test.mjs`
+  reports **50 tests: 48 PASS, 2 FAIL, zero skipped/cancelled/todo**; runner
+  exit **1**. Both failures are the current/extended-manifest D013/D014 drills
+  at `tools/agents/loop-planning.test.mjs:144`, asserting current
+  CAP-CREDIT-LOCKS `pmDecisionId` is still D014 after legitimate D019 advancement
+  (`D019 !== D014`). They fail before completing their rehearsal.
+  Nearby historical revision/last-criterion assumptions are also visible in
+  that fixture, but are not claimed as separately executed failures.
+- **Root is not green and no failure is waived.** This is a current-manifest
+  fixture-portability blocker for coordinator follow-up in separately approved
+  test scope, not a missing accounting feature or permission to weaken D019.
+  No tests/tools/customizations are edited in this four-document packet.
+- A separate **disposable synthetic** full-70-contract D019 bookkeeping
+  rehearsal uses actual `runCommand` init/status/pause/reconcile only. Pending
+  status retains old accepted revisions/planning; reconciliation revises only
+  009/011, preserves all other **68 ticket states**, advances planning changes
+  **9 → 11** and repeats with **zero changes**. It preserves the exact 006/008
+  hashes and creates **zero feature/QA claims, candidates, gates or merges**.
+  This is not application QA, implementation or canonical-ledger reconciliation.
+- Named owned structural/root-test/reconciliation fixture directories were
+  removed after bounded children completed; root test fixture cleanup left no
+  named `.loop-test-*`, `.loop-planning-test-*` or `.qa-loop-*` directories.
+  No Go, application, MongoDB, browser, socket/workspace-test suites, watcher or
+  nested agent was launched. No remote/public-source or live writes occurred.
+
+The ignored D019 handoff records exact commit/commands/counts/limits for parent
+verification. Passing structural and synthetic checks neither repairs the
+two failed root tests nor grants any feature acceptance.

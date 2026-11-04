@@ -357,8 +357,22 @@
       "baseline": "Line uses int64 whole quantity/unit cents/tax basis points; SetDraft rounds VAT half-up per line; quantity bound is 1..10000. No discount field exists.",
       "baselinePaths": ["internal/accounting/model.go", "README.md"],
       "tickets": ["ODEE-009"],
-      "workflowCases": ["fractional quantities", "discount/overflow boundary", "mixed-rate rounding", "old posted history"],
-      "acceptance": ["A versioned fixed-scale policy passes independent boundary fixtures without changing historical stored totals."],
+      "assessmentSha": "04562c9e72e513abacf0c90d868f80414b141c3c",
+      "assessmentStatus": "UNACCEPTED finance draft source evidence, not delivery or application QA",
+      "plannedTicketRevision": 2,
+      "originatingFindingIds": ["PM-NEXT-009-POLICY-LINEAGE-20261104"],
+      "pmDecisionId": "D019",
+      "projectEvidence": [
+        {"path": "internal/accounting/model.go", "symbols": ["Line", "Document", "SetDraft", "Post", "RecordPayment"]},
+        {"path": "internal/accounting/configuration_finance.go", "symbols": ["legacyShape", "frozenConfiguration"]},
+        {"path": "internal/accounting/store.go", "symbols": ["Save"]}
+      ],
+      "workflowCases": ["fractional quantities", "discount/overflow boundary", "mixed-rate rounding", "old posted history", "reviewed exact new-policy design before implementation", "persisted draft calculation policy independent of chart version", "optional explicit version-checked policy conversion", "recognized legacy per-line half-up verification and payment", "two 1-cent lines at 50 percent retain total 4; payment 1 leaves 3", "restart and uncertain-write financial policy lineage"],
+      "acceptance": [
+        "A versioned fixed-scale policy passes independent boundary fixtures without changing historical stored totals.",
+        "ODEE-009 revision 2 requires a reviewed exact new-policy design and persisted reproducible calculation-policy identity independent of chart selection. Conversion is optional and explicit/version-checked if supported; recognized legacy drafts/history remain usable without migration or silent conversion and captured identities never refresh as a side effect.",
+        "Two legacy 1-cent lines at 50 percent retain net 2, VAT 2 and total 4 cents after calculation/chart changes; a valid 1-cent payment leaves 3 using original frozen meanings. Preserve payment/date/idempotency and scoped same-document financial snapshot/state/version/audit recovery rules."
+      ],
       "prerequisites": ["ODEE-008"], "risk": "high",
       "priorityRationale": "One shared policy must feed ledger, PDF and UBL before broad billing.",
       "deliveredSha": null, "qaEvidence": []
@@ -387,14 +401,26 @@
       "baseline": "SetDraft only accepts invoice/bill and rejects editing posted records. README explicitly excludes credit notes/reversals/fiscal locks.",
       "baselinePaths": ["internal/accounting/model.go", "README.md"],
       "tickets": ["ODEE-011"],
-      "workflowCases": ["partial/full credit", "original-invoice link", "payment allocation/refund distinction", "locked period", "duplicate correction"],
+      "assessmentSha": "04562c9e72e513abacf0c90d868f80414b141c3c",
+      "assessmentStatus": "UNACCEPTED finance draft source evidence, not delivery or application QA",
+      "projectEvidence": [
+        {"path": "internal/accounting/configuration.go", "symbols": ["FiscalPeriod", "FinancialSnapshot"]},
+        {"path": "internal/accounting/configuration_finance.go", "symbols": ["snapshot", "frozenConfiguration"]},
+        {"path": "internal/accounting/snapshots.go", "symbols": ["PartnerSnapshot", "CompanySnapshot"]},
+        {"path": "internal/accounting/audit.go", "symbols": ["FinancialEvent", "attribute"]},
+        {"path": "internal/accounting/store.go", "symbols": ["Save"]}
+      ],
+      "workflowCases": ["partial/full credit", "original-invoice link", "payment allocation/refund distinction", "locked period", "duplicate correction", "pre-code operational lock/date/revision/concurrency design", "closed-date enforcement across immutable configuration versions", "open-period payment of an older closed-period invoice", "correction preserves original captured identity and credited account meanings", "January close and reviewed February credit after V2 activation", "bounded source/credit/allocation/audit recovery without assumed cross-record atomicity"],
       "acceptance": [
         "Credit/reversal fixtures reconcile independently; original snapshots and configured approval/lock rules remain intact.",
-        "A 24200-cent invoice, 10000-cent payment and one allocated 12100-cent partial credit leave 2100 cents receivable; a retry creates no duplicate credit/allocation or automatic cash refund."
+        "A 24200-cent invoice, 10000-cent payment and one allocated 12100-cent partial credit leave 2100 cents receivable; a retry creates no duplicate credit/allocation or automatic cash refund.",
+        "ODEE-011 revision 3 requires a bounded pre-code operational-lock/correction design separate from immutable period support flags, with explicit scoped dates, independent capabilities, observed revision/concurrency and uncertain-state recovery. A new default cannot bypass a closed date; an otherwise valid later-open-period payment retains original frozen bindings and date rules.",
+        "A reviewed February credit of the supported January V1 invoice reverses original revenue 10000 and VAT payable 2100 against original receivable 12100 after January close and unrelated V2 activation. Capture reviewed corrective date/journal/number/identity choices separately, preserve source history and require bounded audit/idempotent recovery without invented transactions, immediate revocation, transfers or statutory approval."
       ],
-      "plannedTicketRevision": 2,
+      "plannedTicketRevision": 3,
       "originatingDiscoveryId": "G-CREDIT-PARTIAL-20261103",
-      "pmDecisionId": "D014",
+      "originatingFindingIds": ["PM-NEXT-011-LOCK-CORRECTION-LINEAGE-20261104"],
+      "pmDecisionId": "D019",
       "prerequisites": ["ODEE-009", "ODEE-010"], "risk": "high",
       "priorityRationale": "Required correction and Peppol credit-note flow; higher priority than dashboards.",
       "deliveredSha": null, "qaEvidence": []

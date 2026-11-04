@@ -6,6 +6,54 @@ not evidence that its tickets have been implemented, tested or released.
 See [backlog](backlog.json), [capabilities and sources](capabilities.json),
 [decisions and feedback contract](decisions.md) and [operating guide](../agents.md).
 
+## D019 draft: future calculation lineage and operational correction boundaries
+
+**Docs-only future-contract proposal, not finance acceptance or dispatch.**
+[D019](decisions.md#d019--future-calculation-lineage-and-operational-lockcorrection-design)
+appends requirements only to existing **ODEE-009 1 → 2** and **ODEE-011 2 → 3**.
+All original criteria, owners, priorities, paths, dependencies and QA remain.
+The graph stays **70 contracts / 23 leaves / 47 epics** with the same genuinely
+overlapping serialized accounting/web leases. ODEE-010/012 need no change.
+
+Evidence anchor `04562c9e72e513abacf0c90d868f80414b141c3c` is the recovered
+**UNACCEPTED PR9 finance draft**, not delivery. It includes accepted-local
+company baseline `051747e8defe83632888bddd21105a4b78eb2e99`; that is not proof
+PR5 merged remotely. Coordinator reports actual protected remote main
+`e5c501256f191682b46ea37fd4121021eba946e2` after PR3/4. Earlier main/protection,
+local-integration and validation statements below are dated planning history,
+not the current remote state. PR8/5/6/9 remain unmerged; six finance acceptance
+roles remain pending final-main reconciliation despite reported green CI.
+
+ODEE-009 binds reproducible calculation-policy identity independently of chart
+configuration and requires reviewed exact scales/discount/rounding/bounds design
+before code. Optional explicit version-checked draft conversion is not a new
+mandatory feature; recognized legacy drafts remain usable without it. Preserve
+the old per-line oracle: net **2**, VAT **2**, total **4 cents**; payment **1**
+leaves **3**, through historical verification/payment after policy/chart changes.
+
+ODEE-011 requires a bounded **pre-code operational-lock/correction design**:
+date/scope/capability rules, original snapshots/account meanings, observed-lock
+revision, concurrency boundary, bounded audit and uncertain-state recovery.
+Immutable period flags/default activation are not close/reopen authority.
+Retain **24200 − 10000 − 12100 = 2100 cents**, with no automatic refund or
+bank movement. No atomic-lock, cross-document transaction, instantaneous
+revocation or statutory guarantee is invented.
+
+Only CAP-EXACT-AMOUNTS/CAP-CREDIT-LOCKS planning fields advance; baseline,
+public-source dates and delivery/QA claims are unchanged. Existing D014 history
+and partial-credit acceptance remain intact. D018, ODEE-006 revision 1,
+ODEE-007 revision 2 and active ODEE-008 revision 2 remain unchanged. Odoo stays
+**20.0 / retrieved 2026-11-03**; no fresh recrawl or latest-version claim.
+Coordinator review, protected final-main/dependency reconciliation and separate
+tester-gated PRs precede implementation/acceptance; this packet changes no
+canonical ledger, claims, grants or live system.
+
+Draft validation: actual graph/deep-preservation checks pass; selected root
+documentation/coordinator tests are **48 PASS / 2 FAIL / zero skipped**.
+Both failures are historical D013/D014 fixture assumptions that the current
+credit capability still points to D014. **Root is not green**; see D019's
+validation record. No fixture repair or application acceptance is included.
+
 ## 2026-11-04 checkpoint: future ODEE-007/008 revision 2
 
 [D018](decisions.md#d018--future-company-snapshots-and-immutable-finance-configuration)
