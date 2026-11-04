@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { safeTestEnvironment, reserveTestPort } from '../../tools/agents/workspace.mjs'
+import { createLocalTransport } from './local-transport.mjs'
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const script = fileURLToPath(import.meta.url)
@@ -105,6 +106,12 @@ async function isolated() {
   const { test } = await import('node:test')
   const env = process.env
   const scratch = env.ODEE_TEST_SCRATCH_DIR
+  const guardPort = await reserveTestPort()
+  await guardPort.release()
+  await command('npm', ['--prefix', 'web', 'run', 'test:e2e', '--', 'local-transport.spec.ts'], {
+    ...env,
+    ODEE_TEST_PORT: String(guardPort.port),
+  })
   const dbPath = join(scratch, 'mongo')
   await mkdir(dbPath)
   const mongo = await MongoMemoryServer.create({
@@ -119,7 +126,9 @@ async function isolated() {
     spawn: { env },
   })
   let browser
+  let transport
   try {
+    transport = await createLocalTransport()
     const uri = mongo.getUri()
     if (!uri.startsWith('mongodb://127.0.0.1:')) throw new Error('nonlocal fixture URI')
     console.log('Owned standalone MongoDB port', new URL(uri).port)
@@ -144,7 +153,7 @@ async function isolated() {
     }
     const binary = join(scratch, 'capabilities-fixture')
     await command('go', ['test', '-c', '-o', binary, './internal/accounting'], env)
-    browser = await chromium.launch({ headless: true })
+    browser = await transport.launch(chromium)
     const company = '000000000000000000000001'
     const token = 'synthetic-browser-token-'.repeat(2)
     async function fixture(
@@ -184,6 +193,7 @@ async function isolated() {
         ODEE_AUTHZ_MODE: policyMode,
         ODEE_CAPABILITY_GRANTS: JSON.stringify(grants),
       })
+      const revokeOrigin = transport.allowOrigin(origin)
       const context = await browser.newContext({ serviceWorkers: 'block' })
       const page = await context.newPage()
       page.setDefaultTimeout(10000)
@@ -208,7 +218,8 @@ async function isolated() {
         if (mode === 'github' && url.pathname === '/auth/github') {
           // Redirect targets are not re-routed by Playwright. Stop the login
           // redirect locally and retain its state cookie without visiting GitHub.
-          const response = await route.fetch({ maxRedirects: 0 })
+          transport.assertAllowed(route.request().url())
+          const response = await route.fetch({ maxRedirects: 0, maxRetries: 0, timeout: 10000 })
           expect(response.status()).toBe(302)
           const destination = new URL(response.headers().location)
           expect(destination.origin).toBe('https://github.com')
@@ -232,7 +243,7 @@ async function isolated() {
         for (let attempt = 0; attempt < 150; attempt++) {
           if (owner.child.exitCode !== null) throw new Error(owner.logs())
           try {
-            const response = await fetch(`${origin}/healthz`, { signal: AbortSignal.timeout(500) })
+            const response = await transport.health(`${origin}/healthz`)
             if (response.ok && (await response.text()) === 'ok') {
               ready = true
               break
@@ -259,7 +270,7 @@ async function isolated() {
         }
         const headers = mode === 'token' ? { Authorization: `Bearer ${token}` } : {}
         const api = async (path, body, method = 'POST') =>
-          context.request.fetch(`${origin}/api/${path}`, {
+          transport.fetch(context.request, `${origin}/api/${path}`, {
             method: body === undefined ? 'GET' : method,
             headers: {
               ...headers,
@@ -270,6 +281,7 @@ async function isolated() {
           })
         await check({ page, context, origin, api, headers, expect, company })
         expect(blockedOrigins).toEqual([])
+        expect(transport.denied).toEqual([])
       } catch (error) {
         throw new Error(
           `${error.message}\nFixture output:\n${owner.logs()}\nSynthetic page:\n${await page.locator('body').innerText()}`,
@@ -277,6 +289,7 @@ async function isolated() {
         )
       } finally {
         await context.close()
+        revokeOrigin()
         const code = await owner.stop()
         if (code !== 0) throw new Error(`fixture cleanup failed (${code}): ${owner.logs()}`)
         await reservation.release()
@@ -304,7 +317,8 @@ async function isolated() {
         ])
           expect((await api(path, body, method)).status()).toBe(403)
         expect((await api(`documents/${draft.id}/audit`)).status()).toBe(403)
-        const upload = await context.request.post(`${origin}/api/imports`, {
+        const upload = await transport.fetch(context.request, `${origin}/api/imports`, {
+          method: 'POST',
           headers: { Origin: origin },
           multipart: {
             file: {
@@ -420,7 +434,7 @@ async function isolated() {
     await test('token 401 and authenticated 403 are distinct', async () => {
       await fixture('token', ['read'], async ({ page, api, context, origin }) => {
         await expect(page.getByRole('button', { name: /Open accounting/ })).toBeVisible()
-        expect((await context.request.get(`${origin}/api/state`)).status()).toBe(401)
+        expect((await transport.fetch(context.request, `${origin}/api/state`)).status()).toBe(401)
         expect((await api('documents', {})).status()).toBe(403)
         expect((await (await api('session')).json()).access.principal).toBe('token:company')
         await expect(page.getByLabel('Company access token')).toHaveCount(0)
@@ -435,7 +449,7 @@ async function isolated() {
         await page.getByRole('button', { name: 'Sign out', exact: true }).click()
         await expect(page.getByRole('link', { name: /Sign in with GitHub/ })).toBeVisible()
         expect((await api('state')).status()).toBe(401)
-        await context.request.get(`${origin}/fixture/expired`)
+        await transport.fetch(context.request, `${origin}/fixture/expired`)
         expect((await api('state')).status()).toBe(401)
       })
     })
@@ -452,9 +466,13 @@ async function isolated() {
       })
     })
   } finally {
-    if (browser) await browser.close()
-    for (const owner of children) await owner.stop()
-    await mongo.stop({ doCleanup: false })
+    const cleanup = await Promise.allSettled([
+      browser?.close(),
+      transport?.close(),
+      ...[...children].map((owner) => owner.stop()),
+      mongo.stop({ doCleanup: false }),
+    ])
+    for (const result of cleanup) if (result.status === 'rejected') throw result.reason
   }
 }
 
