@@ -63,9 +63,9 @@ import { LocaleSwitch } from './LocaleSwitch'
 import { localizedValidation } from './form-validation'
 import {
   formatDate,
-  localeDecimal,
-  localeCents,
-  convertDecimal,
+  moneyEdit,
+  moneyEditCents,
+  switchMoneyEdit,
   localePercent,
 } from './locale-formats'
 
@@ -437,11 +437,9 @@ export default function App() {
               <ShieldCheck />
               <h1>{t('Your workspace, protected.')}</h1>
               <p>
-                {t('Sign in with GitHub. Access is limited to active members of')}{' '}
-                <strong>
-                  {session.organisation}/{session.team}
-                </strong>
-                .
+                {t('Sign in with GitHub. Access is limited to active members of {organization}.', {
+                  organization: `${session.organisation}/${session.team}`,
+                })}
               </p>
               <a className="button primary" href={githubSignInPath(view)}>
                 {t('Sign in with GitHub')} <ArrowRight />
@@ -1494,16 +1492,11 @@ function DraftEditor({
         },
   )
   const locale = useLocale()
-  const previousLocale = useRef(locale)
   const [prices, setPrices] = useState(() =>
-    draft.lines.map((line) => localeDecimal(line.unitCents)),
+    draft.lines.map((line) => moneyEdit(line.unitCents, locale)),
   )
   useEffect(() => {
-    const from = previousLocale.current
-    if (from !== locale) {
-      setPrices((values) => values.map((value) => convertDecimal(value, from, locale)))
-      previousLocale.current = locale
-    }
+    setPrices((values) => values.map((value) => switchMoneyEdit(value, locale)))
   }, [locale])
   const [localError, setLocalError] = useState('')
   const [reviewed, setReviewed] = useState(false)
@@ -1520,7 +1513,7 @@ function DraftEditor({
   try {
     total = draft.lines.reduce(
       (sum, line, index) =>
-        sum + lineTotals({ ...line, unitCents: localeCents(prices[index]) }).total,
+        sum + lineTotals({ ...line, unitCents: moneyEditCents(prices[index]) }).total,
       0n,
     )
   } catch {
@@ -1535,7 +1528,7 @@ function DraftEditor({
           ...draft,
           lines: draft.lines.map((line, index) => ({
             ...line,
-            unitCents: localeCents(prices[index]),
+            unitCents: moneyEditCents(prices[index]),
           })),
         },
         review ? { reviewed, acceptMismatch } : undefined,
@@ -1696,10 +1689,12 @@ function DraftEditor({
                         aria-label={t('Line {n} unit price', { n: index + 1 })}
                         required
                         inputMode="decimal"
-                        value={prices[index]}
+                        value={prices[index].text}
                         onChange={(e) =>
                           setPrices((values) =>
-                            values.map((value, i) => (i === index ? e.target.value : value)),
+                            values.map((value, i) =>
+                              i === index ? { text: e.target.value, locale } : value,
+                            ),
                           )
                         }
                       />
@@ -1741,7 +1736,7 @@ function DraftEditor({
                 disabled={draft.lines.length >= 100}
                 onClick={() => {
                   setDraft((d) => ({ ...d, lines: [...d.lines, { ...blank }] }))
-                  setPrices((p) => [...p, localeDecimal(0)])
+                  setPrices((p) => [...p, moneyEdit(0, locale)])
                 }}
               >
                 <Plus />
@@ -1843,14 +1838,9 @@ function PaymentEditor({
 }) {
   const [id] = useState(() => crypto.randomUUID())
   const locale = useLocale()
-  const previousLocale = useRef(locale)
-  const [amount, setAmount] = useState(localeDecimal(doc.total - doc.paid))
+  const [amount, setAmount] = useState(() => moneyEdit(doc.total - doc.paid, locale))
   useEffect(() => {
-    const from = previousLocale.current
-    if (from !== locale) {
-      setAmount((value) => convertDecimal(value, from, locale))
-      previousLocale.current = locale
-    }
+    setAmount((value) => switchMoneyEdit(value, locale))
   }, [locale])
   const [date, setDate] = useState(today() < doc.date ? doc.date : today())
   const [reference, setReference] = useState('')
@@ -1859,7 +1849,7 @@ function PaymentEditor({
     event.preventDefault()
     setLocalError('')
     try {
-      await onSave({ id, amount: localeCents(amount), date, reference })
+      await onSave({ id, amount: moneyEditCents(amount), date, reference })
     } catch (error) {
       setLocalError(errorMessage(error))
     }
@@ -1883,8 +1873,8 @@ function PaymentEditor({
                   autoFocus
                   required
                   inputMode="decimal"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  value={amount.text}
+                  onChange={(e) => setAmount({ text: e.target.value, locale })}
                 />
               </label>
               <label>

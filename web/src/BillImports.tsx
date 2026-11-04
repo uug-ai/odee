@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Book, Download, Plus, RefreshDouble, ShieldCheck } from 'iconoir-react'
 import { money } from './accounting'
 import type { APIRequest, BillImport } from './types'
-import { messageText, requestMessage, statusText, t } from './i18n'
+import { messageText, requestMessage, scanMethodText, statusText, t } from './i18n'
 import { responseStatus } from './api'
 
 const message = (error: unknown) => requestMessage(error, responseStatus(error))
@@ -238,7 +238,7 @@ export function BillImports({
                         <strong>{item.filename}</strong>
                         <small>
                           {(item.size / 1024).toFixed(0)} KiB ·{' '}
-                          {item.scan.method || t('Not scanned')}
+                          {scanMethodText(item.scan.method, 'Not scanned')}
                         </small>
                       </td>
                       <td>
@@ -390,7 +390,7 @@ export function OriginalPreview({
         <div>
           <strong>{item.filename}</strong>
           <small>
-            {t('Unmodified original')} · {item.scan.method || t('Manual review')}
+            {t('Unmodified original')} · {scanMethodText(item.scan.method, 'Manual review')}
           </small>
         </div>
         <button

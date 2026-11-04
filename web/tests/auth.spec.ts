@@ -33,7 +33,12 @@ test('GitHub login gates workspace reads and fits a mobile viewport', async ({ p
     'href',
     '/auth/github',
   )
-  await expect(page.getByText('uug-ai/engineering', { exact: true })).toBeVisible()
+  await expect(
+    page.getByText(
+      'Sign in with GitHub. Access is limited to active members of uug-ai/engineering.',
+      { exact: true },
+    ),
+  ).toBeVisible()
   await expect(page.getByLabel('Company access token')).toHaveCount(0)
   expect(workspaceReads).toBe(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(

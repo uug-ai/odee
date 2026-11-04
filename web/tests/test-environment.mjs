@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { safeTestEnvironment } from '../../tools/agents/workspace.mjs'
+export { safeTestEnvironment }
 
 export const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 

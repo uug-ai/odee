@@ -24,8 +24,11 @@ export const nl = {
   'EUR · Single company': 'EUR · Eén bedrijf',
   'Dismiss error': 'Foutmelding sluiten',
   'Your workspace, protected.': 'Je werkruimte, beveiligd.',
-  'Sign in with GitHub. Access is limited to active members of':
-    'Meld je aan met GitHub. Alleen actieve leden hebben toegang van',
+  'Sign in with GitHub. Access is limited to active members of {organization}.':
+    'Meld je aan met GitHub. Toegang is beperkt tot actieve leden van {organization}.',
+  'PDF text': 'PDF-tekst',
+  'PDF text + OCR': 'PDF-tekst + OCR',
+  OCR: 'OCR',
   'Sign in with GitHub': 'Aanmelden met GitHub',
   'Your books, protected.': 'Je boekhouding, beveiligd.',
   'Enter the company access token provided by your administrator. It stays in memory for this tab only.':

@@ -9,6 +9,7 @@ import {
   setLocale,
   t,
   accountName,
+  scanMethodText,
 } from './i18n'
 import { cents, decimal, money } from './accounting'
 import {
@@ -18,6 +19,9 @@ import {
   localeDecimal,
   localePercent,
   parseDate,
+  moneyEdit,
+  moneyEditCents,
+  switchMoneyEdit,
 } from './locale-formats'
 
 afterEach(() => setLocale('en'))
@@ -74,6 +78,18 @@ describe('complete shared catalogs', () => {
     )
     expect(accountName('1100', 'Accounts receivable')).toBe('Debiteuren')
     expect(accountName('1100', 'Customer custom account')).toBe('Customer custom account')
+    expect(scanMethodText('pdf text', 'Not scanned')).toBe('PDF-tekst')
+    expect(scanMethodText('pdf + ocr', 'Manual review')).toBe('PDF-tekst + OCR')
+    expect(scanMethodText('ocr', 'Manual review')).toBe('OCR')
+    expect(scanMethodText('', 'Not scanned')).toBe('Niet gescand')
+    expect(scanMethodText('unknown original method', 'Manual review')).toBe(
+      'Oorspronkelijke diagnose: unknown original method',
+    )
+    expect(
+      t('Sign in with GitHub. Access is limited to active members of {organization}.', {
+        organization: 'synthetic/fixture',
+      }),
+    ).toBe('Meld je aan met GitHub. Toegang is beperkt tot actieve leden van synthetic/fixture.')
     expect(messageText('contact row 3 has an invalid or repeated Odoo ID')).toContain(
       'Contactrij 3',
     )
@@ -89,6 +105,16 @@ describe('complete shared catalogs', () => {
     expect(detectLocale('invalid', ['fr-BE', 'NL-be', 'en'])).toBe('nl')
     expect(detectLocale(null, ['de-DE'])).toBe('en')
     expect(detectLocale(null, [])).toBe('en')
+  })
+  it.each([undefined, null, 42, 'nl-BE', {}, { 0: 'nl', length: 1 }])(
+    'safely defaults for malformed/unavailable preferences %j',
+    (languages) => {
+      expect(detectLocale(null, languages)).toBe('en')
+      expect(detectLocale('nl', languages)).toBe('nl')
+    },
+  )
+  it('ignores malformed preference entries without losing the first supported language', () => {
+    expect(detectLocale(null, [null, 42, {}, 'fr-FR', 'NL-be', 'en-GB'])).toBe('nl')
   })
 })
 
@@ -126,7 +152,37 @@ describe.each(['en', 'nl'] as const)('exact %s value presentation', (locale) => 
     ]) {
       expect(() => localeCents(value, locale), value).toThrow()
     }
-    expect(convertDecimal('invalid', locale, locale === 'nl' ? 'en' : 'nl')).toBe('invalid')
+    expect(() => convertDecimal('invalid', locale, locale === 'nl' ? 'en' : 'nl')).toThrow()
+  })
+  it('retains invalid edit provenance across repeated switches until explicit input correction', () => {
+    const other = locale === 'nl' ? 'en' : 'nl'
+    const text = locale === 'nl' ? '1.05' : '1,05'
+    let edit = { text, locale }
+    expect(() => convertDecimal(text, locale, other)).toThrow()
+    for (const target of [other, locale, other, locale, other] as const) {
+      edit = switchMoneyEdit(edit, target)
+      expect(edit).toEqual({ text, locale })
+      expect(() => moneyEditCents(edit)).toThrow()
+    }
+    // Re-entering current-locale text is an explicit user correction/confirmation.
+    edit = { text, locale: other }
+    expect(moneyEditCents(edit)).toBe(105)
+    for (const target of [locale, other, locale, other] as const) {
+      edit = switchMoneyEdit(edit, target)
+      expect(moneyEditCents(edit)).toBe(105)
+      expect(edit.locale).toBe(target)
+    }
+  })
+  it('switches valid monetary edits exactly without changing their integer cents', () => {
+    const other = locale === 'nl' ? 'en' : 'nl'
+    for (const value of [0, 1, 105, 10000, 14200, 24200, 1000000000000]) {
+      let edit = moneyEdit(value, locale)
+      for (const target of [other, locale, other] as const) {
+        edit = switchMoneyEdit(edit, target)
+        expect(edit).toEqual({ text: localeDecimal(value, target), locale: target })
+        expect(moneyEditCents(edit)).toBe(value)
+      }
+    }
   })
   it('round-trips date-only values with no timezone conversion or invalid normalization', () => {
     for (const iso of ['2000-02-29', '2026-03-29', '2026-10-25', '2026-11-03', '2099-12-31']) {

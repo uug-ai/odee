@@ -9,6 +9,10 @@ import { safeTestEnvironment, reserveTestPort } from '../../tools/agents/workspa
 import { createLocalTransport } from './local-transport.mjs'
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
+const browserOnly = process.argv.includes('--browser-only')
+const selectedLocale = process.argv.find((argument) => argument.startsWith('--locale='))?.slice(9)
+if (selectedLocale && !['en', 'nl'].includes(selectedLocale))
+  throw new Error('Unsupported test locale')
 const children = new Set()
 let interrupted = false
 for (const signal of ['SIGINT', 'SIGTERM']) {
@@ -66,17 +70,23 @@ async function launch() {
   try {
     const cache = join(scratch, 'mongodb-binaries')
     await mkdir(cache)
-    const existing = join(homedir(), '.cache', 'mongodb-binaries')
+    const existing =
+      process.env.MONGOMS_DOWNLOAD_DIR || join(homedir(), '.cache', 'mongodb-binaries')
     for (const name of await readdir(existing).catch(() => [])) {
       if (new RegExp(`^mongod-${process.arch}-[a-zA-Z0-9._-]+-8\\.0\\.16$`).test(name))
         await copyFile(join(existing, name), join(cache, name))
     }
-    const owner = run(process.execPath, [fileURLToPath(import.meta.url), '--isolated'], {
-      ...env,
-      MONGOMS_DOWNLOAD_DIR: cache,
-      MONGOMS_MAX_RETRIES: '1',
-      PLAYWRIGHT_BROWSERS_PATH: join(homedir(), '.cache', 'ms-playwright'),
-    })
+    const owner = run(
+      process.execPath,
+      [fileURLToPath(import.meta.url), '--isolated', ...process.argv.slice(2)],
+      {
+        ...env,
+        MONGOMS_DOWNLOAD_DIR: cache,
+        MONGOMS_MAX_RETRIES: '1',
+        PLAYWRIGHT_BROWSERS_PATH:
+          process.env.PLAYWRIGHT_BROWSERS_PATH || join(homedir(), '.cache', 'ms-playwright'),
+      },
+    )
     const code = await owner.done
     process.stdout.write(owner.logs())
     if (code !== 0) throw new Error(`Localization checks failed (${code})`)
@@ -110,6 +120,7 @@ const labels = {
     invoices: 'Invoices',
     bills: 'Bills',
     newInvoice: 'New invoice',
+    newBill: 'New bill',
     customer: 'Customer name',
     description: 'Line 1 description',
     quantity: 'Line 1 quantity',
@@ -164,6 +175,7 @@ const labels = {
     invoices: 'Klantfacturen',
     bills: 'Leveranciersfacturen',
     newInvoice: 'Nieuwe klantfactuur',
+    newBill: 'Nieuwe leveranciersfactuur',
     customer: 'Naam klant',
     description: 'Regel 1 omschrijving',
     quantity: 'Regel 1 aantal',
@@ -211,11 +223,12 @@ async function isolated() {
   const { test } = await import('node:test')
   const env = process.env
   const scratch = env.ODEE_TEST_SCRATCH_DIR
-  await command(
-    'npm',
-    ['--prefix', 'web', 'run', 'test:e2e', '--', '--config', 'tests/local-transport.config.ts'],
-    env,
-  ).then((log) => process.stdout.write(log))
+  if (!browserOnly)
+    await command(
+      'npm',
+      ['--prefix', 'web', 'run', 'test:e2e', '--', '--config', 'tests/local-transport.config.ts'],
+      env,
+    ).then((log) => process.stdout.write(log))
   const dbPath = join(scratch, 'mongo')
   await mkdir(dbPath)
   const mongo = await MongoMemoryServer.create({
@@ -234,36 +247,38 @@ async function isolated() {
   try {
     const uri = mongo.getUri()
     if (!uri.startsWith('mongodb://127.0.0.1:')) throw new Error('Nonlocal fixture URI')
-    const output = await command(
-      'go',
-      ['test', '-race', '-json', '-count=1', './internal/accounting', './cmd/odee'],
-      { ...env, ODEE_TEST_MONGODB_URI: uri },
-    )
-    const events = output
-      .split('\n')
-      .filter((line) => line.startsWith('{'))
-      .map((line) => JSON.parse(line))
-    const summary = Object.fromEntries(
-      ['pass', 'skip', 'fail'].map((action) => [
-        action,
-        {
-          topLevel: events
-            .filter((event) => event.Test && !event.Test.includes('/') && event.Action === action)
-            .map((event) => `${event.Package}/${event.Test}`),
-          subcases: events
-            .filter((event) => event.Test?.includes('/') && event.Action === action)
-            .map((event) => `${event.Package}/${event.Test}`),
-        },
-      ]),
-    )
-    await writeFile(
-      join(root, '.local-data', 'odee-006-go-results.json'),
-      JSON.stringify(summary, null, 2),
-    )
-    for (const [action, result] of Object.entries(summary))
-      console.log(
-        `Go ${action}: ${result.topLevel.length} top-level, ${result.subcases.length} subcases${action === 'skip' ? ` (${result.topLevel.join(', ')})` : ''}`,
+    if (!browserOnly) {
+      const output = await command(
+        'go',
+        ['test', '-race', '-json', '-count=1', './internal/accounting', './cmd/odee'],
+        { ...env, ODEE_TEST_MONGODB_URI: uri },
       )
+      const events = output
+        .split('\n')
+        .filter((line) => line.startsWith('{'))
+        .map((line) => JSON.parse(line))
+      const summary = Object.fromEntries(
+        ['pass', 'skip', 'fail'].map((action) => [
+          action,
+          {
+            topLevel: events
+              .filter((event) => event.Test && !event.Test.includes('/') && event.Action === action)
+              .map((event) => `${event.Package}/${event.Test}`),
+            subcases: events
+              .filter((event) => event.Test?.includes('/') && event.Action === action)
+              .map((event) => `${event.Package}/${event.Test}`),
+          },
+        ]),
+      )
+      await writeFile(
+        join(root, '.local-data', 'odee-006-go-results.json'),
+        JSON.stringify(summary, null, 2),
+      )
+      for (const [action, result] of Object.entries(summary))
+        console.log(
+          `Go ${action}: ${result.topLevel.length} top-level, ${result.subcases.length} subcases${action === 'skip' ? ` (${result.topLevel.join(', ')})` : ''}`,
+        )
+    }
     const binary = join(scratch, 'localization-fixture')
     await command('go', ['test', '-c', '-o', binary, './internal/accounting'], env)
     transport = await createLocalTransport()
@@ -403,7 +418,7 @@ async function isolated() {
       }
     }
 
-    for (const locale of ['en', 'nl']) {
+    for (const locale of selectedLocale ? [selectedLocale] : ['en', 'nl']) {
       await test(`${locale}: protected contact/create/review/post/payment, conflict and restart`, async () => {
         await fixture(
           locale,
@@ -626,6 +641,9 @@ async function isolated() {
               mimeType: 'application/pdf',
               buffer: pdf,
             })
+            await expect(
+              page.getByRole('row').filter({ hasText: 'synthetic-local-bill.pdf' }),
+            ).toContainText(locale === 'nl' ? 'PDF-tekst' : 'PDF text')
             await page.getByRole('button', { name: l.review, exact: true }).click()
             const scanned = (await state()).imports.find(
               (item) => item.filename === 'synthetic-local-bill.pdf',
@@ -633,6 +651,15 @@ async function isolated() {
             expect([scanned.scan.subtotal, scanned.scan.tax, scanned.scan.total]).toEqual([
               20000, 4200, 24200,
             ])
+            expect(scanned.scan.method).toBe('pdf text')
+            await expect(
+              dialog.getByText(
+                locale === 'nl'
+                  ? 'Ongewijzigd origineel · PDF-tekst'
+                  : 'Unmodified original · PDF text',
+                { exact: true },
+              ),
+            ).toBeVisible()
             await expect(
               dialog.getByRole('img', {
                 name:
@@ -697,6 +724,148 @@ async function isolated() {
             await expect(page.getByRole('heading', { name: l.protected })).toBeVisible()
             await expect(page.getByText('SYNTHETIC-TRANSFER')).toHaveCount(0)
             await expect(page.getByLabel(l.token)).toHaveCount(0)
+          },
+        )
+      })
+      await test(`${locale}: every monetary editor retains rejected and unsubmitted invalid source edits`, async () => {
+        await fixture(
+          locale,
+          ['read', 'write', 'post', 'admin'],
+          async ({ page, context, l, api, state, origin }) => {
+            const other = locale === 'en' ? 'nl' : 'en'
+            let current = locale
+            const dialog = page.getByRole('dialog')
+            const writes = []
+            page.on('request', (request) => {
+              if (request.method() !== 'GET' && request.url().startsWith(`${origin}/api/`))
+                writes.push({ url: request.url(), body: request.postData() })
+            })
+            async function switchTo(next) {
+              const scope = (await dialog.count()) ? dialog : page
+              await scope.getByLabel(labels[current].language, { exact: true }).selectOption(next)
+              current = next
+              await expect(page.locator('html')).toHaveAttribute('lang', next)
+            }
+            async function invalidEdits(field, action) {
+              const before = await state()
+              const beforeWrites = writes.length
+              const invalid = locale === 'en' ? '1,05' : '1.05'
+              async function reject() {
+                await dialog
+                  .getByRole('button', { name: labels[current][action], exact: true })
+                  .click()
+                await expect(dialog.getByRole('alert')).toHaveText(labels[current].invalid)
+                await expect(dialog).toHaveCount(1)
+                expect(writes).toHaveLength(beforeWrites)
+                expect(await state()).toEqual(before)
+              }
+              for (const alreadyRejected of [false, true]) {
+                await switchTo(locale)
+                await dialog.getByLabel(labels[current][field], { exact: true }).fill(invalid)
+                if (alreadyRejected) await reject()
+                for (const next of [other, locale, other]) {
+                  await switchTo(next)
+                  await expect(
+                    dialog.getByLabel(labels[current][field], { exact: true }),
+                  ).toHaveValue(invalid)
+                  expect(writes).toHaveLength(beforeWrites)
+                  await reject()
+                }
+                // Explicit re-entry under the new language restores normal exact conversion.
+                await dialog
+                  .getByLabel(labels[current][field], { exact: true })
+                  .fill(current === 'nl' ? '100,00' : '100.00')
+                await switchTo(locale)
+                await expect(
+                  dialog.getByLabel(labels[current][field], { exact: true }),
+                ).toHaveValue(locale === 'nl' ? '100,00' : '100.00')
+                await switchTo(other)
+              }
+              expect(await state()).toEqual(before)
+              await dialog
+                .getByRole('button', { name: labels[current][action], exact: true })
+                .click()
+              await expect(dialog).toHaveCount(0)
+              expect(writes).toHaveLength(beforeWrites + 1)
+              await switchTo(locale)
+            }
+            for (const kind of ['invoice', 'bill']) {
+              const partner = `Invalid-edit recovery ${kind} ${locale}`
+              await page.goto(`${origin}/accounting/${kind === 'invoice' ? 'invoices' : 'bills'}`)
+              await page
+                .getByRole('button', {
+                  name: kind === 'invoice' ? l.newInvoice : l.newBill,
+                  exact: true,
+                })
+                .click()
+              await dialog.getByLabel(kind === 'invoice' ? l.customer : l.vendor).fill(partner)
+              await dialog.getByLabel(l.description).fill('Original description')
+              await dialog.getByLabel(l.quantity).fill('2')
+              await dialog.getByLabel(l.date, { exact: true }).fill('2026-03-29')
+              await dialog.getByLabel(l.dueDate, { exact: true }).fill('2026-12-03')
+              await invalidEdits('price', 'saveDraft')
+              let doc = (await state()).documents.find((d) => d.partner === partner)
+              expect([doc.lines[0].unitCents, doc.lines[0].quantity, doc.total, doc.date]).toEqual([
+                10000,
+                2,
+                24200,
+                '2026-03-29',
+              ])
+              await page.getByRole('button', { name: l.editDraft, exact: true }).click()
+              await invalidEdits('price', 'saveDraft')
+              doc = (await state()).documents.find((d) => d.id === doc.id)
+              expect([doc.lines[0].unitCents, doc.total]).toEqual([10000, 24200])
+              expect(
+                (await api(`documents/${doc.id}/post`, { version: doc.version })).status(),
+              ).toBe(200)
+              await page.reload()
+              await page.getByRole('button', { name: partner, exact: true }).click()
+              await page.getByRole('button', { name: l.pay, exact: true }).click()
+              await invalidEdits('amount', 'pay')
+              doc = (await state()).documents.find((d) => d.id === doc.id)
+              expect([doc.total, doc.paid, doc.total - doc.paid, doc.payments.length]).toEqual([
+                24200, 10000, 14200, 1,
+              ])
+              for (const entries of [doc.entries, ...doc.payments.map((p) => p.entries)])
+                expect(
+                  entries.reduce((sum, e) => sum + BigInt(e.debit) - BigInt(e.credit), 0n),
+                ).toBe(0n)
+            }
+            await page.goto(`${origin}/accounting/bills`)
+            const pdfPage = await context.newPage()
+            await pdfPage.setContent(
+              '<html><body><pre style="font:18px monospace">Supplier: Synthetic Local Supplier\nInvoice number: INVALID-006\nInvoice date: 03/11/2026\nDue date: 03/12/2026\nCurrency: EUR\nConsulting  2  100.00  21%  242.00\nSubtotal: 200.00\nVAT 21%: 42.00\nTotal: 242.00 EUR</pre></body></html>',
+            )
+            let pdf
+            try {
+              pdf = await pdfPage.pdf({ format: 'A4' })
+            } finally {
+              await pdfPage.close()
+            }
+            await page.getByLabel(l.choose).setInputFiles({
+              name: 'invalid-edit-review.pdf',
+              mimeType: 'application/pdf',
+              buffer: pdf,
+            })
+            await page.getByRole('button', { name: l.review, exact: true }).click()
+            await dialog.getByLabel(l.vendor).fill(`Invalid reviewed recovery ${locale}`)
+            await dialog.getByLabel(l.description).fill('Original reviewed description')
+            await dialog.getByLabel(l.quantity).fill('2')
+            await dialog.getByLabel(l.reviewed).check()
+            await invalidEdits('price', 'saveDraft')
+            const reviewed = (await state()).documents.find(
+              (d) => d.partner === `Invalid reviewed recovery ${locale}`,
+            )
+            expect([reviewed.status, reviewed.lines[0].unitCents, reviewed.total]).toEqual([
+              'draft',
+              10000,
+              24200,
+            ])
+            expect(reviewed.sourceId).toBeTruthy()
+            expect(reviewed.entries).toEqual([])
+            console.log(
+              `${locale}: 7 monetary surfaces × rejected/unsubmitted × 3 switches blocked without writes; explicit corrections persisted`,
+            )
           },
         )
       })

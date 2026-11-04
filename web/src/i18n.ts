@@ -15,9 +15,11 @@ export const catalogs: Record<Locale, Record<MessageKey, string>> = {
   nl,
 }
 const storageKey = 'odee.locale'
-export function detectLocale(saved: string | null, languages: readonly string[]): Locale {
+export function detectLocale(saved: unknown, languages: unknown): Locale {
   if (saved === 'en' || saved === 'nl') return saved
+  if (!Array.isArray(languages)) return 'en'
   for (const language of languages) {
+    if (typeof language !== 'string') continue
     const base = language.toLowerCase().split('-')[0]
     if (base === 'en' || base === 'nl') return base
   }
@@ -30,7 +32,15 @@ function initialLocale(): Locale {
   } catch {
     // Storage can be disabled. Switching still works for the current tab.
   }
-  return detectLocale(saved, typeof navigator === 'undefined' ? [] : navigator.languages)
+  if (saved === 'en' || saved === 'nl') return saved
+  let languages: unknown
+  try {
+    languages = typeof navigator === 'undefined' ? undefined : navigator.languages
+  } catch {
+    // Browser preferences may be unavailable independently of persistent storage.
+    return 'en'
+  }
+  return detectLocale(null, languages)
 }
 let locale = initialLocale()
 const listeners = new Set<() => void>()
@@ -104,6 +114,18 @@ export const statusText = (value: string) => {
     expense: 'Expense',
   }
   return keys[value] ? t(keys[value]) : value
+}
+
+export function scanMethodText(method: string, empty: StaticKey) {
+  if (!method) return t(empty)
+  const methods: Record<string, StaticKey> = {
+    'pdf text': 'PDF text',
+    'pdf + ocr': 'PDF text + OCR',
+    ocr: 'OCR',
+  }
+  return Object.hasOwn(methods, method)
+    ? t(methods[method])
+    : t('Original diagnostic: {message}', { message: method })
 }
 
 // Never translate business data. This adapter is only for application messages, not names/text.

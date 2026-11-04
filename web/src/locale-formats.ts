@@ -16,11 +16,24 @@ export function localeCents(value: string, locale = getLocale()) {
   return cents(value.trim().replace(',', '.'))
 }
 export function convertDecimal(value: string, from: Locale, to: Locale) {
+  return localeDecimal(localeCents(value, from), to)
+}
+export interface MoneyEdit {
+  text: string
+  locale: Locale
+}
+export function moneyEdit(value: number, locale = getLocale()): MoneyEdit {
+  return { text: localeDecimal(value, locale), locale }
+}
+export function moneyEditCents(edit: MoneyEdit) {
+  return localeCents(edit.text, edit.locale)
+}
+export function switchMoneyEdit(edit: MoneyEdit, locale: Locale): MoneyEdit {
   try {
-    return localeDecimal(localeCents(value, from), to)
+    return { text: convertDecimal(edit.text, edit.locale, locale), locale }
   } catch {
-    // Keep an invalid edit intact; never silently coerce or discard user input.
-    return value
+    // Invalid text retains its source rules until the user explicitly edits it.
+    return edit
   }
 }
 function validISO(value: string) {

@@ -7,11 +7,14 @@ Changing it does not navigate, refetch, resubmit or change financial policy.
 
 ## Selection contract
 
-1. A valid explicit `odee.locale` local-storage choice (`en` or `nl`) wins.
+1. A valid explicit `odee.locale` local-storage choice (`en` or `nl`) wins
+   without reading browser language preferences.
 2. Otherwise, the first supported language in `navigator.languages` wins
    (including regional variants such as `nl-BE`).
-3. If neither language is supported or browser preferences are unavailable,
-   English is the deterministic default.
+3. If neither language is supported or browser preferences are unavailable
+   (including undefined or throwing getters), English is the deterministic
+   default. Non-array preference values are ignored; non-string array entries
+   are skipped.
 
 An explicit choice survives reload/history and sign-out on that browser
 origin. When storage is unavailable, the choice works for the current tab.
@@ -34,6 +37,9 @@ starter-account names are translated at display time only when both the code
 and original stock name match. Custom names, partner/contact names, tags,
 references, line descriptions, source websites, OCR text, filenames and
 historical snapshots remain original data.
+Known scan-method codes (`pdf text`, `pdf + ocr`, `ocr`) have cataloged display
+labels, including “PDF-tekst” in Dutch. Stored machine codes and original text
+are unchanged; unknown methods are explicitly labeled original diagnostics.
 
 Known validation/conflict messages are mapped to the catalogs without changing
 the API error object, HTTP status or retry behavior. Unknown operational
@@ -51,7 +57,13 @@ introduced.
 - Existing integer cents are converted by decimal-string operations.
   Currency displays use integer/BigInt grouping and remainder, never floating
   point ledger arithmetic. Switching language in an open dialog reformats valid
-  amount edits and retains invalid edits for correction.
+  amount edits and retains invalid edits **with their source locale** for
+  correction. For example, English `1,05` remains invalid after switching to
+  Dutch, and Dutch `1.05` remains invalid after switching to English. Saving
+  untouched invalid text never sends a write, even after repeated switches
+  or when the edit had not yet been submitted. Explicit user re-entry under
+  the current language restores normal parsing. This applies to new and edited
+  invoices/bills, scanned review and customer/vendor payments.
 - Quantities remain whole-number inputs with the existing bounds.
 - Date-only display is `DD/MM/YYYY` (English), `DD-MM-YYYY` (Dutch).
   Strict shared format/parse helpers reject invalid calendar dates without
@@ -89,6 +101,23 @@ language persistence, history/reload, responsive layout, keyboard/focus, real
 unchanged after a server restart. Go JSON event summaries distinguish
 top-level tests from subcases and list every skip; the opt-in browser fixture
 is covered by the subsequent actual journeys.
+
+Normal `web/tests/**/*.spec.ts` discovery now includes:
+
+- `localization.spec.ts`: separate English/Dutch protected journeys through the
+  same committed runner, including invalid-money provenance on seven monetary
+  surfaces per language. Its `--browser-only` selection avoids recursively
+  starting Playwright or duplicating the broad Go suite/transport-guard suite.
+  Normal discovery retains all ten standalone transport guards.
+- `localization-startup.spec.ts`: the production application in fresh,
+  proxy-bound browser contexts, retaining twelve supported preference rows
+  plus two unavailable-storage rows, and adding nine unavailable/malformed
+  preference or saved-choice-precedence cases.
+
+The normal selection is 59 Playwright cases: 24 historical, ten transport
+guards, 23 startup cases and two protected locale selections. Each locale
+selection executes three child browser cases; these are not six additional
+top-level Playwright tests. No package/workflow/config changes are required.
 
 The historical normal Playwright suite predates that permanent boundary.
 Do not run it unguarded: use the disclosed launch-only safety wrapper/config
