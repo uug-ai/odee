@@ -2,6 +2,11 @@ import assert from 'node:assert/strict'
 
 export const mongoSelector = '^(TestMongo|TestSnapshot|TestCompanyProfile|TestReview)'
 export const requiredMongoCases = [
+  'TestMongoConfigurationLifecycle',
+  'TestMongoConfigurationDurableReassertion',
+  'TestMongoConfigurationScope',
+  'TestMongoConfigurationPublicationUncertain',
+  'TestMongoConfigurationFinancialUncertain',
   'TestMongoFinancialAuditAtomicity',
   'TestMongoAuthorizationCanonicalAndLegacyEverySurface',
   'TestMongoContactsPersistenceIsolationAndSources',
@@ -32,7 +37,9 @@ export function requireMongoResults(events, phase = '') {
     false,
     'Go test failure',
   )
-  const required = phase ? ['TestMongoDiskPersistence'] : requiredMongoCases
+  const required = phase
+    ? ['TestMongoDiskPersistence', 'TestMongoDiskPersistence/configuration']
+    : requiredMongoCases
   for (const name of required)
     assert.ok(
       passed.some((event) => event.Test === name),
@@ -52,7 +59,8 @@ export function requireMongoResults(events, phase = '') {
   }
 }
 
-export function requireCompanyResults(report, readOnly = false) {
+export function requireCompanyResults(report, readOnly = false, fixture = 'company') {
+  assert.ok(['company', 'configuration'].includes(fixture))
   const specs = []
   function collect(suites) {
     for (const suite of suites ?? []) {
@@ -71,7 +79,7 @@ export function requireCompanyResults(report, readOnly = false) {
     assert.equal(spec.tests[0].results.length, 1)
     assert.equal(spec.tests[0].results[0].status, 'passed', `Child did not pass: ${spec.title}`)
   }
-  const company = specs.filter((spec) => spec.file.endsWith('company.fixture.ts'))
+  const company = specs.filter((spec) => spec.file.endsWith(`${fixture}.fixture.ts`))
   assert.equal(company.length, readOnly ? 1 : 2)
   if (readOnly) assert.match(company[0].title, /read-only/)
   else
@@ -80,7 +88,7 @@ export function requireCompanyResults(report, readOnly = false) {
         company.some(
           (spec) =>
             spec.title ===
-            `protected ${locale}: complete saved-contact and legal-company snapshot lifecycle`,
+            `protected ${locale}: complete ${fixture === 'company' ? 'saved-contact and legal-company snapshot' : 'configuration and frozen financial meaning'} lifecycle`,
         ),
         `Missing ${locale} lifecycle`,
       )

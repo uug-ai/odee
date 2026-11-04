@@ -1,5 +1,5 @@
-import type { Document, Journal, Line } from './types'
-import { getLocale } from './i18n'
+import type { Document, Journal, Line, Entry } from './types'
+import { getLocale, accountName, t } from './i18n'
 
 export function cents(value: string): number {
   if (!/^\d{1,11}(\.\d{1,2})?$/.test(value.trim()))
@@ -74,17 +74,65 @@ export function journals(documents: Document[]): Journal[] {
 }
 
 export function balances(documents: Document[]) {
-  const result = new Map<string, { debit: bigint; credit: bigint }>()
+  const result = new Map<
+    string,
+    ReturnType<typeof entryMeaning> & { debit: bigint; credit: bigint }
+  >()
   for (const journal of journals(documents)) {
-    for (const entry of journal.entries) {
-      const current = result.get(entry.accountCode) ?? { debit: 0n, credit: 0n }
-      result.set(entry.accountCode, {
+    for (const [index, entry] of journal.entries.entries()) {
+      const meaning = entryMeaning(journal.document, entry, `${journal.key}/${index}`)
+      const current = result.get(meaning.key) ?? { debit: 0n, credit: 0n }
+      result.set(meaning.key, {
+        ...meaning,
         debit: current.debit + BigInt(entry.debit),
         credit: current.credit + BigInt(entry.credit),
       })
     }
   }
   return result
+}
+
+export function selectionLabel(
+  doc: Pick<Document, 'configurationSelection' | 'financialMeaning' | 'meaningError'>,
+) {
+  return (
+    doc.configurationSelection?.versionId ??
+    doc.configurationSelection?.policy ??
+    doc.financialMeaning?.selection.policy ??
+    (doc.meaningError ? t('Financial meaning unknown') : 'legacy-starter-v1')
+  )
+}
+export function entryMeaning(doc: Document, entry: Entry, identity: string) {
+  const frozen = doc.financialSnapshot ?? doc.financialMeaning
+  const account = frozen?.accounts.find((a) => a.code === entry.accountCode)
+  const scope = `${doc.organisationId ?? ''}/${doc.projectId ?? ''}/${doc.currency}`
+  if (account && !doc.meaningError) {
+    const selection = frozen!.selection
+    const version = selection.versionId ?? selection.policy ?? ''
+    return {
+      key: `${scope}/${version}/${selection.digest}/${account.code}`,
+      code: account.code,
+      name:
+        selection.policy === 'legacy-starter-v1'
+          ? accountName(account.code, account.name)!
+          : account.name,
+      type: account.type,
+      version,
+      currency: doc.currency,
+      known: true,
+      role: Object.keys(frozen!.mappings).filter((role) => frozen!.mappings[role] === account.code),
+    }
+  }
+  return {
+    key: `${scope}/unresolved/${identity}`,
+    code: entry.accountCode,
+    name: t('Financial meaning unknown'),
+    type: 'unknown',
+    version: doc.configurationSelection?.versionId ?? 'unresolved',
+    currency: doc.currency,
+    known: false,
+    role: [] as string[],
+  }
 }
 
 export function csvCell(value: string) {

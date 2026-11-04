@@ -37,6 +37,19 @@ describe('exact accounting amounts', () => {
 
 describe('posted ledger', () => {
   const doc: Document = {
+    financialMeaning: {
+      schemaVersion: 1,
+      selection: { policy: 'legacy-starter-v1', digest: 'starter-fixture' },
+      accounts: [
+        { code: '1000', name: 'Bank', type: 'asset', active: true },
+        { code: '1100', name: 'Accounts receivable', type: 'asset', active: true },
+        { code: '4000', name: 'Sales revenue', type: 'income', active: true },
+        { code: '2100', name: 'VAT payable', type: 'liability', active: true },
+      ],
+      mappings: { bank: '1000', receivable: '1100', revenue: '4000', vatPayable: '2100' },
+      journals: [],
+      period: { start: '2026-01-01', end: '2026-12-31', active: true },
+    },
     id: 'a',
     number: 'INV-a',
     version: 2,
@@ -77,8 +90,41 @@ describe('posted ledger', () => {
     const docs: Document[] = [doc, { ...doc, id: 'draft', status: 'draft' }]
     expect(journals(docs)).toHaveLength(2)
     const ledger = balances(docs)
-    expect(ledger.get('1100')).toEqual({ debit: 12100n, credit: 5000n })
-    expect(ledger.get('1000')).toEqual({ debit: 5000n, credit: 0n })
+    expect([...ledger.values()].find((row) => row.code === '1100')).toMatchObject({
+      debit: 12100n,
+      credit: 5000n,
+    })
+    expect([...ledger.values()].find((row) => row.code === '1000')).toMatchObject({
+      debit: 5000n,
+      credit: 0n,
+    })
     expect([...ledger.values()].reduce((sum, b) => sum + b.debit - b.credit, 0n)).toBe(0n)
+  })
+  it('keeps same-code meanings separate and includes unresolved history', () => {
+    const changed: Document = {
+      ...doc,
+      id: 'v2',
+      financialMeaning: {
+        ...doc.financialMeaning!,
+        selection: { versionId: 'v2', digest: 'different' },
+        accounts: doc.financialMeaning!.accounts.map((account) =>
+          account.code === '1100'
+            ? { ...account, name: 'Different meaning', type: 'expense' }
+            : account,
+        ),
+      },
+    }
+    const unknown: Document = {
+      ...doc,
+      id: 'unknown',
+      financialMeaning: undefined,
+      meaningError: 'unknown',
+    }
+    const rows = [...balances([doc, changed, unknown]).values()]
+    expect(rows.filter((row) => row.code === '1100' && row.known)).toHaveLength(2)
+    expect(rows.find((row) => row.name === 'Different meaning')?.type).toBe('expense')
+    expect(rows.filter((row) => !row.known)).toHaveLength(5)
+    expect(rows.reduce((sum, row) => sum + row.debit - row.credit, 0n)).toBe(0n)
+    expect(rows.reduce((sum, row) => sum + row.debit, 0n)).toBe(51300n)
   })
 })

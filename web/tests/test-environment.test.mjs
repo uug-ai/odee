@@ -91,11 +91,20 @@ test('normal Mongo result gate requires every persistent branch and the two real
     /Unexpected Mongo fixture skip/,
   )
   for (const phase of ['write', 'read']) {
-    assert.equal(
-      requireMongoResults([{ Test: 'TestMongoDiskPersistence', Action: 'pass' }], phase).phase,
-      phase,
-    )
+    const phaseEvents = [
+      { Test: 'TestMongoDiskPersistence', Action: 'pass' },
+      { Test: 'TestMongoDiskPersistence/configuration', Action: 'pass' },
+    ]
+    assert.equal(requireMongoResults(phaseEvents, phase).phase, phase)
     assert.throws(() => requireMongoResults([], phase), /Required Mongo case/)
+    assert.throws(
+      () => requireMongoResults(phaseEvents.slice(0, 1), phase),
+      /Required Mongo case did not pass: TestMongoDiskPersistence\/configuration/,
+    )
+    assert.throws(
+      () => requireMongoResults([phaseEvents[0], { ...phaseEvents[1], Action: 'skip' }], phase),
+      /Required Mongo case did not pass: TestMongoDiskPersistence\/configuration/,
+    )
   }
 })
 

@@ -1,12 +1,13 @@
 # ODEE-008 revision 2: configuration publication and financial meaning
 
-**Pre-coding design for coordinator technical review, not delivery or QA approval.**
+**Reviewed design and draft implementation candidate, not delivery or QA approval.**
 Source baseline: `051747e8defe83632888bddd21105a4b78eb2e99` (accepted ODEE-007).
 Contract: all eleven [ODEE-008 acceptance strings](roadmap/backlog.json),
 [D018 finance/atomicity section](roadmap/decisions.md#odee-008-immutable-coexistence-not-instantaneous-revocation);
 specification hash `8247a1e4bd9035d3815b9105e67fdaaf19c715a7f5e4bf7d8deb2da825b01754`.
-This document chooses implementation semantics within that contract. No production
-code, control ledger, grants, shared data or roadmap is changed.
+Sections A-H preserve the reviewed implementation contract and its starting
+baseline. Section I records the recovered draft implementation and validation
+limits. No grants, shared data or roadmap changes are authorized by this document.
 
 ## A. Verified starting points
 
@@ -462,3 +463,47 @@ per-target contract, return a narrow source-backed reason before coding an
 alternative or touching excluded paths. Missing verified Belgian annex/
 accountant mapping remains an explicit statutory-use gate, not authority to
 invent mappings and not a blocker to synthetic software implementation.
+
+## I. Draft implementation and recovery evidence
+
+The candidate now includes the bounded configuration model, memory/Mongo storage,
+same-target journaled durability reassertion, protected API, explicit draft
+binding/rebinding, frozen posting/payment meaning, historical report resolution
+and English/Dutch configuration UI. The feature runtime was interrupted before
+its handoff. The coordinator preserved its source and completed the validation
+and fixture repairs below; this is not an independent acceptance verdict.
+
+- Full Go race validation passed: 40 top-level and 2,359 nested cases. Fourteen
+  top-level and eleven nested Mongo/browser/scanner cases skipped in that
+  environment; do not treat them as executed there.
+- The normal Mongo entry point separately passed eighteen top-level matrix
+  cases and 276 nested cases. Its intentionally skipped disk test then executed
+  in separate write/read phases, including the configuration child, with an
+  actual owned MongoDB `SIGKILL` and a fresh daemon over the same disk.
+- The guarded configuration adapter executed one parent and thirteen children:
+  two EN/NL lifecycle journeys, ten permanent transport guards and one read-only
+  journey. It also checked state after an owned application `SIGKILL`/restart.
+  Selection used the launch-only parent config; this is not proof of unfiltered
+  normal CI reachability or repair of the historical broad launcher.
+- The frontend ran 124 tests across nine files; TypeScript and the explicit
+  production bundle passed. All 75 root coordinator/environment contracts passed.
+- Go vet/build and formatting passed. No full local broad browser, OAuth or
+  generated-image scanner rerun is claimed.
+
+Recovery retained failed-attempt evidence rather than weakening checks. The
+financial no-write oracle now compares persisted pre-fault BSON state, avoiding
+a constructor-versus-BSON timestamp precision mismatch. Disk phases use a stable
+synthetic company instead of the random per-process test company. A fresh Mongo
+owner avoids the library's stale dead-child handle after a hard crash, without
+changing library internals or replacing the disk. Guard tests now require the
+configuration disk child in both phases and reject missing/skipped children.
+Memory creation retains its prior raw legacy-record semantics; readers still
+normalize returned copies without migrating the stored record.
+
+The draft must still be reconciled with current protected `main`, evaluated by
+all six required independent roles on the final exact candidate, and pass its
+own remote CI before acceptance or merge. Those checks must challenge normal
+unfiltered discovery, complete failure/recovery coverage and all eleven
+criteria, not infer completion from the counts above. Belgian mapping and
+professional approval gates in section G remain unresolved; software activation
+is not statutory approval.
