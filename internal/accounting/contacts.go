@@ -28,21 +28,22 @@ type ContactAddress struct {
 }
 
 type ContactData struct {
-	Name        string         `json:"name" bson:"name"`
-	IsCompany   bool           `json:"isCompany" bson:"isCompany"`
-	CompanyName string         `json:"companyName" bson:"companyName"`
-	Email       string         `json:"email" bson:"email"`
-	Phone       string         `json:"phone" bson:"phone"`
-	Mobile      string         `json:"mobile" bson:"mobile"`
-	Website     string         `json:"website" bson:"website"`
-	VAT         string         `json:"vat" bson:"vat"`
-	Reference   string         `json:"reference" bson:"reference"`
-	Type        string         `json:"type" bson:"type"`
-	Address     ContactAddress `json:"address" bson:"address"`
-	Tags        []string       `json:"tags" bson:"tags"`
-	Customer    bool           `json:"customer" bson:"customer"`
-	Vendor      bool           `json:"vendor" bson:"vendor"`
-	Active      bool           `json:"active" bson:"active"`
+	AccountingMetadata `bson:",inline"`
+	Name               string         `json:"name" bson:"name"`
+	IsCompany          bool           `json:"isCompany" bson:"isCompany"`
+	CompanyName        string         `json:"companyName" bson:"companyName"`
+	Email              string         `json:"email" bson:"email"`
+	Phone              string         `json:"phone" bson:"phone"`
+	Mobile             string         `json:"mobile" bson:"mobile"`
+	Website            string         `json:"website" bson:"website"`
+	VAT                string         `json:"vat" bson:"vat"`
+	Reference          string         `json:"reference" bson:"reference"`
+	Type               string         `json:"type" bson:"type"`
+	Address            ContactAddress `json:"address" bson:"address"`
+	Tags               []string       `json:"tags" bson:"tags"`
+	Customer           bool           `json:"customer" bson:"customer"`
+	Vendor             bool           `json:"vendor" bson:"vendor"`
+	Active             bool           `json:"active" bson:"active"`
 }
 
 type OdooContactSource struct {
@@ -137,6 +138,9 @@ func (d *ContactData) validate() error {
 		}
 	}
 	d.Tags = tags
+	if d.TaxApplicability == "" {
+		d.TaxApplicability = "unknown"
+	}
 	return nil
 }
 
@@ -260,6 +264,10 @@ func (s *MemoryContacts) List(context.Context) ([]Contact, error) {
 	defer s.mu.Unlock()
 	items := []Contact{}
 	for _, item := range s.items {
+		item.normalize()
+		if item.OrganisationID != s.company || item.ProjectID != s.company {
+			continue
+		}
 		items = append(items, cloneContact(item))
 	}
 	return items, nil
@@ -271,12 +279,20 @@ func (s *MemoryContacts) Get(_ context.Context, id primitive.ObjectID) (Contact,
 	if !ok {
 		return Contact{}, ErrNotFound
 	}
+	item.normalize()
+	if item.OrganisationID != s.company || item.ProjectID != s.company {
+		return Contact{}, ErrNotFound
+	}
 	return cloneContact(item), nil
 }
 func (s *MemoryContacts) ByOdoo(_ context.Context, source OdooContactSource) (Contact, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, item := range s.items {
+		item.normalize()
+		if item.OrganisationID != s.company || item.ProjectID != s.company {
+			continue
+		}
 		if item.Odoo != nil && item.Odoo.Origin == source.Origin && item.Odoo.Database == source.Database && item.Odoo.ID == source.ID {
 			return cloneContact(item), nil
 		}
@@ -294,6 +310,10 @@ func (s *MemoryContacts) Create(_ context.Context, item Contact) error {
 		return ErrConflict
 	}
 	for _, old := range s.items {
+		old.normalize()
+		if old.OrganisationID != s.company || old.ProjectID != s.company {
+			continue
+		}
 		if item.Odoo != nil && old.Odoo != nil && item.Odoo.Origin == old.Odoo.Origin && item.Odoo.Database == old.Odoo.Database && item.Odoo.ID == old.Odoo.ID {
 			return ErrConflict
 		}
@@ -310,6 +330,10 @@ func (s *MemoryContacts) Save(_ context.Context, item Contact, version int64) er
 	}
 	old, ok := s.items[item.ID]
 	if !ok {
+		return ErrNotFound
+	}
+	old.normalize()
+	if old.OrganisationID != s.company || old.ProjectID != s.company {
 		return ErrNotFound
 	}
 	if old.Version != version {

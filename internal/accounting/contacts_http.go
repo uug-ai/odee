@@ -58,6 +58,9 @@ func (s *Server) createContact(w http.ResponseWriter, r *http.Request) {
 	}
 	item, err := newContact(input, s.Company)
 	if err == nil {
+		err = item.validateAccounting(nil)
+	}
+	if err == nil {
 		err = s.Contacts.Create(r.Context(), item)
 	}
 	if err != nil {
@@ -73,7 +76,12 @@ func (s *Server) editContact(w http.ResponseWriter, r *http.Request) {
 	}
 	var input struct {
 		ContactData
-		Version int64 `json:"version"`
+		Version          int64   `json:"version"`
+		EnterpriseID     *string `json:"enterpriseId"`
+		BankAccount      *string `json:"bankAccount"`
+		BIC              *string `json:"bic"`
+		PaymentTerms     *string `json:"paymentTerms"`
+		TaxApplicability *string `json:"taxApplicability"`
 	}
 	if !decode(w, r, &input) {
 		return
@@ -92,7 +100,24 @@ func (s *Server) editContact(w http.ResponseWriter, r *http.Request) {
 		apiError(w, ErrConflict)
 		return
 	}
+	input.ContactData.AccountingMetadata = item.AccountingMetadata
+	for _, field := range []struct {
+		target *string
+		value  *string
+	}{
+		{&input.ContactData.EnterpriseID, input.EnterpriseID}, {&input.ContactData.BankAccount, input.BankAccount},
+		{&input.ContactData.BIC, input.BIC}, {&input.ContactData.PaymentTerms, input.PaymentTerms},
+		{&input.ContactData.TaxApplicability, input.TaxApplicability},
+	} {
+		if field.value != nil {
+			*field.target = *field.value
+		}
+	}
 	if err := input.ContactData.validate(); err != nil {
+		apiError(w, err)
+		return
+	}
+	if err := input.ContactData.validateAccounting(&item.ContactData); err != nil {
 		apiError(w, err)
 		return
 	}

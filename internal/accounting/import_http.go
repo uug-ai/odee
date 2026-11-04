@@ -266,7 +266,7 @@ func (s *Server) importDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
-		Draft
+		draftRequest
 		Reviewed       bool `json:"reviewed"`
 		AcceptMismatch bool `json:"acceptMismatch"`
 	}
@@ -280,6 +280,11 @@ func (s *Server) importDraft(w http.ResponseWriter, r *http.Request) {
 	}
 	// The import ID is also the draft ID: retries can never create a second bill.
 	if existing, err := s.Store.Get(r.Context(), id); err == nil {
+		existing.NormalizeOwnership()
+		if existing.OrganisationID != s.Company || existing.ProjectID != s.Company {
+			apiError(w, ErrNotFound)
+			return
+		}
 		if existing.SourceID == nil || *existing.SourceID != id {
 			apiError(w, ErrConflict)
 			return
@@ -303,7 +308,7 @@ func (s *Server) importDraft(w http.ResponseWriter, r *http.Request) {
 		apiError(w, invalid("only EUR bills can be converted in this release"))
 		return
 	}
-	doc, err := NewDocument(input.Draft, s.Company)
+	doc, err := s.newDraft(r.Context(), input.draftRequest)
 	if err != nil {
 		apiError(w, err)
 		return
@@ -318,6 +323,11 @@ func (s *Server) importDraft(w http.ResponseWriter, r *http.Request) {
 			existing, findErr := s.Store.Get(r.Context(), id)
 			if findErr != nil {
 				apiError(w, findErr)
+				return
+			}
+			existing.NormalizeOwnership()
+			if existing.OrganisationID != s.Company || existing.ProjectID != s.Company || existing.SourceID == nil || *existing.SourceID != id {
+				apiError(w, ErrNotFound)
 				return
 			}
 			doc = existing

@@ -1,6 +1,5 @@
 export type Kind = 'invoice' | 'bill'
-export type View =
-  'apps' | 'contacts' | 'dashboard' | 'invoices' | 'bills' | 'journal' | 'accounts' | 'reports'
+export type { View } from './modules'
 export interface Line {
   description: string
   quantity: number
@@ -21,6 +20,11 @@ export interface Payment {
   entries: Entry[]
 }
 export interface Draft {
+  partnerAction?: 'select' | 'refresh' | 'manual'
+  contactId?: string
+  expectedContactVersion?: number
+  ownCompanyAction?: 'refresh'
+  expectedCompanyVersion?: number
   kind: Kind
   partner: string
   email: string
@@ -30,6 +34,8 @@ export interface Draft {
   lines: Line[]
 }
 export interface Document extends Draft {
+  partnerSnapshot?: PartnerSnapshot
+  ownCompanySnapshot?: CompanySnapshot
   id: string
   number: string
   version: number
@@ -51,6 +57,7 @@ export interface Account {
   type: string
 }
 export interface State {
+  companyProfile?: CompanyProfile | null
   company: string
   currency: string
   demo: boolean
@@ -63,12 +70,30 @@ export interface State {
   contacts: Contact[]
 }
 export interface Session {
-  authMode: 'github' | 'token'
+  authMode: 'github' | 'token' | 'development'
   authenticated: boolean
+  access?: {
+    principal: string
+    authorizationMode: 'compatibility' | 'enforced'
+    companyId: string
+    member: boolean
+    capabilities: Capability[]
+  }
   organisation?: string
   team?: string
   csrfToken?: string
   user?: { id: number; login: string; name: string }
+}
+export type Capability = 'read' | 'write' | 'post' | 'admin'
+export interface FinancialEvent {
+  id: string
+  time: string
+  actorType: 'github' | 'token' | 'development'
+  principal: string
+  action: 'document.post' | 'manual-payment.record'
+  targetId: string
+  version: number
+  outcome: 'committed'
 }
 export interface BillImport {
   id: string
@@ -110,6 +135,11 @@ export interface Journal {
 }
 
 export interface ContactData {
+  enterpriseId?: string
+  bankAccount?: string
+  bic?: string
+  paymentTerms?: string
+  taxApplicability?: '' | 'unknown' | 'unsupported'
   name: string
   isCompany: boolean
   companyName: string
@@ -132,6 +162,25 @@ export interface ContactData {
   customer: boolean
   vendor: boolean
   active: boolean
+}
+export interface CompanyProfile {
+  id: string
+  data: ContactData
+  version: number
+  updatedAt: string
+}
+export interface PartnerSnapshot {
+  contactId?: string
+  sourceVersion: number
+  schemaVersion: number
+  data: ContactData
+}
+export interface CompanySnapshot {
+  profileId: string
+  sourceVersion: number
+  schemaVersion: number
+  role: 'seller' | 'buyer'
+  data: ContactData
 }
 export interface Contact extends ContactData {
   id: string

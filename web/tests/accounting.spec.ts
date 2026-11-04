@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
+test.use({ locale: 'en-GB' })
+
 async function create(
   page: Page,
   kind: 'invoice' | 'bill',
@@ -82,7 +84,8 @@ test('create, edit, post, pay, report, and refresh invoices and bills', async ({
   await page.getByRole('button', { name: 'Export CSV' }).click()
   expect((await download).suggestedFilename()).toContain('odee-trial-balance')
   await page.reload()
-  await page.getByRole('button', { name: /Open accounting/ }).click()
+  await expect(page).toHaveURL('/accounting/reports')
+  await expect(page.getByRole('heading', { level: 1, name: 'Trial balance' })).toBeVisible()
   await page
     .getByRole('navigation', { name: 'Accounting navigation' })
     .getByRole('button', { name: /^Invoices/ })
@@ -108,9 +111,10 @@ test('mobile launcher, navigation, draft dialog and keyboard dismissal', async (
   await expect(page.getByRole('heading', { level: 1, name: 'Chart of accounts' })).toBeVisible()
 })
 
-test('editing an API-created draft preserves a custom VAT rate', async ({ page }) => {
+test('editing an API-created draft preserves a custom VAT rate', async ({ page, baseURL }) => {
+  if (!baseURL) throw new Error('The accounting browser suite requires an isolated baseURL.')
   const response = await page.request.post('/api/documents', {
-    headers: { Origin: 'http://127.0.0.1:8099' },
+    headers: { Origin: new URL(baseURL).origin },
     data: {
       kind: 'invoice',
       partner: 'Custom VAT example',

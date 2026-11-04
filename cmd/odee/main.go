@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -81,15 +80,21 @@ func run() error {
 	if err != nil || company.IsZero() {
 		return fmt.Errorf("ODEE_COMPANY_ID must be a nonzero BSON ObjectID")
 	}
+	authorization, err := accounting.ParseAuthorization(env("ODEE_AUTHZ_MODE", "compatibility"), os.Getenv("ODEE_CAPABILITY_GRANTS"))
+	if err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	var store accounting.Store
 	var imports accounting.ImportStore
 	var contacts accounting.ContactStore
+	var profiles accounting.CompanyStore
 	if demo {
 		store = accounting.NewMemoryStore()
 		imports = accounting.NewMemoryImports(company)
 		contacts = accounting.NewMemoryContacts(company)
+		profiles = accounting.NewMemoryCompany(company)
 		slog.Warn("DEMO MODE: temporary empty storage; all data is lost on restart")
 	} else {
 		uri := os.Getenv("MONGODB_URI")
@@ -116,6 +121,7 @@ func run() error {
 			return err
 		}
 		store = mongoStore
+		profiles = accounting.NewMongoCompany(mongoStore)
 		if documentsDirectory == "" {
 			imports, err = accounting.NewMongoImports(ctx, mongoStore)
 		} else {
@@ -132,33 +138,19 @@ func run() error {
 	if err := scanner.Ready(); err != nil {
 		slog.Warn("local bill scanning is unavailable", "error", err)
 	}
-	api := (&accounting.Server{Store: store, Company: company, Name: env("ODEE_COMPANY_NAME", "My company"),
-		Token: token, Origin: origin, Demo: demo, Dev: dev, Auth: auth, Imports: imports, Scanner: scanner, Contacts: contacts}).Handler()
+	service := &accounting.Server{Store: store, Company: company, Name: env("ODEE_COMPANY_NAME", "My company"),
+		Token: token, Origin: origin, Demo: demo, Dev: dev, Auth: auth, Authorization: authorization, Imports: imports, Scanner: scanner, Contacts: contacts, Profiles: profiles}
+	api := service.Handler()
 	mux := http.NewServeMux()
 	mux.Handle("/api/", api)
-	if auth != nil {
-		auth.Register(mux)
-	} else {
-		mux.HandleFunc("GET /api/session", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("Cache-Control", "no-store")
-			if _, err := fmt.Fprintf(w, `{"authMode":"token","authenticated":%t}`, dev); err != nil {
-				slog.Error("write session response", "error", err)
-			}
-		})
-	}
+	service.RegisterAuthentication(mux)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("ok")); err != nil {
 			slog.Error("write health response", "error", err)
 		}
 	})
-	dist := env("ODEE_WEB_DIR", "web/dist")
-	mux.Handle("GET /{$}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		http.ServeFile(w, r, filepath.Join(dist, "index.html"))
-	}))
-	mux.Handle("GET /assets/", http.FileServer(http.Dir(dist)))
+	web := registerWeb(mux, env("ODEE_WEB_DIR", "web/dist"))
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -167,7 +159,7 @@ func run() error {
 		if originURL.Scheme == "https" {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}
-		mux.ServeHTTP(w, r)
+		web.ServeHTTP(w, r)
 	})
 	server := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout: 45 * time.Second, WriteTimeout: 210 * time.Second, IdleTimeout: 60 * time.Second}

@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	ErrInvalid  = errors.New("invalid accounting input")
-	ErrNotFound = errors.New("document not found")
-	ErrConflict = errors.New("document changed; refresh before trying again")
+	ErrInvalid   = errors.New("invalid accounting input")
+	ErrNotFound  = errors.New("document not found")
+	ErrConflict  = errors.New("document changed; refresh before trying again")
+	ErrUncertain = errors.New("write outcome uncertain; reconcile the document and its financial history before retrying")
 )
 
 const MaxAmount int64 = 1_000_000_000_000
@@ -59,30 +60,35 @@ type Payment struct {
 }
 
 type Document struct {
-	ID             primitive.ObjectID  `json:"id" bson:"_id"`
-	OrganisationID primitive.ObjectID  `json:"organisationId" bson:"organisationId"`
-	ProjectID      primitive.ObjectID  `json:"projectId" bson:"projectId"`
-	OwnerID        primitive.ObjectID  `json:"-" bson:"ownerId,omitempty"`
-	SourceID       *primitive.ObjectID `json:"sourceId,omitempty" bson:"sourceId,omitempty"`
-	Version        int64               `json:"version" bson:"version"`
-	Number         string              `json:"number" bson:"number"`
-	Kind           string              `json:"kind" bson:"kind"`
-	Partner        string              `json:"partner" bson:"partner"`
-	Email          string              `json:"email" bson:"email"`
-	Reference      string              `json:"reference" bson:"reference"`
-	Date           string              `json:"date" bson:"date"`
-	DueDate        string              `json:"dueDate" bson:"dueDate"`
-	Currency       string              `json:"currency" bson:"currency"`
-	Status         string              `json:"status" bson:"status"`
-	Lines          []Line              `json:"lines" bson:"lines"`
-	Subtotal       int64               `json:"subtotal" bson:"subtotal"`
-	Tax            int64               `json:"tax" bson:"tax"`
-	Total          int64               `json:"total" bson:"total"`
-	Paid           int64               `json:"paid" bson:"paid"`
-	Entries        []Entry             `json:"entries" bson:"entries"`
-	Payments       []Payment           `json:"payments" bson:"payments"`
-	CreatedAt      time.Time           `json:"createdAt" bson:"createdAt"`
-	UpdatedAt      time.Time           `json:"updatedAt" bson:"updatedAt"`
+	PartnerSnapshot    *PartnerSnapshot    `json:"partnerSnapshot,omitempty" bson:"partnerSnapshot,omitempty"`
+	OwnCompanySnapshot *CompanySnapshot    `json:"ownCompanySnapshot,omitempty" bson:"ownCompanySnapshot,omitempty"`
+	ID                 primitive.ObjectID  `json:"id" bson:"_id"`
+	OrganisationID     primitive.ObjectID  `json:"organisationId" bson:"organisationId"`
+	ProjectID          primitive.ObjectID  `json:"projectId" bson:"projectId"`
+	OwnerID            primitive.ObjectID  `json:"-" bson:"ownerId,omitempty"`
+	SourceID           *primitive.ObjectID `json:"sourceId,omitempty" bson:"sourceId,omitempty"`
+	Version            int64               `json:"version" bson:"version"`
+	Number             string              `json:"number" bson:"number"`
+	Kind               string              `json:"kind" bson:"kind"`
+	Partner            string              `json:"partner" bson:"partner"`
+	Email              string              `json:"email" bson:"email"`
+	Reference          string              `json:"reference" bson:"reference"`
+	Date               string              `json:"date" bson:"date"`
+	DueDate            string              `json:"dueDate" bson:"dueDate"`
+	Currency           string              `json:"currency" bson:"currency"`
+	Status             string              `json:"status" bson:"status"`
+	Lines              []Line              `json:"lines" bson:"lines"`
+	Subtotal           int64               `json:"subtotal" bson:"subtotal"`
+	Tax                int64               `json:"tax" bson:"tax"`
+	Total              int64               `json:"total" bson:"total"`
+	Paid               int64               `json:"paid" bson:"paid"`
+	Entries            []Entry             `json:"entries" bson:"entries"`
+	Payments           []Payment           `json:"payments" bson:"payments"`
+	CreatedAt          time.Time           `json:"createdAt" bson:"createdAt"`
+	UpdatedAt          time.Time           `json:"updatedAt" bson:"updatedAt"`
+
+	FinancialEvents []FinancialEvent `json:"-" bson:"financialEvents,omitempty"`
+	pendingEvent    *FinancialEvent
 }
 
 type Draft struct {
