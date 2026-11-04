@@ -6,6 +6,46 @@ export interface Line {
   unitCents: number
   taxBps: number
   accountCode: string
+  calculation?: PolicyLineData
+}
+export interface CalculationPolicyMetadata {
+  policyId: string
+  schemaVersion: number
+  currency: string
+  currencyExponent: number
+}
+export interface PolicyLineData {
+  lineId?: string
+  quantityUnits: string
+  unitPriceUnits: string
+  fixedDiscountUnits: string
+  percentageDiscountBps: string[]
+  taxRateBps: string
+}
+export interface CalculationLineResult {
+  lineId: string
+  netMinor: string
+  taxMinor: string
+  grossMinor: string
+  netRoundingResidue: { numerator: string; denominator: string }
+}
+export interface CalculationTaxGroup {
+  taxRateBps: string
+  netMinor: string
+  taxMinor: string
+  independentLineTax: string
+  roundingAdjustment: string
+}
+export interface CalculationResult {
+  policyId: string
+  schemaVersion: number
+  currency: string
+  currencyExponent: number
+  netMinor: string
+  taxMinor: string
+  grossMinor: string
+  lines: CalculationLineResult[]
+  taxGroups: CalculationTaxGroup[]
 }
 export interface Entry {
   accountCode: string
@@ -15,7 +55,7 @@ export interface Entry {
 export interface Payment {
   id: string
   date: string
-  amount: number
+  amount: number | string
   reference: string
   entries: Entry[]
 }
@@ -32,8 +72,10 @@ export interface Draft {
   date: string
   dueDate: string
   lines: Line[]
+  calculationPolicy?: CalculationPolicyMetadata
 }
 export interface Document extends Draft {
+  calculation?: CalculationResult
   configurationSelection?: ConfigurationSelection
   journalCode?: string
   financialSnapshot?: FinancialSnapshot

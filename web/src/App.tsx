@@ -67,13 +67,140 @@ import { LocaleSwitch } from './LocaleSwitch'
 import { localizedValidation } from './form-validation'
 import {
   formatDate,
+  formatBasisPointPercent,
+  formatScaledDecimal,
   moneyEdit,
   moneyEditCents,
+  parseBasisPointPercent,
+  parseScaledDecimal,
+  scaledDecimalEdit,
   switchMoneyEdit,
+  switchScaledDecimalEdit,
   localePercent,
+  type ScaledDecimalEdit,
 } from './locale-formats'
+import { calculatePolicyPreview } from './calculation-policy'
+import type { CalculationPolicyMetadata, PolicyLineData } from './types'
 
 const errorMessage = (error: unknown) => requestMessage(error, responseStatus(error))
+const exactPolicy: CalculationPolicyMetadata = {
+  policyId: 'exact-fixed-v1',
+  schemaVersion: 1,
+  currency: 'EUR',
+  currencyExponent: 2,
+}
+
+interface PolicyLineEditor {
+  quantity: ScaledDecimalEdit
+  unitPrice: ScaledDecimalEdit
+  fixedDiscount: ScaledDecimalEdit
+  percentageDiscounts: ScaledDecimalEdit[]
+  taxRate: ScaledDecimalEdit
+}
+
+function blankPolicyLine(locale: 'en' | 'nl'): PolicyLineEditor {
+  return {
+    quantity: scaledDecimalEdit('10000', locale),
+    unitPrice: scaledDecimalEdit('0', locale),
+    fixedDiscount: scaledDecimalEdit('0', locale),
+    percentageDiscounts: [],
+    taxRate: { text: '21', locale },
+  }
+}
+
+function policyLineEditor(line: Line, locale: 'en' | 'nl'): PolicyLineEditor {
+  const calculation = line.calculation
+  if (!calculation)
+    return {
+      quantity: scaledDecimalEdit((BigInt(line.quantity) * 10_000n).toString(), locale),
+      unitPrice: scaledDecimalEdit((BigInt(line.unitCents) * 100n).toString(), locale),
+      fixedDiscount: scaledDecimalEdit('0', locale),
+      percentageDiscounts: [],
+      taxRate: {
+        text: formatBasisPointPercent(String(line.taxBps), locale),
+        locale,
+      },
+    }
+  return {
+    quantity: scaledDecimalEdit(calculation.quantityUnits, locale),
+    unitPrice: scaledDecimalEdit(calculation.unitPriceUnits, locale),
+    fixedDiscount: scaledDecimalEdit(calculation.fixedDiscountUnits, locale),
+    percentageDiscounts: calculation.percentageDiscountBps.map((rate) =>
+      scaledDecimalEdit((BigInt(rate) * 100n).toString(), locale),
+    ),
+    taxRate: {
+      text: formatBasisPointPercent(calculation.taxRateBps, locale),
+      locale,
+    },
+  }
+}
+
+function policyLineData(editor: PolicyLineEditor, existing?: PolicyLineData): PolicyLineData {
+  return {
+    ...(existing?.lineId ? { lineId: existing.lineId } : {}),
+    quantityUnits: parseScaledDecimal(editor.quantity.text, editor.quantity.locale),
+    unitPriceUnits: parseScaledDecimal(editor.unitPrice.text, editor.unitPrice.locale),
+    fixedDiscountUnits: parseScaledDecimal(editor.fixedDiscount.text, editor.fixedDiscount.locale),
+    percentageDiscountBps: editor.percentageDiscounts.map((rate) =>
+      parseBasisPointPercent(rate.text, rate.locale),
+    ),
+    taxRateBps: parseBasisPointPercent(editor.taxRate.text, editor.taxRate.locale),
+  }
+}
+
+function knownCalculationPolicy(doc: Document) {
+  const metadata = doc.calculationPolicy
+  const result = doc.calculation
+  if (
+    metadata?.policyId !== exactPolicy.policyId ||
+    metadata.schemaVersion !== exactPolicy.schemaVersion ||
+    metadata.currency !== exactPolicy.currency ||
+    metadata.currencyExponent !== exactPolicy.currencyExponent ||
+    result?.policyId !== exactPolicy.policyId ||
+    result.schemaVersion !== exactPolicy.schemaVersion ||
+    result.currency !== exactPolicy.currency ||
+    result.currencyExponent !== exactPolicy.currencyExponent ||
+    result.lines.length !== doc.lines.length
+  )
+    return false
+  try {
+    const preview = calculatePolicyPreview(
+      doc.lines.map((line) => {
+        if (!line.calculation) throw new Error('calculation policy history is unresolved')
+        return line.calculation
+      }),
+    )
+    return (
+      result.netMinor === preview.netMinor &&
+      result.taxMinor === preview.taxMinor &&
+      result.grossMinor === preview.grossMinor &&
+      result.lines.every((line, index) => {
+        const calculated = preview.lines[index]
+        return (
+          line.lineId === calculated.lineId &&
+          line.netMinor === calculated.netMinor &&
+          line.taxMinor === calculated.taxMinor &&
+          line.grossMinor === calculated.grossMinor &&
+          line.netRoundingResidue.numerator === calculated.netRoundingResidue.numerator &&
+          line.netRoundingResidue.denominator === calculated.netRoundingResidue.denominator
+        )
+      }) &&
+      result.taxGroups.length === preview.taxGroups.length &&
+      result.taxGroups.every((group, index) => {
+        const calculated = preview.taxGroups[index]
+        return (
+          group.taxRateBps === calculated.taxRateBps &&
+          group.netMinor === calculated.netMinor &&
+          group.taxMinor === calculated.taxMinor &&
+          group.independentLineTax === calculated.independentLineTax &&
+          group.roundingAdjustment === calculated.roundingAdjustment
+        )
+      })
+    )
+  } catch {
+    return false
+  }
+}
 
 function Badge({ doc }: { doc: Document }) {
   return <span className={`badge ${label(doc).toLowerCase()}`}>{statusText(label(doc))}</span>
@@ -1349,6 +1476,8 @@ function DocumentDetail({
   canPost: boolean
   onAudit?: () => void
 }) {
+  const resolvedPolicy = knownCalculationPolicy(doc)
+  const unresolvedPolicy = Boolean(doc.calculationPolicy || doc.calculation) && !resolvedPolicy
   return (
     <div className="detail">
       <section className="panel">
@@ -1372,16 +1501,28 @@ function DocumentDetail({
             )}
             {doc.status === 'draft' ? (
               <>
-                <button className="button secondary" disabled={busy || !canWrite} onClick={onEdit}>
+                <button
+                  className="button secondary"
+                  disabled={busy || !canWrite || unresolvedPolicy}
+                  onClick={onEdit}
+                >
                   {t('Edit draft')}
                 </button>
-                <button className="button primary" disabled={busy || !canPost} onClick={onPost}>
+                <button
+                  className="button primary"
+                  disabled={busy || !canPost || unresolvedPolicy}
+                  onClick={onPost}
+                >
                   <Check />
                   {t('Post document')}
                 </button>
               </>
             ) : doc.status === 'posted' ? (
-              <button className="button primary" disabled={busy || !canPost} onClick={onPay}>
+              <button
+                className="button primary"
+                disabled={busy || !canPost || unresolvedPolicy}
+                onClick={onPay}
+              >
                 <Wallet />
                 {t('Record payment')}
               </button>
@@ -1413,6 +1554,21 @@ function DocumentDetail({
           </div>
         </div>
         <section aria-label={t('Accounting captures')}>
+          {resolvedPolicy ? (
+            <p role="status">
+              {t(
+                'Calculation policy {policy} · schema {version} · {currency} exponent {exponent}',
+                {
+                  policy: doc.calculationPolicy!.policyId,
+                  version: doc.calculationPolicy!.schemaVersion,
+                  currency: doc.calculationPolicy!.currency,
+                  exponent: doc.calculationPolicy!.currencyExponent,
+                },
+              )}
+            </p>
+          ) : unresolvedPolicy ? (
+            <p role="alert">{t('Calculation policy history is unresolved.')}</p>
+          ) : null}
           <h3>{t('Partner capture')}</h3>
           <p>
             {doc.partnerSnapshot?.sourceVersion
@@ -1450,11 +1606,60 @@ function DocumentDetail({
                         (a) => a.code === line.accountCode,
                       )?.name ?? t('Selected accounting configuration')}
                     </small>
+                    {resolvedPolicy && line.calculation && (
+                      <small>
+                        {t('Fixed line discount (up to 4 decimals)')}:{' '}
+                        {formatScaledDecimal(line.calculation.fixedDiscountUnits)}
+                        {line.calculation.percentageDiscountBps.map((rate, index) => (
+                          <span key={index}>
+                            {' · '}
+                            {t('Percentage discount {n}', { n: index + 1 })}:{' '}
+                            {formatBasisPointPercent(rate)}%
+                          </span>
+                        ))}
+                      </small>
+                    )}
                   </td>
-                  <td className="numeric">{line.quantity}</td>
-                  <td className="numeric">{money(line.unitCents)}</td>
-                  <td className="numeric">{localePercent(line.taxBps)}</td>
-                  <td className="numeric">{money(lineTotals(line).total)}</td>
+                  {resolvedPolicy && line.calculation ? (
+                    (() => {
+                      const calculated = doc.calculation!.lines.find(
+                        (item) => item.lineId === line.calculation!.lineId,
+                      )!
+                      return (
+                        <>
+                          <td className="numeric">
+                            {formatScaledDecimal(line.calculation.quantityUnits)}
+                            <small>
+                              {t('Net rounding residue {fraction}', {
+                                fraction: `${calculated.netRoundingResidue.numerator}/${calculated.netRoundingResidue.denominator}`,
+                              })}
+                            </small>
+                          </td>
+                          <td className="numeric">
+                            {formatScaledDecimal(line.calculation.unitPriceUnits)}
+                          </td>
+                          <td className="numeric">
+                            {formatBasisPointPercent(line.calculation.taxRateBps)}%
+                          </td>
+                          <td className="numeric">{money(calculated.grossMinor)}</td>
+                        </>
+                      )
+                    })()
+                  ) : unresolvedPolicy ? (
+                    <>
+                      <td className="numeric">—</td>
+                      <td className="numeric">—</td>
+                      <td className="numeric">—</td>
+                      <td className="numeric">—</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="numeric">{line.quantity}</td>
+                      <td className="numeric">{money(line.unitCents)}</td>
+                      <td className="numeric">{localePercent(line.taxBps)}</td>
+                      <td className="numeric">{money(lineTotals(line).total)}</td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -1463,16 +1668,28 @@ function DocumentDetail({
         <div className="detail-totals">
           <div>
             <span>{t('Subtotal')}</span>
-            <strong>{money(doc.subtotal)}</strong>
+            <strong>{money(resolvedPolicy ? doc.calculation!.netMinor : doc.subtotal)}</strong>
           </div>
           <div>
             <span>{t('VAT')}</span>
-            <strong>{money(doc.tax)}</strong>
+            <strong>{money(resolvedPolicy ? doc.calculation!.taxMinor : doc.tax)}</strong>
           </div>
           <div className="grand-total">
             <span>{t('Total')}</span>
-            <strong>{money(doc.total)}</strong>
+            <strong>{money(resolvedPolicy ? doc.calculation!.grossMinor : doc.total)}</strong>
           </div>
+          {resolvedPolicy &&
+            doc.calculation!.taxGroups.map((group) => (
+              <div key={group.taxRateBps}>
+                <span>
+                  {t('Tax rounding adjustment')} · {formatBasisPointPercent(group.taxRateBps)}%
+                </span>
+                <strong>{money(group.roundingAdjustment)}</strong>
+                <small>
+                  {t('Independent line tax')}: {money(group.independentLineTax)}
+                </small>
+              </div>
+            ))}
           {doc.status !== 'draft' && (
             <>
               <div>
@@ -1481,7 +1698,13 @@ function DocumentDetail({
               </div>
               <div className="grand-total">
                 <span>{t('Amount due')}</span>
-                <strong>{money(doc.total - doc.paid)}</strong>
+                <strong>
+                  {money(
+                    resolvedPolicy
+                      ? BigInt(doc.calculation!.grossMinor) - BigInt(doc.paid)
+                      : doc.total - doc.paid,
+                  )}
+                </strong>
               </div>
             </>
           )}
@@ -1580,14 +1803,29 @@ function DraftEditor({
           date: initial.date,
           dueDate: initial.dueDate,
           lines: initial.lines.map((line) => ({ ...line })),
+          calculationPolicy: initial.calculationPolicy,
         },
   )
   const locale = useLocale()
+  const [policyLines, setPolicyLines] = useState(() =>
+    draft.lines.map((line) => policyLineEditor(line, locale)),
+  )
   const [prices, setPrices] = useState(() =>
     draft.lines.map((line) => moneyEdit(line.unitCents, locale)),
   )
   useEffect(() => {
     setPrices((values) => values.map((value) => switchMoneyEdit(value, locale)))
+    setPolicyLines((values) =>
+      values.map((line) => ({
+        quantity: switchScaledDecimalEdit(line.quantity, locale),
+        unitPrice: switchScaledDecimalEdit(line.unitPrice, locale),
+        fixedDiscount: switchScaledDecimalEdit(line.fixedDiscount, locale),
+        percentageDiscounts: line.percentageDiscounts.map((rate) =>
+          switchScaledDecimalEdit(rate, locale),
+        ),
+        taxRate: switchScaledDecimalEdit(line.taxRate, locale),
+      })),
+    )
   }, [locale])
   const [localError, setLocalError] = useState('')
   const savedSelection =
@@ -1602,16 +1840,34 @@ function DraftEditor({
       ...d,
       lines: d.lines.map((line, i) => (i === index ? { ...line, ...patch } : line)),
     }))
+  const setPolicyLine = (index: number, patch: Partial<PolicyLineEditor>) =>
+    setPolicyLines((values) =>
+      values.map((line, i) => (i === index ? { ...line, ...patch } : line)),
+    )
   let total = 0n
   let previewValid = true
-  try {
-    total = draft.lines.reduce(
-      (sum, line, index) =>
-        sum + lineTotals({ ...line, unitCents: moneyEditCents(prices[index]) }).total,
-      0n,
-    )
-  } catch {
-    previewValid = false
+  let policyPreview: ReturnType<typeof calculatePolicyPreview> | undefined
+  let previewError = ''
+  if (draft.calculationPolicy) {
+    try {
+      policyPreview = calculatePolicyPreview(
+        draft.lines.map((line, index) => policyLineData(policyLines[index], line.calculation)),
+      )
+      total = BigInt(policyPreview.grossMinor)
+    } catch (error) {
+      previewValid = false
+      previewError = error instanceof Error ? error.message : 'Check exact calculation inputs.'
+    }
+  } else {
+    try {
+      total = draft.lines.reduce(
+        (sum, line, index) =>
+          sum + lineTotals({ ...line, unitCents: moneyEditCents(prices[index]) }).total,
+        0n,
+      )
+    } catch {
+      previewValid = false
+    }
   }
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -1620,10 +1876,18 @@ function DraftEditor({
       await onSave(
         {
           ...draft,
-          lines: draft.lines.map((line, index) => ({
-            ...line,
-            unitCents: moneyEditCents(prices[index]),
-          })),
+          lines: draft.calculationPolicy
+            ? draft.lines.map((line, index) => ({
+                ...line,
+                quantity: 0,
+                unitCents: 0,
+                taxBps: 0,
+                calculation: policyLineData(policyLines[index], line.calculation),
+              }))
+            : draft.lines.map((line, index) => ({
+                ...line,
+                unitCents: moneyEditCents(prices[index]),
+              })),
         },
         review ? { reviewed, acceptMismatch } : undefined,
       )
@@ -1668,6 +1932,28 @@ function DraftEditor({
               <p className="dialog-intro">
                 {t('Start with a draft. You can review and edit it before posting.')}
               </p>
+              {typeof initial === 'string' && !review && (
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(draft.calculationPolicy)}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        calculationPolicy: event.target.checked ? exactPolicy : undefined,
+                      }))
+                    }
+                  />
+                  <span>{t('Use exact fixed calculation policy')}</span>
+                </label>
+              )}
+              {draft.calculationPolicy && (
+                <p role="status">
+                  {t(
+                    'This is an explicit opt-in for new drafts. Existing drafts keep their recognized calculation policy.',
+                  )}
+                </p>
+              )}
               <p role="status">
                 {t('Partner capture')}:{' '}
                 {captured?.sourceVersion
@@ -1832,11 +2118,20 @@ function DraftEditor({
               </div>
               <div className="line-heading">
                 <h3>{kind === 'bill' ? t('Bill lines') : t('Invoice lines')}</h3>
-                <span>{t('EUR · VAT rounded per line')}</span>
+                <span>
+                  {draft.calculationPolicy
+                    ? t('EUR · exact fixed policy')
+                    : t('EUR · VAT rounded per line')}
+                </span>
               </div>
               <div className="editor-lines">
                 {draft.lines.map((line, index) => (
-                  <div className="editor-line" key={index}>
+                  <div
+                    className={
+                      draft.calculationPolicy ? 'editor-line policy-editor-line' : 'editor-line'
+                    }
+                    key={line.calculation?.lineId ?? index}
+                  >
                     <label>
                       {t('Description')}
                       <input
@@ -1858,51 +2153,172 @@ function DraftEditor({
                         onChange={(event) => setLine(index, { accountCode: event.target.value })}
                       />
                     </label>
-                    <label>
-                      {t('Qty')}
-                      <input
-                        aria-label={t('Line {n} quantity', { n: index + 1 })}
-                        required
-                        type="number"
-                        min="1"
-                        max="10000"
-                        step="1"
-                        value={line.quantity}
-                        onChange={(e) => setLine(index, { quantity: Number(e.target.value) })}
-                      />
-                    </label>
-                    <label>
-                      {t('Unit price')}
-                      <input
-                        aria-label={t('Line {n} unit price', { n: index + 1 })}
-                        required
-                        inputMode="decimal"
-                        value={prices[index].text}
-                        onChange={(e) =>
-                          setPrices((values) =>
-                            values.map((value, i) =>
-                              i === index ? { text: e.target.value, locale } : value,
-                            ),
-                          )
-                        }
-                      />
-                    </label>
-                    <label>
-                      {t('VAT')}
-                      <select
-                        aria-label={t('Line {n} VAT', { n: index + 1 })}
-                        value={line.taxBps}
-                        onChange={(e) => setLine(index, { taxBps: Number(e.target.value) })}
-                      >
-                        {[...new Set([0, 600, 1200, 2100, line.taxBps])]
-                          .sort((a, b) => a - b)
-                          .map((rate) => (
-                            <option key={rate} value={rate}>
-                              {localePercent(rate)}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
+                    {draft.calculationPolicy ? (
+                      <div className="form-grid" style={{ gridColumn: '1 / -2' }}>
+                        <label>
+                          {t('Quantity (up to 4 decimals)')}
+                          <input
+                            aria-label={t('Line {n} quantity', { n: index + 1 })}
+                            required
+                            inputMode="decimal"
+                            value={policyLines[index].quantity.text}
+                            onChange={(event) =>
+                              setPolicyLine(index, {
+                                quantity: { text: event.target.value, locale },
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          {t('Unit price (up to 4 decimals)')}
+                          <input
+                            aria-label={t('Line {n} unit price', { n: index + 1 })}
+                            required
+                            inputMode="decimal"
+                            value={policyLines[index].unitPrice.text}
+                            onChange={(event) =>
+                              setPolicyLine(index, {
+                                unitPrice: { text: event.target.value, locale },
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          {t('Fixed line discount (up to 4 decimals)')}
+                          <input
+                            aria-label={t('Line {n} fixed discount', { n: index + 1 })}
+                            required
+                            inputMode="decimal"
+                            value={policyLines[index].fixedDiscount.text}
+                            onChange={(event) =>
+                              setPolicyLine(index, {
+                                fixedDiscount: { text: event.target.value, locale },
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          {t('Tax rate (%)')}
+                          <input
+                            aria-label={t('Line {n} VAT', { n: index + 1 })}
+                            required
+                            inputMode="decimal"
+                            value={policyLines[index].taxRate.text}
+                            onChange={(event) =>
+                              setPolicyLine(index, {
+                                taxRate: { text: event.target.value, locale },
+                              })
+                            }
+                          />
+                          <small>
+                            {t('Rates accept exact basis-point values; no rounding is applied.')}
+                          </small>
+                        </label>
+                        {policyLines[index].percentageDiscounts.map((rate, rateIndex) => (
+                          <label key={rateIndex}>
+                            {t('Percentage discount {n}', { n: rateIndex + 1 })}
+                            <span className="input-suffix">
+                              <input
+                                aria-label={t('Line {n} percentage discount {m}', {
+                                  n: index + 1,
+                                  m: rateIndex + 1,
+                                })}
+                                required
+                                inputMode="decimal"
+                                value={rate.text}
+                                onChange={(event) =>
+                                  setPolicyLine(index, {
+                                    percentageDiscounts: policyLines[index].percentageDiscounts.map(
+                                      (value, i) =>
+                                        i === rateIndex
+                                          ? { text: event.target.value, locale }
+                                          : value,
+                                    ),
+                                  })
+                                }
+                              />
+                              <span>%</span>
+                            </span>
+                            <button
+                              type="button"
+                              className="text-button"
+                              onClick={() =>
+                                setPolicyLine(index, {
+                                  percentageDiscounts: policyLines[
+                                    index
+                                  ].percentageDiscounts.filter((_, i) => i !== rateIndex),
+                                })
+                              }
+                            >
+                              {t('Remove percentage discount {n}', { n: rateIndex + 1 })}
+                            </button>
+                          </label>
+                        ))}
+                        <button
+                          type="button"
+                          className="text-button"
+                          disabled={policyLines[index].percentageDiscounts.length >= 4}
+                          onClick={() =>
+                            setPolicyLine(index, {
+                              percentageDiscounts: [
+                                ...policyLines[index].percentageDiscounts,
+                                scaledDecimalEdit('0', locale),
+                              ],
+                            })
+                          }
+                        >
+                          {t('Add percentage discount')}
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <label>
+                          {t('Qty')}
+                          <input
+                            aria-label={t('Line {n} quantity', { n: index + 1 })}
+                            required
+                            type="number"
+                            min="1"
+                            max="10000"
+                            step="1"
+                            value={line.quantity}
+                            onChange={(e) => setLine(index, { quantity: Number(e.target.value) })}
+                          />
+                        </label>
+                        <label>
+                          {t('Unit price')}
+                          <input
+                            aria-label={t('Line {n} unit price', { n: index + 1 })}
+                            required
+                            inputMode="decimal"
+                            value={prices[index].text}
+                            onChange={(e) =>
+                              setPrices((values) =>
+                                values.map((value, i) =>
+                                  i === index ? { text: e.target.value, locale } : value,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                        <label>
+                          {t('VAT')}
+                          <select
+                            aria-label={t('Line {n} VAT', { n: index + 1 })}
+                            value={line.taxBps}
+                            onChange={(e) => setLine(index, { taxBps: Number(e.target.value) })}
+                          >
+                            {[...new Set([0, 600, 1200, 2100, line.taxBps])]
+                              .sort((a, b) => a - b)
+                              .map((rate) => (
+                                <option key={rate} value={rate}>
+                                  {localePercent(rate)}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                      </>
+                    )}
                     <button
                       type="button"
                       className="icon-button"
@@ -1911,6 +2327,7 @@ function DraftEditor({
                       onClick={() => {
                         setDraft((d) => ({ ...d, lines: d.lines.filter((_, i) => i !== index) }))
                         setPrices((p) => p.filter((_, i) => i !== index))
+                        setPolicyLines((values) => values.filter((_, i) => i !== index))
                       }}
                     >
                       <Xmark />
@@ -1925,6 +2342,7 @@ function DraftEditor({
                 onClick={() => {
                   setDraft((d) => ({ ...d, lines: [...d.lines, { ...blank }] }))
                   setPrices((p) => [...p, moneyEdit(0, locale)])
+                  setPolicyLines((values) => [...values, blankPolicyLine(locale)])
                 }}
               >
                 <Plus />
@@ -1934,6 +2352,34 @@ function DraftEditor({
                 <span>{t('Total including VAT')}</span>
                 <strong>{previewValid ? money(total) : t('Check line amounts')}</strong>
               </div>
+              {draft.calculationPolicy && policyPreview && (
+                <>
+                  <div className="editor-total">
+                    <span>{t('Subtotal')}</span>
+                    <strong>{money(policyPreview.netMinor)}</strong>
+                  </div>
+                  <div className="editor-total">
+                    <span>{t('VAT')}</span>
+                    <strong>{money(policyPreview.taxMinor)}</strong>
+                  </div>
+                  {policyPreview.taxGroups.map((group) => (
+                    <p key={group.taxRateBps}>
+                      {t('Tax rounding adjustment')} · {formatBasisPointPercent(group.taxRateBps)}%:{' '}
+                      {money(group.roundingAdjustment)} · {t('Independent line tax')}:{' '}
+                      {money(group.independentLineTax)}
+                    </p>
+                  ))}
+                  <p>
+                    {t('Line tax allocation is assigned after saving the draft.')}{' '}
+                    {t('The server assigns stable line IDs when the draft is saved.')}
+                  </p>
+                </>
+              )}
+              {draft.calculationPolicy && !previewValid && (
+                <p className="form-error" role="alert">
+                  {messageText(previewError)}
+                </p>
+              )}
               {review && (
                 <>
                   {review.scan.total > 0 && previewValid && total !== BigInt(review.scan.total) && (
@@ -1992,8 +2438,10 @@ function DraftEditor({
               type="submit"
               className="button primary"
               disabled={
-                Boolean(review) &&
-                (!reviewed || Boolean(review?.scan.currency && review.scan.currency !== 'EUR'))
+                (Boolean(review) &&
+                  (!reviewed ||
+                    Boolean(review?.scan.currency && review.scan.currency !== 'EUR'))) ||
+                (Boolean(draft.calculationPolicy) && !previewValid)
               }
             >
               {busy ? t('Saving…') : t('Save draft')}
@@ -2019,14 +2467,15 @@ function PaymentEditor({
   onClose: () => void
   onSave: (input: {
     id: string
-    amount: number
+    amount: number | string
     date: string
     reference: string
   }) => Promise<boolean>
 }) {
   const [id] = useState(() => crypto.randomUUID())
   const locale = useLocale()
-  const [amount, setAmount] = useState(() => moneyEdit(doc.total - doc.paid, locale))
+  const outstanding = () => BigInt(doc.calculation?.grossMinor ?? doc.total) - BigInt(doc.paid)
+  const [amount, setAmount] = useState(() => moneyEdit(Number(outstanding()), locale))
   useEffect(() => {
     setAmount((value) => switchMoneyEdit(value, locale))
   }, [locale])
@@ -2037,7 +2486,13 @@ function PaymentEditor({
     event.preventDefault()
     setLocalError('')
     try {
-      await onSave({ id, amount: moneyEditCents(amount), date, reference })
+      const cents = moneyEditCents(amount)
+      await onSave({
+        id,
+        amount: doc.calculationPolicy ? String(cents) : cents,
+        date,
+        reference,
+      })
     } catch (error) {
       setLocalError(errorMessage(error))
     }
@@ -2052,7 +2507,7 @@ function PaymentEditor({
           <div className="dialog-body">
             <p className="dialog-intro">
               {t('Outstanding for')} <strong>{doc.partner}</strong>:{' '}
-              <strong>{money(doc.total - doc.paid)}</strong>
+              <strong>{money(outstanding())}</strong>
             </p>
             <div className="form-grid">
               <label>

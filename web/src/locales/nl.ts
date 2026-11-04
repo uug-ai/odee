@@ -394,6 +394,110 @@ export const nl = {
   'Bill lines': 'Leveranciersfactuurregels',
   'Invoice lines': 'Klantfactuurregels',
   'EUR · VAT rounded per line': 'EUR · Btw afgerond per regel',
+  'EUR · exact fixed policy': 'EUR · exact vast beleid',
+  'Use exact fixed calculation policy': 'Gebruik exact vast rekenbeleid',
+  'This is an explicit opt-in for new drafts. Existing drafts keep their recognized calculation policy.':
+    'Dit is een expliciete keuze voor nieuwe concepten. Bestaande concepten behouden hun herkende rekenbeleid.',
+  'Calculation policy {policy} · schema {version} · {currency} exponent {exponent}':
+    'Rekenbeleid {policy} · schema {version} · {currency}-exponent {exponent}',
+  'Calculation policy history is unresolved.': 'De geschiedenis van het rekenbeleid is onopgelost.',
+  'Net rounding residue {fraction}': 'Netto-afrondingsverschil {fraction}',
+  'The server assigns stable line IDs when the draft is saved.':
+    'De server kent vaste regel-ID’s toe wanneer het concept wordt opgeslagen.',
+  'recognized calculation policy cannot be removed or converted implicitly':
+    'Een herkend rekenbeleid kan niet impliciet worden verwijderd of omgezet',
+  'calculation line data requires an explicit calculation policy':
+    'Regelgegevens voor berekening vereisen een expliciet rekenbeleid',
+  "payment amount must use the document's canonical minor-unit encoding":
+    'Het betalingsbedrag moet de canonieke kleinste valuta-eenheid van het document gebruiken',
+  'Calculation inputs': 'Rekeninvoer',
+  'Quantity (up to 4 decimals)': 'Aantal (maximaal 4 decimalen)',
+  'Unit price (up to 4 decimals)': 'Eenheidsprijs (maximaal 4 decimalen)',
+  'Fixed line discount (up to 4 decimals)': 'Vaste regelkorting (maximaal 4 decimalen)',
+  'Line {n} fixed discount': 'Regel {n} vaste korting',
+  'Line {n} percentage discount {m}': 'Regel {n} kortingspercentage {m}',
+  'Percentage discount {n}': 'Kortingspercentage {n}',
+  'Add percentage discount': 'Kortingspercentage toevoegen',
+  'Remove percentage discount {n}': 'Kortingspercentage {n} verwijderen',
+  'Tax rate (%)': 'Btw-tarief (%)',
+  'Rates accept exact basis-point values; no rounding is applied.':
+    'Tarieven moeten exact op basispunten uitkomen; er wordt niet afgerond.',
+  'Tax rounded by rate group': 'Btw afgerond per tariefgroep',
+  'Calculated subtotal': 'Berekend subtotaal',
+  'Calculated tax': 'Berekende btw',
+  'Calculated total': 'Berekend totaal',
+  'Tax rounding adjustment': 'Btw-afrondingscorrectie',
+  'Independent line tax': 'Afzonderlijk afgeronde btw per regel',
+  'Rounded line net': 'Afgerond regelnetto',
+  'Allocated line tax': 'Toegewezen regel-btw',
+  'Line tax allocation is assigned after saving the draft.':
+    'De toewijzing van btw per regel wordt bepaald nadat het concept is opgeslagen.',
+  'Check exact calculation inputs.': 'Controleer de exacte rekeninvoer.',
+  'Enter a nonnegative number with up to four decimal places in the current locale.':
+    'Voer een niet-negatief getal in met maximaal vier decimalen volgens de huidige taalinstelling.',
+  'Percentage rates must resolve to whole basis points.':
+    'Percentages moeten exact overeenkomen met hele basispunten.',
+  'Percentage rates must be between zero and one hundred.':
+    'Percentages moeten tussen nul en honderd liggen.',
+  'scaled values must be canonical JSON decimal strings':
+    'Geschaalde waarden moeten canonieke JSON-decimale tekenreeksen zijn',
+  'calculation policy identity or currency is unsupported':
+    'De identiteit of valuta van het rekenbeleid wordt niet ondersteund',
+  'legacy policy conversion is unsupported; the document was not changed':
+    'Omzetting van het bestaande beleid wordt niet ondersteund; het document is niet gewijzigd',
+  'calculation policy cannot be replaced implicitly':
+    'Het rekenbeleid kan niet impliciet worden vervangen',
+  'calculation policy history is unresolved': 'De geschiedenis van het rekenbeleid is onopgelost',
+  'a calculation-policy document needs 1 to 100 lines':
+    'Een document met rekenbeleid moet 1 tot 100 regels bevatten',
+  'new-policy lines must use canonical calculation fields, not legacy numeric fields':
+    'Regels met nieuw beleid moeten canonieke rekenvelden gebruiken, niet de oude numerieke velden',
+  'each new-policy line needs calculation inputs':
+    'Elke regel met nieuw beleid vereist rekeninvoer',
+  'line ID is unknown for this draft': 'De regel-ID is onbekend voor dit concept',
+  'line IDs must be unique within the document': 'Regel-ID’s moeten uniek zijn binnen het document',
+  'scaled integer is empty': 'Het geschaalde gehele getal is leeg',
+  'scaled integer is not canonical or exceeds int64':
+    'Het geschaalde gehele getal is niet canoniek of overschrijdt int64',
+  'calculation policy supports EUR with exponent 2 only':
+    'Het rekenbeleid ondersteunt alleen EUR met exponent 2',
+  'calculation document needs 1 to 100 lines': 'Een rekendocument moet 1 tot 100 regels bevatten',
+  'line ID must be nonempty valid UTF-8': 'De regel-ID moet geldige, niet-lege UTF-8 zijn',
+  'quantity, price, discount, or tax rate is outside policy bounds':
+    'Aantal, prijs, korting of btw-tarief valt buiten de grenzen van het beleid',
+  'percentage discount is outside policy bounds':
+    'Het kortingspercentage valt buiten de beleidsgrenzen',
+  'pre-discount line extension exceeds the supported bound':
+    'Het regelbedrag vóór korting overschrijdt de ondersteunde grens',
+  'fixed line discount exceeds the exact line extension':
+    'De vaste regelkorting overschrijdt het exacte regelbedrag',
+  'calculation intermediate exceeds the supported precision':
+    'Een tussenresultaat van de berekening overschrijdt de ondersteunde precisie',
+  'settled line net exceeds the supported amount':
+    'Het afgeronde regelnetto overschrijdt het ondersteunde bedrag',
+  'line rounding residue exceeds the supported precision':
+    'Het afrondingsverschil van de regel overschrijdt de ondersteunde precisie',
+  'document net exceeds the supported amount':
+    'Het documentnetto overschrijdt het ondersteunde bedrag',
+  'tax rounding adjustment overflows': 'De btw-afrondingscorrectie loopt over',
+  'tax group net overflows': 'Het nettobedrag van de btw-groep loopt over',
+  'document tax exceeds the supported amount':
+    'De document-btw overschrijdt het ondersteunde bedrag',
+  'line gross overflows': 'Het brutobedrag van de regel loopt over',
+  'document gross is zero or exceeds the supported amount':
+    'Het documentbruto is nul of overschrijdt het ondersteunde bedrag',
+  'tax intermediate exceeds the supported precision':
+    'Een btw-tussenresultaat overschrijdt de ondersteunde precisie',
+  'tax group intermediate exceeds the supported precision':
+    'Een tussenresultaat van de btw-groep overschrijdt de ondersteunde precisie',
+  'independent line tax sum overflows': 'De som van afzonderlijk afgeronde regel-btw loopt over',
+  'tax group exceeds the supported amount': 'De btw-groep overschrijdt het ondersteunde bedrag',
+  'allocated tax floor sum overflows': 'De som van de toegewezen btw-ondergrenzen loopt over',
+  'tax allocation remainder is outside the supported range':
+    'Het restant van de btw-toewijzing valt buiten het ondersteunde bereik',
+  'rounding requires a bounded nonnegative exact value':
+    'Afronden vereist een begrensde, niet-negatieve exacte waarde',
+  'rounded amount exceeds int64': 'Het afgeronde bedrag overschrijdt int64',
   'Line {n} description': 'Regel {n} omschrijving',
   'Line {n} quantity': 'Regel {n} aantal',
   'Line {n} unit price': 'Regel {n} eenheidsprijs',
