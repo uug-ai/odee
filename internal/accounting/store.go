@@ -156,6 +156,7 @@ func (s *MongoStore) Save(ctx context.Context, doc Document, version int64) erro
 		"status": doc.Status, "entries": doc.Entries, "payments": doc.Payments, "paid": doc.Paid,
 		"partnerSnapshot": doc.PartnerSnapshot, "ownCompanySnapshot": doc.OwnCompanySnapshot,
 		"configurationSelection": doc.ConfigurationSelection, "journalCode": doc.JournalCode, "financialSnapshot": doc.FinancialSnapshot,
+		"calculationPolicy": doc.CalculationPolicy, "calculation": doc.Calculation,
 	}}
 	if doc.pendingEvent != nil {
 		filter["status"] = "draft"
@@ -190,6 +191,16 @@ func NewMemoryStore() *MemoryStore {
 }
 
 func clone(doc Document) Document {
+	if doc.CalculationPolicy != nil {
+		value := *doc.CalculationPolicy
+		doc.CalculationPolicy = &value
+	}
+	if doc.Calculation != nil {
+		value := *doc.Calculation
+		value.Lines = append([]CalculationLineResult{}, doc.Calculation.Lines...)
+		value.TaxGroups = append([]CalculationTaxGroupResult{}, doc.Calculation.TaxGroups...)
+		doc.Calculation = &value
+	}
 	if doc.ConfigurationSelection != nil {
 		value := copyConfiguration(*doc.ConfigurationSelection)
 		doc.ConfigurationSelection = &value
@@ -214,6 +225,13 @@ func clone(doc Document) Document {
 		doc.pendingEvent = &event
 	}
 	doc.Lines = append([]Line{}, doc.Lines...)
+	for i := range doc.Lines {
+		if doc.Lines[i].Calculation != nil {
+			value := *doc.Lines[i].Calculation
+			value.PercentageDiscountBPS = append([]ScaledInteger{}, doc.Lines[i].Calculation.PercentageDiscountBPS...)
+			doc.Lines[i].Calculation = &value
+		}
+	}
 	doc.Entries = append([]Entry{}, doc.Entries...)
 	doc.Payments = append([]Payment{}, doc.Payments...)
 	for i := range doc.Payments {

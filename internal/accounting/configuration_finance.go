@@ -11,7 +11,7 @@ import (
 
 func selectedConfiguration(ctx context.Context, store Store, doc Document) (ConfigurationData, error) {
 	if doc.ConfigurationSelection == nil || doc.ConfigurationSelection.Policy == starterPolicy {
-		if !legacyShape(doc) {
+		if !legacyShape(doc) && !recognizedCalculationPolicy(doc) {
 			return ConfigurationData{}, invalid("financial meaning is unknown; reconcile before changing this document")
 		}
 		return starterConfiguration(), nil
@@ -73,6 +73,9 @@ func configuredEntries(kind string, total, subtotal, tax int64, data Configurati
 	return entries
 }
 func legacyShape(d Document) bool {
+	if d.hasCalculationPolicyData() {
+		return false
+	}
 	if d.ConfigurationSelection != nil {
 		selection := starterSelection()
 		if !reflect.DeepEqual(*d.ConfigurationSelection, selection) {
@@ -93,7 +96,10 @@ func legacyShape(d Document) bool {
 	}
 	copy := d
 	copy.Status = "draft"
-	if err := copy.SetDraft(Draft{d.Kind, d.Partner, d.Email, d.Reference, d.Date, d.DueDate, d.Lines}); err != nil || copy.Total != d.Total || copy.Subtotal != d.Subtotal || copy.Tax != d.Tax {
+	if err := copy.SetDraft(Draft{
+		Kind: d.Kind, Partner: d.Partner, Email: d.Email, Reference: d.Reference,
+		Date: d.Date, DueDate: d.DueDate, Lines: d.Lines,
+	}); err != nil || copy.Total != d.Total || copy.Subtotal != d.Subtotal || copy.Tax != d.Tax {
 		return false
 	}
 	if d.Status == "draft" {
@@ -175,8 +181,11 @@ func (d Document) snapshot(data ConfigurationData) (*FinancialSnapshot, error) {
 	return frozen, nil
 }
 func (d Document) frozenConfiguration() (ConfigurationData, error) {
+	if d.hasCalculationPolicyData() && !recognizedCalculationPolicy(d) {
+		return ConfigurationData{}, invalid("calculation policy history is unresolved")
+	}
 	if d.FinancialSnapshot == nil {
-		if !legacyShape(d) {
+		if !legacyShape(d) && !recognizedCalculationPolicy(d) {
 			return ConfigurationData{}, invalid("financial meaning is unknown; reconcile before changing this document")
 		}
 		return starterConfiguration(), nil
@@ -187,7 +196,7 @@ func (d Document) frozenConfiguration() (ConfigurationData, error) {
 		return data, invalid("frozen financial meaning integrity check failed")
 	}
 	if f.Selection.Policy != "" {
-		if f.Selection.Policy != starterPolicy || !legacyShape(d) {
+		if f.Selection.Policy != starterPolicy || (!legacyShape(d) && !recognizedCalculationPolicy(d)) {
 			return data, invalid("frozen financial meaning integrity check failed")
 		}
 	} else if f.Selection.VersionID == nil || f.Selection.VersionID.IsZero() || len(f.Selection.Digest) != 64 {

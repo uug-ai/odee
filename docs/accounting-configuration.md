@@ -313,6 +313,9 @@ Reuse `/accounting/accounts` for accessible stage editor, explicit Publish and
 Make default actions, immutable version review and readiness diagnostics; retain
 007 legal settings separately. Display expected stage/default revisions and
 publication source revision, never misleading “latest approved chart” language.
+Keep the stage editor, Publish and Make default disabled while a workspace
+refresh is pending, so actions cannot submit the pre-refresh revisions or data.
+Resume explicit actions after refresh; never automatically retry a stale write.
 Show the selected binding/journal on draft and document views, explicit
 draft-only rebind confirmation, and unresolved line/mapping errors. Rebind is
 an intentional saved action; cancelling has no write. Old drafts remain

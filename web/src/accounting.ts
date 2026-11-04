@@ -15,7 +15,7 @@ export function decimal(value: number) {
   return `${Math.floor(value / 100)}.${String(value % 100).padStart(2, '0')}`
 }
 
-export function money(value: number | bigint): string {
+export function money(value: number | bigint | string): string {
   const amount = BigInt(value)
   const absolute = amount < 0n ? -amount : amount
   const dutch = getLocale() === 'nl'
