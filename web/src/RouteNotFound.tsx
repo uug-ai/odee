@@ -1,23 +1,20 @@
 import { useEffect, useRef } from 'react'
+import { catalogs, detectLocale, useLocale } from './i18n'
 
-export const routeMessages = (locale: string) =>
-  locale.toLowerCase().startsWith('nl')
-    ? {
-        language: 'nl',
-        title: 'Pagina niet gevonden',
-        description: 'Deze pagina bestaat niet of de app is nog niet beschikbaar.',
-        launcher: 'Terug naar de werkruimte',
-      }
-    : {
-        language: 'en',
-        title: 'Page not found',
-        description: 'This page does not exist or the app is not available yet.',
-        launcher: 'Back to workspace',
-      }
+export const routeMessages = (locale: string) => {
+  const language = detectLocale(null, [locale])
+  const catalog = catalogs[language]
+  return {
+    language,
+    title: catalog['Page not found'],
+    description: catalog['This page does not exist or the app is not available yet.'],
+    launcher: catalog['Back to workspace'],
+  }
+}
 
 export function RouteNotFound({ onLauncher }: { onLauncher: () => void }) {
   const title = useRef<HTMLHeadingElement>(null)
-  const messages = routeMessages(navigator.language)
+  const messages = routeMessages(useLocale())
   useEffect(() => title.current?.focus(), [])
   return (
     <section className="empty" lang={messages.language} aria-labelledby="route-not-found">

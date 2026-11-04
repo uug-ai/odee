@@ -196,6 +196,7 @@ async function isolated() {
       const context = await browser.newContext({
         proxy: transport.proxy,
         serviceWorkers: 'block',
+        locale: 'en-GB',
       })
       const page = await context.newPage()
       page.setDefaultTimeout(10000)
@@ -423,7 +424,7 @@ async function isolated() {
           capabilities,
           async ({ page, api }) => {
             await expect(
-              page.getByRole('heading', { name: 'Access forbidden / Toegang geweigerd' }),
+              page.getByRole('heading', { name: 'Access forbidden', exact: true }),
             ).toBeVisible()
             await expect(page.getByLabel('Company access token')).toHaveCount(0)
             const session = await (await api('session')).json()
@@ -458,7 +459,7 @@ async function isolated() {
     await test('mocked GitHub unmapped 403 retains logout and never becomes token login', async () => {
       await fixture('github', null, async ({ page, api }) => {
         await expect(
-          page.getByRole('heading', { name: 'Access forbidden / Toegang geweigerd' }),
+          page.getByRole('heading', { name: 'Access forbidden', exact: true }),
         ).toBeVisible()
         await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
         await expect(page.getByLabel('Company access token')).toHaveCount(0)

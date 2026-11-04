@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+test.use({ locale: 'en-GB' })
+
 const session = {
   authMode: 'github',
   authenticated: true,
@@ -193,12 +195,8 @@ test('authenticated business-read 403 is an actionable forbidden page, not expir
     }),
   )
   await page.goto('/')
-  await expect(
-    page.getByRole('heading', { name: 'Access forbidden / Toegang geweigerd' }),
-  ).toBeVisible()
-  await expect(
-    page.getByRole('button', { name: 'Refresh permissions / Rechten vernieuwen' }),
-  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Access forbidden', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Refresh permissions', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: /Sign in with GitHub/ })).toHaveCount(0)
   await expect(page.getByLabel('Company access token')).toHaveCount(0)

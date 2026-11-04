@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+test.use({ locale: 'en-GB' })
+
 const company = {
   name: 'Imported Example Company',
   isCompany: true,

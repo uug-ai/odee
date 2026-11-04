@@ -12,6 +12,37 @@
   --heading: Outfit, system-ui, sans-serif;
 }
 
+.locale-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.locale-switch select {
+  width: auto;
+  padding: 6px;
+  min-width: 90px;
+}
+.dialog-heading {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+@media (max-width: 760px) {
+  .topbar-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .locale-switch > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
 .app-icon.contacts-icon {
   background: linear-gradient(135deg, #008f83, #32b8a0);
 }

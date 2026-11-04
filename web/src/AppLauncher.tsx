@@ -1,12 +1,13 @@
 import { ArrowRight, ShieldCheck } from 'iconoir-react'
 import { modules, type View } from './modules'
+import { t } from './i18n'
 
 export function AppLauncher({ onNavigate }: { onNavigate: (view: View) => void }) {
   return (
     <div className="launcher">
-      <div className="eyebrow">ODEE / WORKSPACE</div>
-      <h1>Good work starts here.</h1>
-      <p className="lead">One workspace for your business. Open by design.</p>
+      <div className="eyebrow">{t('ODEE / WORKSPACE')}</div>
+      <h1>{t('Good work starts here.')}</h1>
+      <p className="lead">{t('One workspace for your business. Open by design.')}</p>
       <div className="launcher-grid">
         {modules.map((module) => {
           const Icon = module.icon
@@ -19,10 +20,10 @@ export function AppLauncher({ onNavigate }: { onNavigate: (view: View) => void }
               <div className={`app-icon${module.iconClassName ? ` ${module.iconClassName}` : ''}`}>
                 <Icon />
               </div>
-              <h2>{module.name}</h2>
-              <p>{module.description}</p>
+              <h2>{t(module.name)}</h2>
+              <p>{t(module.description)}</p>
               <span className="tile-link">
-                {module.openLabel} <ArrowRight />
+                {t(module.openLabel)} <ArrowRight />
               </span>
             </button>
           ) : (
@@ -30,9 +31,9 @@ export function AppLauncher({ onNavigate }: { onNavigate: (view: View) => void }
               <div className="planned-icon">
                 <Icon />
               </div>
-              <h2>{module.name}</h2>
-              <p>{module.description}</p>
-              <span className="badge">Planned</span>
+              <h2>{t(module.name)}</h2>
+              <p>{t(module.description)}</p>
+              <span className="badge">{t('Planned')}</span>
             </div>
           )
         })}
@@ -40,8 +41,8 @@ export function AppLauncher({ onNavigate }: { onNavigate: (view: View) => void }
       <div className="launcher-note">
         <ShieldCheck />
         <div>
-          <strong>Built on open foundations.</strong>
-          <p>MongoDB-backed accounting. No hidden spreadsheets, no vendor lock-in.</p>
+          <strong>{t('Built on open foundations.')}</strong>
+          <p>{t('MongoDB-backed accounting. No hidden spreadsheets, no vendor lock-in.')}</p>
         </div>
         <span>v0.1</span>
       </div>

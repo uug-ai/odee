@@ -2,9 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { ArrowRight, Building, Download, Plus, RefreshDouble, Search } from 'iconoir-react'
 import { Modal } from './Modal'
 import type { APIRequest, Contact, ContactData, OdooContactImport } from './types'
+import { getLocale, messageText, requestMessage, statusText, t } from './i18n'
+import { responseStatus } from './api'
+import { localizedValidation } from './form-validation'
 
-const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : 'Contact operation failed.'
+const errorMessage = (error: unknown) => requestMessage(error, responseStatus(error))
 const blank = (): ContactData => ({
   name: '',
   isCompany: true,
@@ -60,6 +62,11 @@ export function Contacts({
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [importResult, setImportResult] = useState<{
+    created: number
+    skipped: number
+    normalizedWebsites: number
+  } | null>(null)
   const visible = items
     .filter((item) => {
       if (filter === 'Archived' ? item.active : !item.active) return false
@@ -104,20 +111,20 @@ export function Contacts({
   return (
     <>
       <div className="breadcrumb">
-        <button onClick={onRefresh}>Workspace data</button>
+        <button onClick={onRefresh}>{t('Workspace data')}</button>
         <span>/</span>
-        <span>Contacts</span>
+        <span>{t('Contacts')}</span>
       </div>
       <div className="page-heading contacts-heading">
         <div>
-          <div className="eyebrow">YOUR BUSINESS RELATIONSHIPS</div>
-          <h1>Contacts</h1>
-          <p>Companies, people and the details that keep you connected.</p>
+          <div className="eyebrow">{t('YOUR BUSINESS RELATIONSHIPS')}</div>
+          <h1>{t('Contacts')}</h1>
+          <p>{t('Companies, people and the details that keep you connected.')}</p>
         </div>
         <div className="heading-actions">
           <button
             className="icon-button"
-            aria-label="Refresh contacts"
+            aria-label={t('Refresh contacts')}
             onClick={() => void onRefresh()}
           >
             <RefreshDouble />
@@ -127,11 +134,11 @@ export function Contacts({
             disabled={!canWrite}
             onClick={() => setImporting(true)}
           >
-            Import Odoo JSON
+            {t('Import Odoo JSON')}
           </button>
           <button className="button secondary" disabled={!items.length} onClick={exportContacts}>
             <Download />
-            Export JSON
+            {t('Export JSON')}
           </button>
           <button
             className="button primary"
@@ -142,22 +149,32 @@ export function Contacts({
             }}
           >
             <Plus />
-            New contact
+            {t('New contact')}
           </button>
         </div>
       </div>
       {error && (
         <p className="form-error" role="alert">
-          {error}
+          {messageText(error)}
         </p>
       )}
       {notice && (
         <div className="alert success" role="status">
-          {notice}
+          {messageText(notice)}
+        </div>
+      )}
+      {importResult && (
+        <div className="alert success" role="status">
+          {t(
+            'Odoo import finished: {created} created, {skipped} already present. Existing contacts were not overwritten.',
+            importResult,
+          )}
+          {importResult.normalizedWebsites > 0 &&
+            ` ${t('{count} website links normalized; source text retained.', { count: importResult.normalizedWebsites })}`}
         </div>
       )}
       <div className="contacts-toolbar panel">
-        <div className="filter-tabs" role="group" aria-label="Contact filters">
+        <div className="filter-tabs" role="group" aria-label={t('Contact filters')}>
           {['Active', 'Companies', 'People', 'Customers', 'Vendors', 'Archived'].map((value) => (
             <button
               key={value}
@@ -165,28 +182,32 @@ export function Contacts({
               onClick={() => setFilter(value)}
               className={filter === value ? 'active' : ''}
             >
-              {value}
+              {statusText(value)}
             </button>
           ))}
         </div>
         <label className="contact-search">
           <Search />
           <input
-            aria-label="Search contacts"
-            placeholder="Search name, email, VAT or address…"
+            aria-label={t('Search contacts')}
+            placeholder={t('Search name, email, VAT or address…')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
       </div>
       <p className="contact-count">
-        {visible.length} {filter.toLowerCase()} contacts · {items.length} total records
+        {statusText(filter)} ·{' '}
+        {t('{visible} contacts · {total} total records', {
+          visible: visible.length,
+          total: items.length,
+        })}
       </p>
       <div className="contact-grid">
         {visible.map((item) => (
           <button
             className={`contact-card ${!item.active ? 'archived' : ''}`}
-            aria-label={`Open contact ${item.name}`}
+            aria-label={t('Open contact {name}', { name: item.name })}
             key={item.id}
             onClick={() => {
               setSelected(item)
@@ -199,7 +220,7 @@ export function Contacts({
             <span className="contact-summary">
               <strong>{item.name}</strong>
               <span>
-                {item.isCompany ? 'Company' : 'Person'}
+                {item.isCompany ? t('Company') : t('Person')}
                 {item.companyName ? ` · ${item.companyName}` : ''}
               </span>
               {item.email && <span>{item.email}</span>}
@@ -208,8 +229,8 @@ export function Contacts({
                 <span>{[item.address.city, item.address.country].filter(Boolean).join(', ')}</span>
               )}
               <span className="contact-tags">
-                {item.customer && <em>Customer</em>}
-                {item.vendor && <em>Vendor</em>}
+                {item.customer && <em>{t('Customer')}</em>}
+                {item.vendor && <em>{t('Vendor')}</em>}
                 {item.tags.map((tag) => (
                   <em key={tag}>{tag}</em>
                 ))}
@@ -223,10 +244,11 @@ export function Contacts({
       {!visible.length && (
         <div className="empty panel">
           <Building />
-          <h3>{items.length ? 'No matching contacts.' : 'Your contacts start here.'}</h3>
+          <h3>{items.length ? t('No matching contacts.') : t('Your contacts start here.')}</h3>
           <p>
-            Create a contact or import your Odoo records. No sample contacts are added
-            automatically.
+            {t(
+              'Create a contact or import your Odoo records. No sample contacts are added automatically.',
+            )}
           </p>
         </div>
       )}
@@ -238,86 +260,95 @@ export function Contacts({
                 <Building />
               </span>
               <div>
-                <h3>{selected.isCompany ? 'Company' : 'Person'}</h3>
+                <h3>{selected.isCompany ? t('Company') : t('Person')}</h3>
                 <p>{selected.companyName}</p>
               </div>
-              <span className="badge">{selected.active ? 'Active' : 'Archived'}</span>
+              <span className="badge">{selected.active ? t('Active') : t('Archived')}</span>
             </div>
             <dl className="contact-details">
-              <dt>Email</dt>
+              <dt>{t('Email')}</dt>
               <dd>
                 {selected.email ? (
                   <a href={`mailto:${selected.email}`}>{selected.email}</a>
                 ) : (
-                  'Not set'
+                  t('Not set')
                 )}
               </dd>
-              <dt>Phone</dt>
+              <dt>{t('Phone')}</dt>
               <dd>
-                {selected.phone || 'Not set'}
+                {selected.phone || t('Not set')}
                 {selected.mobile && (
                   <>
                     <br />
-                    Mobile: {selected.mobile}
+                    {t('Mobile')}: {selected.mobile}
                   </>
                 )}
               </dd>
-              <dt>Website</dt>
+              <dt>{t('Website')}</dt>
               <dd>
                 {selected.website ? (
                   <a href={selected.website} target="_blank" rel="noreferrer">
                     {selected.website}
                   </a>
                 ) : (
-                  'Not set'
+                  t('Not set')
                 )}
               </dd>
-              <dt>Address</dt>
-              <dd className="postal-address">{addressText(selected) || 'Not set'}</dd>
-              <dt>Address type</dt>
-              <dd>{selected.type}</dd>
-              <dt>VAT / tax ID</dt>
-              <dd>{selected.vat || 'Not set'}</dd>
-              <dt>Reference</dt>
-              <dd>{selected.reference || 'Not set'}</dd>
-              <dt>Relationships</dt>
+              <dt>{t('Address')}</dt>
+              <dd className="postal-address">{addressText(selected) || t('Not set')}</dd>
+              <dt>{t('Address type')}</dt>
+              <dd>{statusText(selected.type)}</dd>
+              <dt>{t('VAT / tax ID')}</dt>
+              <dd>{selected.vat || t('Not set')}</dd>
+              <dt>{t('Reference')}</dt>
+              <dd>{selected.reference || t('Not set')}</dd>
+              <dt>{t('Relationships')}</dt>
               <dd>
-                {[selected.customer && 'Customer', selected.vendor && 'Vendor']
+                {[selected.customer && t('Customer'), selected.vendor && t('Vendor')]
                   .filter(Boolean)
-                  .join(', ') || 'Contact'}
+                  .join(', ') || t('Contact')}
               </dd>
-              <dt>Tags</dt>
-              <dd>{selected.tags.join(', ') || 'None'}</dd>
+              <dt>{t('Tags')}</dt>
+              <dd>{selected.tags.join(', ') || t('None')}</dd>
               {selected.odoo && (
                 <>
                   {selected.odoo.originalWebsite &&
                     selected.odoo.originalWebsite !== selected.website && (
                       <>
-                        <dt>Original Odoo website</dt>
+                        <dt>{t('Original Odoo website')}</dt>
                         <dd>
                           {selected.odoo.originalWebsite}
                           <br />
                           <small>
-                            Source text retained; the current website was normalized or edited.
+                            {t(
+                              'Source text retained; the current website was normalized or edited.',
+                            )}
                           </small>
                         </dd>
                       </>
                     )}
-                  <dt>Odoo source</dt>
+                  <dt>{t('Odoo source')}</dt>
                   <dd>
-                    Record #{selected.odoo.id} · {selected.odoo.origin}
+                    {t('Record #{id} · {origin}', {
+                      id: selected.odoo.id,
+                      origin: selected.odoo.origin,
+                    })}
                     <br />
-                    Copied {new Date(selected.odoo.importedAt).toLocaleDateString()}
+                    {t('Copied {date}', {
+                      date: new Date(selected.odoo.importedAt).toLocaleDateString(
+                        getLocale() === 'nl' ? 'nl-NL' : 'en-GB',
+                      ),
+                    })}
                     {selected.odoo.parentId > 0 && (
                       <>
                         <br />
-                        Parent:{' '}
+                        {t('Parent')}:{' '}
                         {parent ? (
                           <button className="text-button" onClick={() => setSelected(parent)}>
                             {parent.name}
                           </button>
                         ) : (
-                          `Odoo #${selected.odoo.parentId} (not in this workspace)`
+                          t('Odoo #{id} (not in this workspace)', { id: selected.odoo.parentId })
                         )}
                       </>
                     )}
@@ -326,12 +357,14 @@ export function Contacts({
               )}
             </dl>
             <p className="dialog-intro">
-              Changes here stay in Odee. Existing invoice and bill snapshots are not modified.
+              {t(
+                'Changes here stay in Odee. Existing invoice and bill snapshots are not modified.',
+              )}
             </p>
           </div>
           <div className="dialog-actions">
             <button className="button secondary" onClick={() => setSelected(null)}>
-              Close
+              {t('Close')}
             </button>
             <button
               className="button primary"
@@ -341,7 +374,7 @@ export function Contacts({
                 setSelected(null)
               }}
             >
-              Edit contact
+              {t('Edit contact')}
             </button>
           </div>
         </Modal>
@@ -365,9 +398,8 @@ export function Contacts({
           onClose={() => setImporting(false)}
           onDone={async (result) => {
             await onRefresh()
-            setNotice(
-              `Odoo import finished: ${result.created} created, ${result.skipped} already present. Existing contacts were not overwritten.${result.normalizedWebsites ? ` ${result.normalizedWebsites} website links normalized; source text retained.` : ''}`,
-            )
+            setNotice('')
+            setImportResult(result)
             setImporting(false)
           }}
         />
@@ -441,17 +473,17 @@ function ContactEditor({
   }
   return (
     <Modal
-      title={initial === 'new' ? 'New contact' : 'Edit contact'}
+      title={initial === 'new' ? t('New contact') : t('Edit contact')}
       onClose={() => {
         if (!busy) onClose()
       }}
     >
-      <form onSubmit={(event) => void submit(event)}>
+      <form {...localizedValidation} onSubmit={(event) => void submit(event)}>
         <fieldset disabled={busy}>
           <div className="dialog-body">
             <div className="form-grid">
               <label>
-                Name
+                {t('Name')}
                 <input
                   required
                   autoFocus
@@ -461,17 +493,17 @@ function ContactEditor({
                 />
               </label>
               <label>
-                Contact kind
+                {t('Contact kind')}
                 <select
                   value={data.isCompany ? 'company' : 'person'}
                   onChange={(event) => field('isCompany', event.target.value === 'company')}
                 >
-                  <option value="company">Company</option>
-                  <option value="person">Person</option>
+                  <option value="company">{t('Company')}</option>
+                  <option value="person">{t('Person')}</option>
                 </select>
               </label>
               <label>
-                Company / affiliation
+                {t('Company / affiliation')}
                 <input
                   maxLength={200}
                   value={data.companyName}
@@ -479,7 +511,7 @@ function ContactEditor({
                 />
               </label>
               <label>
-                Email
+                {t('Email')}
                 <input
                   type="email"
                   maxLength={320}
@@ -488,7 +520,7 @@ function ContactEditor({
                 />
               </label>
               <label>
-                Phone
+                {t('Phone')}
                 <input
                   maxLength={80}
                   value={data.phone}
@@ -496,7 +528,7 @@ function ContactEditor({
                 />
               </label>
               <label>
-                Mobile
+                {t('Mobile')}
                 <input
                   maxLength={80}
                   value={data.mobile}
@@ -504,7 +536,7 @@ function ContactEditor({
                 />
               </label>
               <label>
-                Website
+                {t('Website')}
                 <input
                   maxLength={500}
                   value={data.website}
@@ -513,7 +545,7 @@ function ContactEditor({
                 />
               </label>
               <label>
-                VAT / tax ID
+                {t('VAT / tax ID')}
                 <input
                   maxLength={80}
                   value={data.vat}
@@ -521,7 +553,7 @@ function ContactEditor({
                 />
               </label>
               <label>
-                Reference
+                {t('Reference')}
                 <input
                   maxLength={100}
                   value={data.reference}
@@ -529,7 +561,7 @@ function ContactEditor({
                 />
               </label>
               <label>
-                Address type
+                {t('Address type')}
                 <select
                   value={data.type}
                   onChange={(event) =>
@@ -540,7 +572,9 @@ function ContactEditor({
                   }
                 >
                   {['contact', 'invoice', 'delivery', 'other', 'private'].map((type) => (
-                    <option key={type}>{type}</option>
+                    <option key={type} value={type}>
+                      {statusText(type)}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -549,12 +583,12 @@ function ContactEditor({
                   <label key={key}>
                     {
                       {
-                        street: 'Street',
-                        street2: 'Street 2',
-                        postalCode: 'Postal code',
-                        city: 'City',
-                        state: 'State / province',
-                        country: 'Country',
+                        street: t('Street'),
+                        street2: t('Street 2'),
+                        postalCode: t('Postal code'),
+                        city: t('City'),
+                        state: t('State / province'),
+                        country: t('Country'),
                       }[key]
                     }
                     <input
@@ -571,7 +605,7 @@ function ContactEditor({
                 ),
               )}
               <label>
-                Tags (comma separated)
+                {t('Tags (comma separated)')}
                 <input value={tags} onChange={(event) => setTags(event.target.value)} />
               </label>
             </div>
@@ -586,9 +620,9 @@ function ContactEditor({
                   <span>
                     {
                       {
-                        customer: 'Customer',
-                        vendor: 'Vendor',
-                        active: 'Active (uncheck to archive)',
+                        customer: t('Customer'),
+                        vendor: t('Vendor'),
+                        active: t('Active (uncheck to archive)'),
                       }[key]
                     }
                   </span>
@@ -597,16 +631,16 @@ function ContactEditor({
             </div>
             {error && (
               <p className="form-error" role="alert">
-                {error}
+                {messageText(error)}
               </p>
             )}
           </div>
           <div className="dialog-actions">
             <button type="button" className="button secondary" onClick={onClose}>
-              Cancel
+              {t('Cancel')}
             </button>
             <button className="button primary">
-              {busy ? 'Saving…' : 'Save contact'}
+              {busy ? t('Saving…') : t('Save contact')}
               <ArrowRight />
             </button>
           </div>
@@ -685,21 +719,21 @@ function OdooImport({
   }
   return (
     <Modal
-      title="Copy contacts from Odoo"
+      title={t('Copy contacts from Odoo')}
       onClose={() => {
         if (!busy) onClose()
       }}
     >
-      <form onSubmit={(event) => void submit(event)}>
+      <form {...localizedValidation} onSubmit={(event) => void submit(event)}>
         <fieldset disabled={busy}>
           <div className="dialog-body">
             <p className="dialog-intro">
-              Import a normalized Odoo JSON export. Source IDs preserve companies, people and
-              address relationships. No Odoo credentials are stored and nothing is written back.
-              Existing source IDs are skipped, preserving local edits.
+              {t(
+                'Import a normalized Odoo JSON export. Source IDs preserve companies, people and address relationships. No Odoo credentials are stored and nothing is written back. Existing source IDs are skipped, preserving local edits.',
+              )}
             </p>
             <label>
-              Odoo contact JSON
+              {t('Odoo contact JSON')}
               <input
                 type="file"
                 accept=".json,application/json"
@@ -708,9 +742,13 @@ function OdooImport({
             </label>
             {document && (
               <div className="contact-import-summary">
-                <strong>{document.contacts.length} contacts</strong>
-                <p>Source: {document.source}</p>
-                <p>Database identity: {document.database}</p>
+                <strong>{t('{count} contacts', { count: document.contacts.length })}</strong>
+                <p>
+                  {t('Source')}: {document.source}
+                </p>
+                <p>
+                  {t('Database identity')}: {document.database}
+                </p>
               </div>
             )}
             <label className="checkbox">
@@ -720,20 +758,22 @@ function OdooImport({
                 checked={reviewed}
                 onChange={(event) => setReviewed(event.target.checked)}
               />
-              <span>I am authorized to copy these contacts into this company workspace.</span>
+              <span>
+                {t('I am authorized to copy these contacts into this company workspace.')}
+              </span>
             </label>
             {error && (
               <p className="form-error" role="alert">
-                {error}
+                {messageText(error)}
               </p>
             )}
           </div>
           <div className="dialog-actions">
             <button type="button" className="button secondary" onClick={onClose}>
-              Cancel
+              {t('Cancel')}
             </button>
             <button className="button primary" disabled={!document || !reviewed}>
-              {busy ? 'Importing…' : 'Import contacts'}
+              {busy ? t('Importing…') : t('Import contacts')}
               <ArrowRight />
             </button>
           </div>

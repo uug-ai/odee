@@ -29,9 +29,7 @@ import {
 } from 'iconoir-react'
 import {
   balances,
-  cents,
   csvCell,
-  decimal,
   dueInDays,
   journals,
   label,
@@ -60,12 +58,21 @@ import { can } from './permissions'
 import { defaultView, moduleForView, navigation, views } from './modules'
 import { githubSignInPath, useWorkspaceRoute } from './routing'
 import { RouteNotFound } from './RouteNotFound'
+import { accountName, messageText, requestMessage, statusText, t, useLocale } from './i18n'
+import { LocaleSwitch } from './LocaleSwitch'
+import { localizedValidation } from './form-validation'
+import {
+  formatDate,
+  localeDecimal,
+  localeCents,
+  convertDecimal,
+  localePercent,
+} from './locale-formats'
 
-const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : 'An unexpected error occurred.'
+const errorMessage = (error: unknown) => requestMessage(error, responseStatus(error))
 
 function Badge({ doc }: { doc: Document }) {
-  return <span className={`badge ${label(doc).toLowerCase()}`}>{label(doc)}</span>
+  return <span className={`badge ${label(doc).toLowerCase()}`}>{statusText(label(doc))}</span>
 }
 function Empty({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -80,6 +87,10 @@ function Empty({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export default function App() {
+  const locale = useLocale()
+  useEffect(() => {
+    document.documentElement.lang = locale
+  }, [locale])
   const [state, setState] = useState<State | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const csrf = useRef('')
@@ -118,6 +129,11 @@ export default function App() {
     setAudit(null)
   }, [])
   const { view, navigate, routeKey, routeVersion } = useWorkspaceRoute(clearTransient)
+  useEffect(() => {
+    const title =
+      view === null ? t('Page not found') : view === 'apps' ? t('Workspace') : t(views[view].title)
+    document.title = t('Odee · {view}', { view: title })
+  }, [view, locale])
 
   const clearWorkspace = useCallback(() => {
     setState(null)
@@ -266,7 +282,7 @@ export default function App() {
   function downloadReport() {
     if (!state) return
     const rows = [
-      ['Code', 'Account', 'Debit EUR', 'Credit EUR'],
+      [t('Code'), t('Account'), t('Debit EUR'), t('Credit EUR')],
       ...state.accounts.map((account) => {
         const value = ledger.get(account.code)
         return [
@@ -296,11 +312,15 @@ export default function App() {
   return (
     <>
       <a className="skip-link" href="#main">
-        Skip to content
+        {t('Skip to content')}
       </a>
       <header className="topbar">
         <div className="topbar-left">
-          <button className="brand" onClick={() => navigate('apps')} aria-label="Odee app launcher">
+          <button
+            className="brand"
+            onClick={() => navigate('apps')}
+            aria-label={t('Odee app launcher')}
+          >
             odee<span>.</span>
           </button>
           <span className="brand-divider" />
@@ -309,13 +329,14 @@ export default function App() {
             onClick={() => navigate(view === 'apps' ? defaultView : 'apps')}
           >
             <Apps />
-            {currentModule?.name ?? 'Workspace'}
+            {currentModule ? t(currentModule.name) : t('Workspace')}
           </button>
         </div>
         <div className="topbar-right">
+          <LocaleSwitch />
           <span className="open-source">
             <span />
-            Open source
+            {t('Open source')}
           </span>
           <span className="company">
             <Building />
@@ -323,13 +344,17 @@ export default function App() {
           </span>
           <span
             className="avatar"
-            aria-label={session?.user ? `Signed in as ${session.user.login}` : 'Company workspace'}
+            aria-label={
+              session?.user
+                ? t('Signed in as {login}', { login: session.user.login })
+                : t('Company workspace')
+            }
           >
             {session?.user?.login.slice(0, 1).toUpperCase() ?? 'O'}
           </span>
           {session?.authMode === 'github' && session.authenticated && (
             <button className="button secondary" onClick={() => void logout()} disabled={busy}>
-              Sign out
+              {t('Sign out')}
             </button>
           )}
         </div>
@@ -338,8 +363,8 @@ export default function App() {
         <div className="dev-banner">
           <ShieldCheck />
           {state.demo
-            ? 'Demo workspace · temporary storage · data is lost on restart'
-            : 'Local development · MongoDB connected · authentication disabled'}
+            ? t('Demo workspace · temporary storage · data is lost on restart')
+            : t('Local development · MongoDB connected · authentication disabled')}
         </div>
       )}
       <div className={`layout ${view === null || view === 'apps' ? 'launcher-layout' : ''}`}>
@@ -348,23 +373,23 @@ export default function App() {
             <div className="sidebar-app">
               <div className="app-icon small">{ModuleIcon && <ModuleIcon />}</div>
               <div>
-                <strong>{currentModule?.name}</strong>
-                <span>{currentModule?.workspaceDescription}</span>
+                <strong>{t(currentModule.name)}</strong>
+                <span>{t(currentModule.workspaceDescription)}</span>
               </div>
             </div>
-            <nav aria-label={currentModule?.navigationLabel}>
+            <nav aria-label={t(currentModule.navigationLabel)}>
               {navigation.map((item) => {
                 const Container = item.standalone ? Fragment : 'div'
                 return (
                   <Container key={item.view}>
-                    {item.group && <div className="nav-group">{item.group}</div>}
+                    {item.group && <div className="nav-group">{t(item.group)}</div>}
                     <button
                       className={view === item.view ? 'nav-item active' : 'nav-item'}
                       aria-current={!item.standalone && view === item.view ? 'page' : undefined}
                       onClick={() => navigate(item.view)}
                     >
                       <item.icon />
-                      {item.label}
+                      {t(item.label)}
                       {item.view === 'invoices' && (
                         <span className="nav-count">{invoices.length}</span>
                       )}
@@ -377,23 +402,23 @@ export default function App() {
               <div className="status-dot" />
               <span>
                 {state?.demo
-                  ? 'Temporary demo store'
+                  ? t('Temporary demo store')
                   : state
-                    ? 'MongoDB workspace'
-                    : 'Not connected'}
+                    ? t('MongoDB workspace')
+                    : t('Not connected')}
               </span>
-              <small>EUR · Single company</small>
+              <small>{t('EUR · Single company')}</small>
             </div>
           </aside>
         )}
         <main id="main" className="main">
           {error && (
             <div className="alert error" role="alert">
-              <span>{error}</span>
+              <span>{messageText(error)}</span>
               <button
                 className="icon-button"
                 onClick={() => setError('')}
-                aria-label="Dismiss error"
+                aria-label={t('Dismiss error')}
               >
                 <Xmark />
               </button>
@@ -402,7 +427,7 @@ export default function App() {
           {notice && (
             <div className="alert success" role="status">
               <CheckCircle />
-              {notice}
+              {messageText(notice)}
             </div>
           )}
           {view === null ? (
@@ -410,27 +435,29 @@ export default function App() {
           ) : session?.authMode === 'github' && !session.authenticated ? (
             <div className="login panel">
               <ShieldCheck />
-              <h1>Your workspace, protected.</h1>
+              <h1>{t('Your workspace, protected.')}</h1>
               <p>
-                Sign in with GitHub. Access is limited to active members of{' '}
+                {t('Sign in with GitHub. Access is limited to active members of')}{' '}
                 <strong>
                   {session.organisation}/{session.team}
                 </strong>
                 .
               </p>
               <a className="button primary" href={githubSignInPath(view)}>
-                Sign in with GitHub <ArrowRight />
+                {t('Sign in with GitHub')} <ArrowRight />
               </a>
             </div>
           ) : needsToken ? (
             <div className="login panel">
               <ShieldCheck />
-              <h1>Your books, protected.</h1>
+              <h1>{t('Your books, protected.')}</h1>
               <p>
-                Enter the company access token provided by your administrator. It stays in memory
-                for this tab only.
+                {t(
+                  'Enter the company access token provided by your administrator. It stays in memory for this tab only.',
+                )}
               </p>
               <form
+                {...localizedValidation}
                 onSubmit={(event) => {
                   event.preventDefault()
                   if (tokenInput === token) void refresh()
@@ -438,7 +465,7 @@ export default function App() {
                 }}
               >
                 <label>
-                  Company access token
+                  {t('Company access token')}
                   <input
                     type="password"
                     value={tokenInput}
@@ -448,34 +475,35 @@ export default function App() {
                   />
                 </label>
                 <button className="button primary" disabled={loading}>
-                  Open workspace <ArrowRight />
+                  {t('Open workspace')} <ArrowRight />
                 </button>
               </form>
             </div>
           ) : forbidden ? (
             <section className="empty" aria-labelledby="forbidden-heading">
               <ShieldCheck />
-              <h1 id="forbidden-heading">Access forbidden / Toegang geweigerd</h1>
+              <h1 id="forbidden-heading">{t('Access forbidden')}</h1>
               <p>
-                You are still signed in. Ask your administrator for company membership and read
-                access. Je bent nog aangemeld; vraag je beheerder om toegang.
+                {t(
+                  'You are still signed in. Ask your administrator for company membership and read access.',
+                )}
               </p>
               <button className="button secondary" onClick={() => void refresh()}>
-                Refresh permissions / Rechten vernieuwen
+                {t('Refresh permissions')}
               </button>
             </section>
           ) : !state ? (
             <div className="empty">
-              <h1>{loading ? 'Opening your workspace…' : 'Unable to open workspace'}</h1>
+              <h1>{loading ? t('Opening your workspace…') : t('Unable to open workspace')}</h1>
               <p>
                 {loading
-                  ? 'Connecting to Accounting.'
-                  : 'Check the server and MongoDB connection, then retry.'}
+                  ? t('Connecting to Accounting.')
+                  : t('Check the server and MongoDB connection, then retry.')}
               </p>
               {!loading && (
                 <button className="button secondary" onClick={() => void refresh()}>
                   <RefreshDouble />
-                  Retry
+                  {t('Retry')}
                 </button>
               )}
             </div>
@@ -493,39 +521,39 @@ export default function App() {
           ) : (
             <>
               <div className="breadcrumb">
-                <button onClick={() => navigate('apps')}>Workspace</button>
+                <button onClick={() => navigate('apps')}>{t('Workspace')}</button>
                 <span>/</span>
-                <span>Accounting</span>
+                <span>{t('Accounting')}</span>
                 <span>/</span>
-                <span>{doc ? doc.partner : views[view].title}</span>
+                <span>{doc ? doc.partner : t(views[view].title)}</span>
               </div>
               <div className="page-heading">
                 <div>
                   <div className="eyebrow">
                     {doc
                       ? doc.kind === 'invoice'
-                        ? 'CUSTOMER INVOICE'
-                        : 'VENDOR BILL'
-                      : 'ACCOUNTING'}
+                        ? t('CUSTOMER INVOICE')
+                        : t('VENDOR BILL')
+                      : t('ACCOUNTING')}
                   </div>
-                  <h1>{doc ? doc.partner : views[view].title}</h1>
+                  <h1>{doc ? doc.partner : t(views[view].title)}</h1>
                   <p>
                     {doc
                       ? doc.number
                       : view === 'dashboard'
-                        ? 'A clear view of your money. A good place to start.'
+                        ? t('A clear view of your money. A good place to start.')
                         : view === 'reports'
-                          ? 'All posted activity · EUR · since workspace creation'
+                          ? t('All posted activity · EUR · since workspace creation')
                           : view === 'accounts'
-                            ? 'Your starter chart. A foundation for balanced books.'
-                            : 'Keep the details in order. Let the numbers add up.'}
+                            ? t('Your starter chart. A foundation for balanced books.')
+                            : t('Keep the details in order. Let the numbers add up.')}
                   </p>
                 </div>
                 <div className="heading-actions">
                   <button
                     className="icon-button"
-                    title="Refresh workspace"
-                    aria-label="Refresh workspace"
+                    title={t('Refresh workspace')}
+                    aria-label={t('Refresh workspace')}
                     disabled={loading || busy}
                     onClick={() => void refresh()}
                   >
@@ -534,12 +562,12 @@ export default function App() {
                   {doc ? (
                     <button className="button secondary" onClick={() => setSelected(null)}>
                       <ArrowLeft />
-                      Back
+                      {t('Back')}
                     </button>
                   ) : view === 'reports' ? (
                     <button className="button secondary" onClick={downloadReport}>
                       <Download />
-                      Export CSV
+                      {t('Export CSV')}
                     </button>
                   ) : (
                     (view === 'dashboard' || view === 'invoices' || view === 'bills') && (
@@ -549,7 +577,7 @@ export default function App() {
                         onClick={() => setEditor(view === 'bills' ? 'bill' : 'invoice')}
                       >
                         <Plus />
-                        {view === 'bills' ? 'New bill' : 'New invoice'}
+                        {view === 'bills' ? t('New bill') : t('New invoice')}
                       </button>
                     )
                   )}
@@ -602,10 +630,10 @@ export default function App() {
                   <div className="overview-strip">
                     <span>
                       <span className="status-dot" />
-                      YOUR BOOKS AT A GLANCE
+                      {t('YOUR BOOKS AT A GLANCE')}
                     </span>
                     <span>
-                      {new Date().toLocaleDateString('en-GB', {
+                      {new Date().toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
                         day: 'numeric',
                         month: 'long',
                         year: 'numeric',
@@ -614,25 +642,29 @@ export default function App() {
                   </div>
                   <div className="dashboard-grid">
                     <JournalCard
-                      title="Customer invoices"
+                      title={t('Customer invoices')}
+                      kind="invoice"
                       icon={<CreditCard />}
                       amount={sumOpen(invoices)}
-                      caption="Outstanding receivables"
+                      caption={t('Outstanding receivables')}
                       count={invoices.filter((d) => d.status === 'posted').length}
-                      countLabel="awaiting payment"
-                      extra={`${invoices.filter(overdue).length} overdue`}
+                      countLabel={t('awaiting payment')}
+                      extra={t('{count} overdue', { count: invoices.filter(overdue).length })}
                       onOpen={() => navigate('invoices')}
                       onNew={() => setEditor('invoice')}
                       canWrite={canWrite}
                     />
                     <JournalCard
-                      title="Vendor bills"
+                      title={t('Vendor bills')}
+                      kind="bill"
                       icon={<Wallet />}
                       amount={sumOpen(bills)}
-                      caption="Outstanding payables"
+                      caption={t('Outstanding payables')}
                       count={bills.filter((d) => d.status === 'posted').length}
-                      countLabel="to pay"
-                      extra={`${bills.filter((d) => d.status === 'draft').length} drafts to review`}
+                      countLabel={t('to pay')}
+                      extra={t('{count} drafts to review', {
+                        count: bills.filter((d) => d.status === 'draft').length,
+                      })}
                       onOpen={() => navigate('bills')}
                       onNew={() => setEditor('bill')}
                       canWrite={canWrite}
@@ -642,17 +674,17 @@ export default function App() {
                         <span className="card-icon mint">
                           <Building />
                         </span>
-                        <span className="badge">Manual ledger</span>
+                        <span className="badge">{t('Manual ledger')}</span>
                       </div>
-                      <h2>Bank account</h2>
+                      <h2>{t('Bank account')}</h2>
                       <div className="metric">{money(accountBalance('1000'))}</div>
-                      <p className="metric-caption">Recorded payment movements</p>
+                      <p className="metric-caption">{t('Recorded payment movements')}</p>
                       <div className="card-facts">
-                        <span>Bank feed</span>
-                        <span>Not connected</span>
+                        <span>{t('Bank feed')}</span>
+                        <span>{t('Not connected')}</span>
                       </div>
                       <button className="card-action" onClick={() => navigate('journal')}>
-                        View payment entries <ArrowRight />
+                        {t('View payment entries')} <ArrowRight />
                       </button>
                     </div>
                     <div className="panel journal-card">
@@ -660,19 +692,19 @@ export default function App() {
                         <span className="card-icon peach">
                           <GraphUp />
                         </span>
-                        <span className="badge">Indicative only</span>
+                        <span className="badge">{t('Indicative only')}</span>
                       </div>
-                      <h2>VAT position</h2>
+                      <h2>{t('VAT position')}</h2>
                       <div className="metric">
                         {money(-accountBalance('2100') - accountBalance('1200'))}
                       </div>
-                      <p className="metric-caption">Output VAT less recoverable VAT</p>
+                      <p className="metric-caption">{t('Output VAT less recoverable VAT')}</p>
                       <div className="card-facts">
-                        <span>Tax filing</span>
-                        <span>Not configured</span>
+                        <span>{t('Tax filing')}</span>
+                        <span>{t('Not configured')}</span>
                       </div>
                       <button className="card-action" onClick={() => navigate('reports')}>
-                        View trial balance <ArrowRight />
+                        {t('View trial balance')} <ArrowRight />
                       </button>
                     </div>
                   </div>
@@ -680,17 +712,18 @@ export default function App() {
                     <section className="panel activity">
                       <div className="section-heading">
                         <div>
-                          <h2>Recent documents</h2>
-                          <p>A little order goes a long way.</p>
+                          <h2>{t('Recent documents')}</h2>
+                          <p>{t('A little order goes a long way.')}</p>
                         </div>
                         <button className="text-button" onClick={() => navigate('invoices')}>
-                          View invoices <ArrowRight />
+                          {t('View invoices')} <ArrowRight />
                         </button>
                       </div>
                       {documents.length === 0 ? (
-                        <Empty title="Your books start with a first entry.">
-                          Create an invoice or vendor bill. Save it as a draft, review it, then post
-                          it to the ledger.
+                        <Empty title={t('Your books start with a first entry.')}>
+                          {t(
+                            'Create an invoice or vendor bill. Save it as a draft, review it, then post it to the ledger.',
+                          )}
                         </Empty>
                       ) : (
                         <div className="recent-list">
@@ -712,7 +745,7 @@ export default function App() {
                                 <span className="recent-partner">
                                   <strong>{d.partner}</strong>
                                   <small>
-                                    {d.kind === 'invoice' ? 'Invoice' : 'Bill'} · {d.date}
+                                    {statusText(d.kind)} · {formatDate(d.date)}
                                   </small>
                                 </span>
                                 <Badge doc={d} />
@@ -724,42 +757,43 @@ export default function App() {
                       )}
                     </section>
                     <section className="panel getting-started">
-                      <div className="eyebrow">MAKE YOURSELF AT HOME</div>
+                      <div className="eyebrow">{t('MAKE YOURSELF AT HOME')}</div>
                       <h2>
-                        Good books.
+                        {t('Good books.')}
                         <br />
-                        Better decisions.
+                        {t('Better decisions.')}
                       </h2>
                       <p>
-                        Start simple. Every posted document creates a balanced journal, and every
-                        payment keeps a trace.
+                        {t(
+                          'Start simple. Every posted document creates a balanced journal, and every payment keeps a trace.',
+                        )}
                       </p>
                       <div className="setup-item">
                         <CheckCircle />
-                        <span>Starter chart of accounts</span>
+                        <span>{t('Starter chart of accounts')}</span>
                         <Check />
                       </div>
                       <div className={`setup-item ${documents.length ? '' : 'pending'}`}>
                         <Book />
-                        <span>Create your first document</span>
+                        <span>{t('Create your first document')}</span>
                         {documents.length ? <Check /> : <span>01</span>}
                       </div>
                       <div className={`setup-item ${posted.length ? '' : 'pending'}`}>
                         <ShieldCheck />
-                        <span>Post a balanced entry</span>
+                        <span>{t('Post a balanced entry')}</span>
                         {posted.length ? <Check /> : <span>02</span>}
                       </div>
                       <button className="text-button" onClick={() => navigate('accounts')}>
-                        Explore your accounts <ArrowRight />
+                        {t('Explore your accounts')} <ArrowRight />
                       </button>
                     </section>
                   </div>
                   <div className="info-note">
                     <ShieldCheck />
                     <p>
-                      This first release is a bookkeeping foundation. Bank feeds, statutory tax
-                      filing, reconciliation, and country-specific compliance are not yet
-                      implemented.
+                      {t(
+                        'This first release is a bookkeeping foundation. Bank feeds, statutory tax filing, reconciliation, and country-specific compliance are not yet implemented.',
+                      )}
                     </p>
                   </div>
                 </>
@@ -779,7 +813,7 @@ export default function App() {
                   )}
                   <section className="panel document-table">
                     <div className="table-toolbar">
-                      <div className="tabs" role="group" aria-label="Document status filter">
+                      <div className="tabs" role="group" aria-label={t('Document status filter')}>
                         {['All', 'Draft', 'Posted', 'Partial', 'Paid', 'Overdue'].map((option) => (
                           <button
                             key={option}
@@ -787,15 +821,15 @@ export default function App() {
                             onClick={() => setFilter(option)}
                             aria-pressed={filter === option}
                           >
-                            {option}
+                            {statusText(option)}
                           </button>
                         ))}
                       </div>
                       <label className="search">
                         <Search />
                         <input
-                          aria-label="Search documents"
-                          placeholder="Search name or reference…"
+                          aria-label={t('Search documents')}
+                          placeholder={t('Search name or reference…')}
                           value={query}
                           onChange={(e) => setQuery(e.target.value)}
                         />
@@ -805,13 +839,13 @@ export default function App() {
                       <table>
                         <thead>
                           <tr>
-                            <th>{view === 'bills' ? 'Vendor' : 'Customer'}</th>
-                            <th>Reference</th>
-                            <th>Date</th>
-                            <th>Due date</th>
-                            <th>Status</th>
-                            <th className="numeric">Total</th>
-                            <th className="numeric">Due</th>
+                            <th>{view === 'bills' ? t('Vendor') : t('Customer')}</th>
+                            <th>{t('Reference')}</th>
+                            <th>{t('Date')}</th>
+                            <th>{t('Due date')}</th>
+                            <th>{t('Status')}</th>
+                            <th className="numeric">{t('Total')}</th>
+                            <th className="numeric">{t('Due')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -826,8 +860,10 @@ export default function App() {
                               <td className="reference" title={d.number}>
                                 {d.reference || d.number}
                               </td>
-                              <td>{d.date}</td>
-                              <td className={overdue(d) ? 'late-text' : ''}>{d.dueDate}</td>
+                              <td>{formatDate(d.date)}</td>
+                              <td className={overdue(d) ? 'late-text' : ''}>
+                                {formatDate(d.dueDate)}
+                              </td>
                               <td>
                                 <Badge doc={d} />
                               </td>
@@ -844,16 +880,20 @@ export default function App() {
                       <Empty
                         title={
                           documents.length
-                            ? 'No matching documents.'
-                            : `No ${view === 'bills' ? 'bills' : 'invoices'} yet.`
+                            ? t('No matching documents.')
+                            : view === 'bills'
+                              ? t('No bills yet.')
+                              : t('No invoices yet.')
                         }
                       >
-                        Use New {view === 'bills' ? 'bill' : 'invoice'} to get started, or adjust
-                        your search and filters.
+                        {view === 'bills'
+                          ? t('Use New bill to get started, or adjust your search and filters.')
+                          : t('Use New invoice to get started, or adjust your search and filters.')}
                       </Empty>
                     )}
                     <div className="table-footer">
-                      {filtered.length} documents <span>EUR · Drafts do not affect the ledger</span>
+                      {t('{count} documents', { count: filtered.length })}{' '}
+                      <span>{t('EUR · Drafts do not affect the ledger')}</span>
                     </div>
                   </section>
                 </>
@@ -861,34 +901,38 @@ export default function App() {
                 <section className="panel">
                   <div className="section-heading">
                     <div>
-                      <h2>General journal</h2>
+                      <h2>{t('General journal')}</h2>
                       <p>
-                        Posted documents and their payment entries. Debits always equal credits.
+                        {t(
+                          'Posted documents and their payment entries. Debits always equal credits.',
+                        )}
                       </p>
                     </div>
-                    <span className="badge posted">{journals(documents).length} entries</span>
+                    <span className="badge posted">
+                      {t('{count} entries', { count: journals(documents).length })}
+                    </span>
                   </div>
                   {journals(documents).length === 0 ? (
-                    <Empty title="A balanced beginning.">
-                      Post your first invoice or bill to see its journal entries here.
+                    <Empty title={t('A balanced beginning.')}>
+                      {t('Post your first invoice or bill to see its journal entries here.')}
                     </Empty>
                   ) : (
                     <div className="table-scroll">
                       <table>
                         <thead>
                           <tr>
-                            <th>Date</th>
-                            <th>Document / entry</th>
-                            <th>Account</th>
-                            <th className="numeric">Debit</th>
-                            <th className="numeric">Credit</th>
+                            <th>{t('Date')}</th>
+                            <th>{t('Document / entry')}</th>
+                            <th>{t('Account')}</th>
+                            <th className="numeric">{t('Debit')}</th>
+                            <th className="numeric">{t('Credit')}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {journals(documents).flatMap((journal) =>
                             journal.entries.map((entry, index) => (
                               <tr key={`${journal.key}/${index}`}>
-                                <td>{index === 0 ? journal.date : ''}</td>
+                                <td>{index === 0 ? formatDate(journal.date) : ''}</td>
                                 <td>
                                   {index === 0 && (
                                     <button
@@ -897,15 +941,26 @@ export default function App() {
                                     >
                                       {journal.document.partner}
                                       <small>
-                                        {journal.payment ? 'Payment' : journal.document.kind} ·{' '}
-                                        {journal.reference}
+                                        {journal.payment
+                                          ? t('Payment')
+                                          : statusText(journal.document.kind)}{' '}
+                                        ·{' '}
+                                        {journal.payment &&
+                                        !journal.document.payments.find(
+                                          (p) => `${journal.document.id}/${p.id}` === journal.key,
+                                        )?.reference
+                                          ? t('Payment')
+                                          : journal.reference}
                                       </small>
                                     </button>
                                   )}
                                 </td>
                                 <td>
                                   <span className="account-code">{entry.accountCode}</span>
-                                  {state.accounts.find((a) => a.code === entry.accountCode)?.name}
+                                  {accountName(
+                                    entry.accountCode,
+                                    state.accounts.find((a) => a.code === entry.accountCode)?.name,
+                                  )}
                                 </td>
                                 <td className="numeric">
                                   {entry.debit ? money(entry.debit) : '—'}
@@ -925,28 +980,32 @@ export default function App() {
                 <section className="panel">
                   <div className="section-heading">
                     <div>
-                      <h2>{view === 'reports' ? 'Trial balance' : 'Starter accounts'}</h2>
+                      <h2>{view === 'reports' ? t('Trial balance') : t('Starter accounts')}</h2>
                       <p>
                         {view === 'reports'
-                          ? 'Cumulative posted debits and credits. No opening balances have been imported.'
-                          : 'A minimal, fixed chart for this release. Country-specific charts will follow.'}
+                          ? t(
+                              'Cumulative posted debits and credits. No opening balances have been imported.',
+                            )
+                          : t(
+                              'A minimal, fixed chart for this release. Country-specific charts will follow.',
+                            )}
                       </p>
                     </div>
                     <span className="badge posted">
                       <CheckCircle />
-                      {view === 'reports' ? 'Double-entry' : '8 accounts'}
+                      {view === 'reports' ? t('Double-entry') : t('8 accounts')}
                     </span>
                   </div>
                   <div className="table-scroll">
                     <table>
                       <thead>
                         <tr>
-                          <th>Code</th>
-                          <th>Account</th>
-                          <th>Type</th>
-                          <th className="numeric">Debit</th>
-                          <th className="numeric">Credit</th>
-                          <th className="numeric">Net balance</th>
+                          <th>{t('Code')}</th>
+                          <th>{t('Account')}</th>
+                          <th>{t('Type')}</th>
+                          <th className="numeric">{t('Debit')}</th>
+                          <th className="numeric">{t('Credit')}</th>
+                          <th className="numeric">{t('Net balance')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -956,10 +1015,12 @@ export default function App() {
                             <tr key={account.code}>
                               <td className="account-code">{account.code}</td>
                               <td>
-                                <strong>{account.name}</strong>
+                                <strong>{accountName(account.code, account.name)}</strong>
                               </td>
                               <td>
-                                <span className="badge account-type">{account.type}</span>
+                                <span className="badge account-type">
+                                  {statusText(account.type)}
+                                </span>
                               </td>
                               <td className="numeric">{money(value.debit)}</td>
                               <td className="numeric">{money(value.credit)}</td>
@@ -970,7 +1031,7 @@ export default function App() {
                       </tbody>
                       <tfoot>
                         <tr>
-                          <td colSpan={3}>Total · EUR</td>
+                          <td colSpan={3}>{t('Total · EUR')}</td>
                           <td className="numeric">
                             {money([...ledger.values()].reduce((sum, b) => sum + b.debit, 0n))}
                           </td>
@@ -989,8 +1050,8 @@ export default function App() {
                 </section>
               )}
               <footer className="workspace-footer">
-                <span>odee. / Open accounting</span>
-                <span>Built for clarity. Yours to shape.</span>
+                <span>{t('odee. / Open accounting')}</span>
+                <span>{t('Built for clarity. Yours to shape.')}</span>
               </footer>
             </>
           )}
@@ -1053,7 +1114,7 @@ export default function App() {
         />
       )}
       {original && (
-        <Modal title="Original bill document" wide onClose={() => setOriginal(null)}>
+        <Modal title={t('Original bill document')} wide onClose={() => setOriginal(null)}>
           <div className="dialog-body">
             <OriginalPreview item={original} token={token} onSessionExpired={expireSession} />
           </div>
@@ -1061,30 +1122,32 @@ export default function App() {
       )}
       {posting && (
         <Modal
-          title="Post to the ledger?"
+          title={t('Post to the ledger?')}
           onClose={() => {
             if (!busy) setPosting(null)
           }}
         >
           <div className="dialog-body">
             <p>
-              Post <strong>{posting.partner}</strong> for <strong>{money(posting.total)}</strong>?
-              This creates balanced journal entries. Posted documents cannot be edited in this
-              release.
+              {t('Post')} <strong>{posting.partner}</strong> {t('for')}{' '}
+              <strong>{money(posting.total)}</strong>?{' '}
+              {t(
+                'This creates balanced journal entries. Posted documents cannot be edited in this release.',
+              )}
             </p>
             <div className="info-note">
               <ShieldCheck />
-              Review the date, amounts, partner, and VAT before confirming.
+              {t('Review the date, amounts, partner, and VAT before confirming.')}
             </div>
             {error && (
               <p className="form-error" role="alert">
-                {error}
+                {messageText(error)}
               </p>
             )}
           </div>
           <div className="dialog-actions">
             <button className="button secondary" disabled={busy} onClick={() => setPosting(null)}>
-              Cancel
+              {t('Cancel')}
             </button>
             <button
               className="button primary"
@@ -1098,22 +1161,24 @@ export default function App() {
               }
             >
               <Check />
-              {busy ? 'Posting…' : 'Confirm posting'}
+              {busy ? t('Posting…') : t('Confirm posting')}
             </button>
           </div>
         </Modal>
       )}
       {audit !== null && (
-        <Modal title="Financial audit / Financieel controlespoor" onClose={() => setAudit(null)}>
-          <p>Only new posting and manual payments. Shared credentials do not identify a human.</p>
+        <Modal title={t('Financial audit')} onClose={() => setAudit(null)}>
+          <p>
+            {t('Only new posting and manual payments. Shared credentials do not identify a human.')}
+          </p>
           {audit.length === 0 ? (
-            <p>No attributed financial actions.</p>
+            <p>{t('No attributed financial actions.')}</p>
           ) : (
             <ul>
               {audit.map((event) => (
                 <li key={event.id}>
-                  {event.time} · {event.action} · {event.principal} ({event.actorType}) · v
-                  {event.version} · {event.outcome}
+                  {event.time} · {messageText(event.action)} · {event.principal} (
+                  {messageText(event.actorType)}) · v{event.version} · {messageText(event.outcome)}
                 </li>
               ))}
             </ul>
@@ -1149,6 +1214,7 @@ export default function App() {
 
 function JournalCard({
   title,
+  kind,
   icon,
   amount,
   caption,
@@ -1160,6 +1226,7 @@ function JournalCard({
   canWrite,
 }: {
   title: string
+  kind: Kind
   icon: ReactNode
   amount: bigint
   caption: string
@@ -1176,7 +1243,7 @@ function JournalCard({
         <span className="card-icon">{icon}</span>
         <button
           className="icon-button"
-          aria-label={`Create ${title === 'Vendor bills' ? 'bill' : 'invoice'}`}
+          aria-label={kind === 'bill' ? t('Create bill') : t('Create invoice')}
           disabled={!canWrite}
           onClick={onNew}
         >
@@ -1195,7 +1262,7 @@ function JournalCard({
         <span>{extra}</span>
       </div>
       <button className="card-action" onClick={onOpen}>
-        View {title === 'Vendor bills' ? 'bills' : 'invoices'} <ArrowRight />
+        {kind === 'bill' ? t('View bills') : t('View invoices')} <ArrowRight />
       </button>
     </div>
   )
@@ -1228,59 +1295,59 @@ function DocumentDetail({
         <div className="section-heading">
           <div className="detail-status">
             <Badge doc={doc} />
-            <span>EUR · Version {doc.version}</span>
+            <span>{t('EUR · Version {version}', { version: doc.version })}</span>
           </div>
           <div className="heading-actions">
             {onAudit && (
               <button className="button secondary" onClick={onAudit}>
-                Financial audit
+                {t('Financial audit')}
               </button>
             )}
             {onOriginal && (
               <button type="button" className="button secondary" onClick={onOriginal}>
                 <Book />
-                View original
+                {t('View original')}
               </button>
             )}
             {doc.status === 'draft' ? (
               <>
                 <button className="button secondary" disabled={busy || !canWrite} onClick={onEdit}>
-                  Edit draft
+                  {t('Edit draft')}
                 </button>
                 <button className="button primary" disabled={busy || !canPost} onClick={onPost}>
                   <Check />
-                  Post document
+                  {t('Post document')}
                 </button>
               </>
             ) : doc.status === 'posted' ? (
               <button className="button primary" disabled={busy || !canPost} onClick={onPay}>
                 <Wallet />
-                Record payment
+                {t('Record payment')}
               </button>
             ) : (
               <span className="paid-note">
                 <CheckCircle />
-                Fully paid
+                {t('Fully paid')}
               </span>
             )}
           </div>
         </div>
         <div className="detail-meta">
           <div>
-            <span>{doc.kind === 'bill' ? 'VENDOR' : 'CUSTOMER'}</span>
+            <span>{doc.kind === 'bill' ? t('VENDOR') : t('CUSTOMER')}</span>
             <strong>{doc.partner}</strong>
-            <small>{doc.email || 'No email supplied'}</small>
+            <small>{doc.email || t('No email supplied')}</small>
           </div>
           <div>
-            <span>DOCUMENT DATE</span>
-            <strong>{doc.date}</strong>
+            <span>{t('DOCUMENT DATE')}</span>
+            <strong>{formatDate(doc.date)}</strong>
           </div>
           <div>
-            <span>DUE DATE</span>
-            <strong className={overdue(doc) ? 'late-text' : ''}>{doc.dueDate}</strong>
+            <span>{t('DUE DATE')}</span>
+            <strong className={overdue(doc) ? 'late-text' : ''}>{formatDate(doc.dueDate)}</strong>
           </div>
           <div>
-            <span>REFERENCE</span>
+            <span>{t('REFERENCE')}</span>
             <strong>{doc.reference || '—'}</strong>
           </div>
         </div>
@@ -1288,11 +1355,11 @@ function DocumentDetail({
           <table>
             <thead>
               <tr>
-                <th>Description</th>
-                <th className="numeric">Quantity</th>
-                <th className="numeric">Unit price</th>
-                <th className="numeric">VAT</th>
-                <th className="numeric">Total incl. VAT</th>
+                <th>{t('Description')}</th>
+                <th className="numeric">{t('Quantity')}</th>
+                <th className="numeric">{t('Unit price')}</th>
+                <th className="numeric">{t('VAT')}</th>
+                <th className="numeric">{t('Total incl. VAT')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1302,12 +1369,12 @@ function DocumentDetail({
                     {line.description}
                     <small>
                       {line.accountCode} ·{' '}
-                      {doc.kind === 'bill' ? 'Operating expenses' : 'Sales revenue'}
+                      {doc.kind === 'bill' ? t('Operating expenses') : t('Sales revenue')}
                     </small>
                   </td>
                   <td className="numeric">{line.quantity}</td>
                   <td className="numeric">{money(line.unitCents)}</td>
-                  <td className="numeric">{line.taxBps / 100}%</td>
+                  <td className="numeric">{localePercent(line.taxBps)}</td>
                   <td className="numeric">{money(lineTotals(line).total)}</td>
                 </tr>
               ))}
@@ -1316,25 +1383,25 @@ function DocumentDetail({
         </div>
         <div className="detail-totals">
           <div>
-            <span>Subtotal</span>
+            <span>{t('Subtotal')}</span>
             <strong>{money(doc.subtotal)}</strong>
           </div>
           <div>
-            <span>VAT</span>
+            <span>{t('VAT')}</span>
             <strong>{money(doc.tax)}</strong>
           </div>
           <div className="grand-total">
-            <span>Total</span>
+            <span>{t('Total')}</span>
             <strong>{money(doc.total)}</strong>
           </div>
           {doc.status !== 'draft' && (
             <>
               <div>
-                <span>Paid</span>
+                <span>{t('Paid')}</span>
                 <strong>{money(doc.paid)}</strong>
               </div>
               <div className="grand-total">
-                <span>Amount due</span>
+                <span>{t('Amount due')}</span>
                 <strong>{money(doc.total - doc.paid)}</strong>
               </div>
             </>
@@ -1344,26 +1411,26 @@ function DocumentDetail({
       {doc.payments.length > 0 && (
         <section className="panel">
           <div className="section-heading">
-            <h2>Payment history</h2>
+            <h2>{t('Payment history')}</h2>
             <span className="badge posted">
               <ShieldCheck />
-              Recorded in ledger
+              {t('Recorded in ledger')}
             </span>
           </div>
           <div className="table-scroll">
             <table>
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Reference</th>
-                  <th className="numeric">Amount</th>
+                  <th>{t('Date')}</th>
+                  <th>{t('Reference')}</th>
+                  <th className="numeric">{t('Amount')}</th>
                 </tr>
               </thead>
               <tbody>
                 {doc.payments.map((p) => (
                   <tr key={p.id}>
-                    <td>{p.date}</td>
-                    <td>{p.reference || 'Payment'}</td>
+                    <td>{formatDate(p.date)}</td>
+                    <td>{p.reference || t('Payment')}</td>
                     <td className="numeric">{money(p.amount)}</td>
                   </tr>
                 ))}
@@ -1426,7 +1493,18 @@ function DraftEditor({
           lines: initial.lines.map((line) => ({ ...line })),
         },
   )
-  const [prices, setPrices] = useState(() => draft.lines.map((line) => decimal(line.unitCents)))
+  const locale = useLocale()
+  const previousLocale = useRef(locale)
+  const [prices, setPrices] = useState(() =>
+    draft.lines.map((line) => localeDecimal(line.unitCents)),
+  )
+  useEffect(() => {
+    const from = previousLocale.current
+    if (from !== locale) {
+      setPrices((values) => values.map((value) => convertDecimal(value, from, locale)))
+      previousLocale.current = locale
+    }
+  }, [locale])
   const [localError, setLocalError] = useState('')
   const [reviewed, setReviewed] = useState(false)
   const [acceptMismatch, setAcceptMismatch] = useState(false)
@@ -1441,7 +1519,8 @@ function DraftEditor({
   let previewValid = true
   try {
     total = draft.lines.reduce(
-      (sum, line, index) => sum + lineTotals({ ...line, unitCents: cents(prices[index]) }).total,
+      (sum, line, index) =>
+        sum + lineTotals({ ...line, unitCents: localeCents(prices[index]) }).total,
       0n,
     )
   } catch {
@@ -1454,7 +1533,10 @@ function DraftEditor({
       await onSave(
         {
           ...draft,
-          lines: draft.lines.map((line, index) => ({ ...line, unitCents: cents(prices[index]) })),
+          lines: draft.lines.map((line, index) => ({
+            ...line,
+            unitCents: localeCents(prices[index]),
+          })),
         },
         review ? { reviewed, acceptMismatch } : undefined,
       )
@@ -1466,13 +1548,19 @@ function DraftEditor({
     <Modal
       title={
         review
-          ? 'Review scanned bill'
-          : `${typeof initial === 'string' ? 'New' : 'Edit'} ${kind === 'bill' ? 'vendor bill' : 'customer invoice'}`
+          ? t('Review scanned bill')
+          : typeof initial === 'string'
+            ? kind === 'bill'
+              ? t('New vendor bill')
+              : t('New customer invoice')
+            : kind === 'bill'
+              ? t('Edit vendor bill')
+              : t('Edit customer invoice')
       }
       onClose={onClose}
       wide={Boolean(review)}
     >
-      <form onSubmit={(event) => void submit(event)}>
+      <form {...localizedValidation} onSubmit={(event) => void submit(event)}>
         <fieldset disabled={busy}>
           <div className={review ? 'dialog-body review-layout' : 'dialog-body'}>
             {review && (
@@ -1481,20 +1569,21 @@ function DraftEditor({
             <div className="draft-form">
               {review && (
                 <div className="scan-warnings" role="status">
-                  <strong>Review required</strong>
+                  <strong>{t('Review required')}</strong>
+                  <span>{t('Scan diagnostics')}</span>
                   <ul>
                     {review.scan.warnings.map((warning, index) => (
-                      <li key={index}>{warning}</li>
+                      <li key={index}>{messageText(warning)}</li>
                     ))}
                   </ul>
                 </div>
               )}
               <p className="dialog-intro">
-                Start with a draft. You can review and edit it before posting.
+                {t('Start with a draft. You can review and edit it before posting.')}
               </p>
               <div className="form-grid">
                 <label>
-                  Choose a saved contact
+                  {t('Choose a saved contact')}
                   <select
                     defaultValue=""
                     onChange={(event) => {
@@ -1507,7 +1596,7 @@ function DraftEditor({
                         }))
                     }}
                   >
-                    <option value="">Enter details manually</option>
+                    <option value="">{t('Enter details manually')}</option>
                     {contacts
                       .filter((contact) => contact.active)
                       .sort((a, b) => a.name.localeCompare(b.name))
@@ -1520,18 +1609,18 @@ function DraftEditor({
                   </select>
                 </label>
                 <label>
-                  {kind === 'bill' ? 'Vendor name' : 'Customer name'}
+                  {kind === 'bill' ? t('Vendor name') : t('Customer name')}
                   <input
                     autoFocus
                     required
                     maxLength={200}
                     value={draft.partner}
                     onChange={(e) => setField('partner', e.target.value)}
-                    placeholder="Company or person"
+                    placeholder={t('Company or person')}
                   />
                 </label>
                 <label>
-                  Email <span className="optional">optional</span>
+                  {t('Email')} <span className="optional">{t('optional')}</span>
                   <input
                     type="email"
                     maxLength={254}
@@ -1541,7 +1630,7 @@ function DraftEditor({
                   />
                 </label>
                 <label>
-                  Document date
+                  {t('Document date')}
                   <input
                     required
                     type="date"
@@ -1551,7 +1640,7 @@ function DraftEditor({
                   />
                 </label>
                 <label>
-                  Due date
+                  {t('Due date')}
                   <input
                     required
                     type="date"
@@ -1561,37 +1650,37 @@ function DraftEditor({
                   />
                 </label>
                 <label className="full-width">
-                  Reference <span className="optional">optional</span>
+                  {t('Reference')} <span className="optional">{t('optional')}</span>
                   <input
                     maxLength={300}
                     value={draft.reference}
                     onChange={(e) => setField('reference', e.target.value)}
-                    placeholder="Purchase order, project, or supplier reference"
+                    placeholder={t('Purchase order, project, or supplier reference')}
                   />
                 </label>
               </div>
               <div className="line-heading">
-                <h3>{kind === 'bill' ? 'Bill lines' : 'Invoice lines'}</h3>
-                <span>EUR · VAT rounded per line</span>
+                <h3>{kind === 'bill' ? t('Bill lines') : t('Invoice lines')}</h3>
+                <span>{t('EUR · VAT rounded per line')}</span>
               </div>
               <div className="editor-lines">
                 {draft.lines.map((line, index) => (
                   <div className="editor-line" key={index}>
                     <label>
-                      Description
+                      {t('Description')}
                       <input
-                        aria-label={`Line ${index + 1} description`}
+                        aria-label={t('Line {n} description', { n: index + 1 })}
                         required
                         maxLength={500}
                         value={line.description}
                         onChange={(e) => setLine(index, { description: e.target.value })}
-                        placeholder="What is this for?"
+                        placeholder={t('What is this for?')}
                       />
                     </label>
                     <label>
-                      Qty
+                      {t('Qty')}
                       <input
-                        aria-label={`Line ${index + 1} quantity`}
+                        aria-label={t('Line {n} quantity', { n: index + 1 })}
                         required
                         type="number"
                         min="1"
@@ -1602,9 +1691,9 @@ function DraftEditor({
                       />
                     </label>
                     <label>
-                      Unit price
+                      {t('Unit price')}
                       <input
-                        aria-label={`Line ${index + 1} unit price`}
+                        aria-label={t('Line {n} unit price', { n: index + 1 })}
                         required
                         inputMode="decimal"
                         value={prices[index]}
@@ -1616,9 +1705,9 @@ function DraftEditor({
                       />
                     </label>
                     <label>
-                      VAT
+                      {t('VAT')}
                       <select
-                        aria-label={`Line ${index + 1} VAT`}
+                        aria-label={t('Line {n} VAT', { n: index + 1 })}
                         value={line.taxBps}
                         onChange={(e) => setLine(index, { taxBps: Number(e.target.value) })}
                       >
@@ -1626,7 +1715,7 @@ function DraftEditor({
                           .sort((a, b) => a - b)
                           .map((rate) => (
                             <option key={rate} value={rate}>
-                              {rate / 100}%
+                              {localePercent(rate)}
                             </option>
                           ))}
                       </select>
@@ -1635,7 +1724,7 @@ function DraftEditor({
                       type="button"
                       className="icon-button"
                       disabled={draft.lines.length === 1}
-                      aria-label={`Remove line ${index + 1}`}
+                      aria-label={t('Remove line {n}', { n: index + 1 })}
                       onClick={() => {
                         setDraft((d) => ({ ...d, lines: d.lines.filter((_, i) => i !== index) }))
                         setPrices((p) => p.filter((_, i) => i !== index))
@@ -1652,15 +1741,15 @@ function DraftEditor({
                 disabled={draft.lines.length >= 100}
                 onClick={() => {
                   setDraft((d) => ({ ...d, lines: [...d.lines, { ...blank }] }))
-                  setPrices((p) => [...p, '0.00'])
+                  setPrices((p) => [...p, localeDecimal(0)])
                 }}
               >
                 <Plus />
-                Add a line
+                {t('Add a line')}
               </button>
               <div className="editor-total">
-                <span>Total including VAT</span>
-                <strong>{previewValid ? money(total) : 'Check line amounts'}</strong>
+                <span>{t('Total including VAT')}</span>
+                <strong>{previewValid ? money(total) : t('Check line amounts')}</strong>
               </div>
               {review && (
                 <>
@@ -1672,8 +1761,9 @@ function DraftEditor({
                         onChange={(event) => setAcceptMismatch(event.target.checked)}
                       />
                       <span>
-                        My entered total differs from the detected total. I checked the original and
-                        confirm my entered amounts are correct.
+                        {t(
+                          'My entered total differs from the detected total. I checked the original and confirm my entered amounts are correct.',
+                        )}
                       </span>
                     </label>
                   )}
@@ -1685,21 +1775,24 @@ function DraftEditor({
                       onChange={(event) => setReviewed(event.target.checked)}
                     />
                     <span>
-                      I checked the original, supplier, dates, EUR currency, line amounts and VAT.
-                      Save only a draft.
+                      {t(
+                        'I checked the original, supplier, dates, EUR currency, line amounts and VAT. Save only a draft.',
+                      )}
                     </span>
                   </label>
                   {review.scan.currency && review.scan.currency !== 'EUR' && (
                     <p className="form-error">
-                      This original uses {review.scan.currency}. Multi-currency bills are not
-                      supported; do not enter its amounts as EUR.
+                      {t(
+                        'This original uses {currency}. Multi-currency bills are not supported; do not enter its amounts as EUR.',
+                        { currency: review.scan.currency },
+                      )}
                     </p>
                   )}
                 </>
               )}
               {(localError || error) && (
                 <p className="form-error" role="alert">
-                  {localError || error}
+                  {messageText(localError || error)}
                 </p>
               )}
             </div>
@@ -1707,10 +1800,10 @@ function DraftEditor({
           <div className="dialog-actions">
             <span>
               <Clock />
-              Saved as a draft
+              {t('Saved as a draft')}
             </span>
             <button type="button" className="button secondary" onClick={onClose}>
-              Cancel
+              {t('Cancel')}
             </button>
             <button
               type="submit"
@@ -1720,7 +1813,7 @@ function DraftEditor({
                 (!reviewed || Boolean(review?.scan.currency && review.scan.currency !== 'EUR'))
               }
             >
-              {busy ? 'Saving…' : 'Save draft'}
+              {busy ? t('Saving…') : t('Save draft')}
               <ArrowRight />
             </button>
           </div>
@@ -1749,7 +1842,16 @@ function PaymentEditor({
   }) => Promise<boolean>
 }) {
   const [id] = useState(() => crypto.randomUUID())
-  const [amount, setAmount] = useState(decimal(doc.total - doc.paid))
+  const locale = useLocale()
+  const previousLocale = useRef(locale)
+  const [amount, setAmount] = useState(localeDecimal(doc.total - doc.paid))
+  useEffect(() => {
+    const from = previousLocale.current
+    if (from !== locale) {
+      setAmount((value) => convertDecimal(value, from, locale))
+      previousLocale.current = locale
+    }
+  }, [locale])
   const [date, setDate] = useState(today() < doc.date ? doc.date : today())
   const [reference, setReference] = useState('')
   const [localError, setLocalError] = useState('')
@@ -1757,26 +1859,26 @@ function PaymentEditor({
     event.preventDefault()
     setLocalError('')
     try {
-      await onSave({ id, amount: cents(amount), date, reference })
+      await onSave({ id, amount: localeCents(amount), date, reference })
     } catch (error) {
       setLocalError(errorMessage(error))
     }
   }
   return (
     <Modal
-      title={doc.kind === 'bill' ? 'Record vendor payment' : 'Record customer payment'}
+      title={doc.kind === 'bill' ? t('Record vendor payment') : t('Record customer payment')}
       onClose={onClose}
     >
-      <form onSubmit={(event) => void submit(event)}>
+      <form {...localizedValidation} onSubmit={(event) => void submit(event)}>
         <fieldset disabled={busy}>
           <div className="dialog-body">
             <p className="dialog-intro">
-              Outstanding for <strong>{doc.partner}</strong>:{' '}
+              {t('Outstanding for')} <strong>{doc.partner}</strong>:{' '}
               <strong>{money(doc.total - doc.paid)}</strong>
             </p>
             <div className="form-grid">
               <label>
-                Amount (EUR)
+                {t('Amount (EUR)')}
                 <input
                   autoFocus
                   required
@@ -1786,7 +1888,7 @@ function PaymentEditor({
                 />
               </label>
               <label>
-                Payment date
+                {t('Payment date')}
                 <input
                   required
                   type="date"
@@ -1796,31 +1898,31 @@ function PaymentEditor({
                 />
               </label>
               <label className="full-width">
-                Payment reference
+                {t('Payment reference')}
                 <input
                   maxLength={300}
                   value={reference}
                   onChange={(e) => setReference(e.target.value)}
-                  placeholder="Bank transfer reference"
+                  placeholder={t('Bank transfer reference')}
                 />
               </label>
             </div>
             <div className="info-note">
               <ShieldCheck />
-              This records a payment in your books. It does not initiate a bank transfer.
+              {t('This records a payment in your books. It does not initiate a bank transfer.')}
             </div>
             {(localError || error) && (
               <p className="form-error" role="alert">
-                {localError || error}
+                {messageText(localError || error)}
               </p>
             )}
           </div>
           <div className="dialog-actions">
             <button type="button" className="button secondary" onClick={onClose}>
-              Cancel
+              {t('Cancel')}
             </button>
             <button type="submit" className="button primary">
-              {busy ? 'Recording…' : 'Record payment'}
+              {busy ? t('Recording…') : t('Record payment')}
               <Check />
             </button>
           </div>

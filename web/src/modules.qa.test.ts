@@ -192,17 +192,17 @@ describe('ODEE-004 rev1 independent module compatibility', () => {
         {
           id: 'synthetic-future-module',
           status: 'active',
-          name: 'Synthetic future module',
-          description: 'Synthetic extension fixture',
+          name: 'Sales',
+          description: 'From opportunity to order',
           icon: Book,
           entryView: 'synthetic-future-view',
-          openLabel: 'Open future module',
+          openLabel: 'Open accounting',
         },
         {
           id: 'synthetic-planned-module',
           status: 'planned',
-          name: 'Synthetic planned module',
-          description: 'Not available',
+          name: 'Inventory',
+          description: 'Everything in its place',
           icon: Book,
         },
       ],
@@ -215,7 +215,7 @@ describe('ODEE-004 rev1 independent module compatibility', () => {
       expect(buttons).toHaveLength(1)
       expect(elements(buttons[0].props.children as ReactNode)).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ type: 'h2', props: { children: 'Synthetic future module' } }),
+          expect.objectContaining({ type: 'h2', props: { children: 'Sales' } }),
         ]),
       )
       const click = buttons[0].props.onClick as () => void

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
+test.use({ locale: 'en-GB' })
+
 async function create(
   page: Page,
   kind: 'invoice' | 'bill',
