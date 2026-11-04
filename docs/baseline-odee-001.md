@@ -39,24 +39,34 @@ local memory was consulted or recreated.
 
 ## User-owned dirty work: external, unverified provenance
 
-The parent reported an earlier observation of modifications/untracked files in
-the **original local checkout**, which was not copied into this cloud checkout.
-This is not a fresh inspection, complete inventory, patch comparison, or
-attestation that those original files remain unchanged. The original checkout,
-its Git metadata, environment files and original-file storage were not accessed.
-Where the report supplied a group rather than exact filenames, that uncertainty
-is retained rather than manufacturing a path list or Git status.
+The parent initially reported groups of modifications/untracked files in the
+**original local checkout**, which was not copied into this cloud checkout.
+It subsequently supplied a read-only path inventory observed on 2026-11-04:
+17 modified tracked files (573 insertions, 186 deletions) and eight untracked
+files. The exact inventory below is **attributed to that time-specific parent
+observation**, not independently verified here. It is not a semantic comparison
+or an attestation that the files remain unchanged. This session never accessed
+the original checkout, its Git metadata, environment files or original storage.
 
-| Parent-reported path or group | Classification and likely reconciliation boundary |
+| Parent-reported modified tracked paths | Classification and reconciliation boundary |
 | --- | --- |
 | `.env.example` | User-owned configuration-template change; review without copying credentials or local environment files |
-| README | User-owned documentation change; exact original pathname/diff not independently verified |
+| `README.md` | User-owned documentation change |
 | `cmd/odee/main.go` | User-owned server startup/configuration change; platform ownership overlaps |
-| Accounting auth/HTTP/extraction/store files and related tests | User-owned backend behavior and test changes; platform, finance, contacts/data ownership overlaps; exact original paths and modified-versus-untracked status unknown |
-| `web/src/App.tsx`, `web/src/main.tsx`, styles | User-owned UI/bootstrap changes; platform and domain UI ownership overlaps |
-| Web package metadata and theme | User-owned dependency/build/UI changes; exact original paths unknown |
-| OAuth/scanner fixtures and tests | User-owned authentication/extraction verification work; exact original paths unknown |
-| Original-file storage files | User-owned original-retention/storage work, possibly including data; exact paths and code-versus-runtime-data classification unknown; do not copy or delete |
+| `internal/accounting/auth.go`, `internal/accounting/auth_test.go` | User-owned authentication behavior and tests; platform ownership overlaps |
+| `internal/accounting/extract.go` | User-owned scanner/extraction behavior |
+| `internal/accounting/http.go`, `internal/accounting/http_test.go`, `internal/accounting/import_store.go` | User-owned HTTP/import persistence behavior and tests; platform, finance and data ownership overlaps |
+| `web/index.html`, `web/package.json` | User-owned entry/build/dependency changes |
+| `web/src/App.tsx`, `web/src/main.tsx`, `web/src/styles.css` | User-owned UI/bootstrap/styles; platform and domain UI ownership overlaps |
+| `web/tests/fixtures.mjs`, `web/tests/imports.spec.ts`, `web/tests/mongo.mjs` | User-owned scanner/import/persistence fixtures and verification |
+
+| Parent-reported untracked paths | Classification and reconciliation boundary |
+| --- | --- |
+| `internal/accounting/auth_browser_test.go` | User-owned authentication browser fixture |
+| `internal/accounting/extract_test.go` | User-owned extraction verification |
+| `internal/accounting/import_filesystem_mongo_test.go`, `internal/accounting/originals_disk.go`, `internal/accounting/originals_disk_test.go` | User-owned original-file storage source and tests; not authorization to copy runtime originals |
+| `web/src/ThemeToggle.tsx` | User-owned theme UI |
+| `web/tests/oauth.mjs`, `web/tests/theme.spec.ts` | User-owned OAuth/theme verification |
 
 All rows remain owned by the user until explicit reconciliation. No reset,
 stash, checkout-overwrite, implicit commit, patch import, environment-file copy
@@ -70,14 +80,15 @@ implementations here; filename overlap is not proof that the pending changes
 were included, omitted byte-for-byte, superseded or tested. No claim is made that
 the original dirty behavior has been preserved by this source baseline.
 
-Before any overlapping implementation, the coordinator must obtain a sanitized,
-owner-approved inventory and comparison against this exact application SHA,
-including tracked/untracked classification and explicit keep/integrate/defer
-decisions. Code, fixtures and runtime originals need separate treatment. Secrets
-and real records stay outside evidence. Record any functional differences and
-their independent checks before accepting this as the reconciled execution
-baseline. If the owner cannot establish that evidence, keep this gate blocked;
-do not treat absence from the cloud checkout as reconciliation.
+The parent-reported inventory improves path/status provenance but does not close
+semantic reconciliation. Before overlapping implementation, the coordinator must
+obtain an owner-approved comparison against this exact application SHA and
+explicit keep/integrate/defer decisions. Code, fixtures and runtime originals
+need separate treatment. Secrets and real records stay outside evidence. Record
+functional differences and their independent checks before accepting this as
+the reconciled execution baseline. If the owner cannot establish that evidence,
+keep this gate blocked; do not treat absence from the cloud checkout as
+reconciliation.
 
 ## Reproducible checks and actual outcomes
 
