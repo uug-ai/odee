@@ -317,7 +317,7 @@ func TestMongoFinancialAuditAtomicity(t *testing.T) {
 	}
 	defer store.Client.Disconnect(context.Background())
 	var hello bson.M
-	native := store.Client.(*database.MongoClient)
+	native, _ := nativeDatabase(store.Client)
 	if err := native.Client.Database("admin").RunCommand(ctx, bson.D{{Key: "hello", Value: 1}}).Decode(&hello); err != nil || hello["setName"] != nil {
 		t.Fatal("this proof must run on standalone MongoDB", err, hello["setName"])
 	}

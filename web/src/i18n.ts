@@ -133,6 +133,8 @@ export function messageText(message: string): string {
   if (message.startsWith('Sign-out was not confirmed. '))
     return `${t('Sign-out was not confirmed.')} ${messageText(message.slice(28))}`
   if (message.startsWith('invalid accounting input: ')) return messageText(message.slice(26))
+  if (message.startsWith('configuration is not ready: '))
+    return `${t('Configuration is not ready.')} ${message.slice(28).split('; ').map(messageText).join('; ')}`
   if (Object.hasOwn(nl, message)) return catalogs[locale][message as MessageKey]
   const key = (Object.keys(nl) as MessageKey[]).find((key) => nl[key] === message)
   if (key) return catalogs[locale][key]

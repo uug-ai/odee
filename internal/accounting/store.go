@@ -15,6 +15,7 @@ import (
 )
 
 type Store interface {
+	Configuration(primitive.ObjectID) ConfigurationStore
 	List(context.Context) ([]Document, error)
 	Get(context.Context, primitive.ObjectID) (Document, error)
 	Create(context.Context, Document) error
@@ -71,6 +72,21 @@ func OpenMongo(ctx context.Context, uri, name string, company primitive.ObjectID
 		store.closeAfterError()
 		return nil, fmt.Errorf("create accounting indexes: %w", err)
 	}
+	for _, index := range []bson.D{
+		{{Key: "organisationId", Value: 1}, {Key: "projectId", Value: 1}, {Key: "payload.publishedAt", Value: -1}, {Key: "_id", Value: -1}},
+		{{Key: "ownerId", Value: 1}, {Key: "payload.publishedAt", Value: -1}, {Key: "_id", Value: -1}},
+	} {
+		if _, err = indexer.CreateIndexes(ctx, name, "accounting_configuration_versions", []mongo.IndexModel{{Keys: index}}); err != nil {
+			store.closeAfterError()
+			return nil, err
+		}
+	}
+	native, ok := nativeDatabase(store.Client)
+	if !ok {
+		store.closeAfterError()
+		return nil, fmt.Errorf("durable accounting requires native MongoDB client")
+	}
+	store.Client = &durableDatabase{store.Client, native}
 	return store, nil
 }
 
@@ -107,10 +123,17 @@ func (s *MongoStore) Get(ctx context.Context, id primitive.ObjectID) (Document, 
 }
 
 func (s *MongoStore) Create(ctx context.Context, doc Document) error {
+	doc.NormalizeOwnership()
 	if doc.OrganisationID != s.Company || doc.ProjectID != s.Company {
 		return invalid("document does not belong to configured company")
 	}
+	if err := documentSize(doc); err != nil {
+		return err
+	}
 	_, err := s.Client.InsertOne(ctx, s.Name, "accounting_documents", doc)
+	if err != nil && !mongo.IsDuplicateKeyError(err) {
+		return fmt.Errorf("%w: %w", ErrUncertain, err)
+	}
 	return err
 }
 
@@ -122,6 +145,9 @@ func (s *MongoStore) Save(ctx context.Context, doc Document, version int64) erro
 	filter := s.filter(doc.ID)
 	filter["version"] = version
 	doc.Version, doc.UpdatedAt = version+1, time.Now().UTC()
+	if err := documentSize(doc); err != nil {
+		return err
+	}
 	update := bson.M{"$set": bson.M{
 		"organisationId": doc.OrganisationID, "projectId": doc.ProjectID,
 		"version": doc.Version, "updatedAt": doc.UpdatedAt, "partner": doc.Partner,
@@ -129,8 +155,13 @@ func (s *MongoStore) Save(ctx context.Context, doc Document, version int64) erro
 		"lines": doc.Lines, "subtotal": doc.Subtotal, "tax": doc.Tax, "total": doc.Total,
 		"status": doc.Status, "entries": doc.Entries, "payments": doc.Payments, "paid": doc.Paid,
 		"partnerSnapshot": doc.PartnerSnapshot, "ownCompanySnapshot": doc.OwnCompanySnapshot,
+		"configurationSelection": doc.ConfigurationSelection, "journalCode": doc.JournalCode, "financialSnapshot": doc.FinancialSnapshot,
 	}}
 	if doc.pendingEvent != nil {
+		filter["status"] = "draft"
+		if doc.pendingEvent.Action == "manual-payment.record" {
+			filter["status"] = "posted"
+		}
 		if doc.pendingEvent.Version != version+1 || doc.pendingEvent.TargetID != doc.ID {
 			return invalid("invalid financial event version or target")
 		}
@@ -148,8 +179,10 @@ func (s *MongoStore) Save(ctx context.Context, doc Document, version int64) erro
 }
 
 type MemoryStore struct {
-	mu   sync.Mutex
-	docs map[primitive.ObjectID]Document
+	mu                    sync.Mutex
+	docs                  map[primitive.ObjectID]Document
+	configurationHeads    map[primitive.ObjectID]ConfigurationHead
+	configurationVersions map[primitive.ObjectID]PublishedConfiguration
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -157,6 +190,14 @@ func NewMemoryStore() *MemoryStore {
 }
 
 func clone(doc Document) Document {
+	if doc.ConfigurationSelection != nil {
+		value := copyConfiguration(*doc.ConfigurationSelection)
+		doc.ConfigurationSelection = &value
+	}
+	if doc.FinancialSnapshot != nil {
+		value := copyConfiguration(*doc.FinancialSnapshot)
+		doc.FinancialSnapshot = &value
+	}
 	if doc.PartnerSnapshot != nil {
 		copy := *doc.PartnerSnapshot
 		copy.Data = cloneData(copy.Data)
@@ -204,6 +245,9 @@ func (s *MemoryStore) Get(_ context.Context, id primitive.ObjectID) (Document, e
 }
 
 func (s *MemoryStore) Create(_ context.Context, doc Document) error {
+	if err := documentSize(doc); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.docs[doc.ID]; ok {
@@ -223,6 +267,9 @@ func (s *MemoryStore) Save(_ context.Context, doc Document, version int64) error
 	if current.Version != version {
 		return ErrConflict
 	}
+	if err := documentSize(doc); err != nil {
+		return err
+	}
 	current.NormalizeOwnership()
 	doc.NormalizeOwnership()
 	if current.OrganisationID != doc.OrganisationID || current.ProjectID != doc.ProjectID {
@@ -230,9 +277,17 @@ func (s *MemoryStore) Save(_ context.Context, doc Document, version int64) error
 	}
 	doc.FinancialEvents = append([]FinancialEvent{}, current.FinancialEvents...)
 	if doc.pendingEvent != nil {
+		expected := "draft"
+		if doc.pendingEvent.Action == "manual-payment.record" {
+			expected = "posted"
+		}
+		if current.Status != expected {
+			return ErrConflict
+		}
 		if len(current.FinancialEvents) >= MaxFinancialEvents {
 			return ErrConflict
 		}
+
 		if doc.pendingEvent.Version != version+1 || doc.pendingEvent.TargetID != doc.ID {
 			return invalid("invalid financial event version or target")
 		}
@@ -241,5 +296,19 @@ func (s *MemoryStore) Save(_ context.Context, doc Document, version int64) error
 	doc.pendingEvent = nil
 	doc.Version, doc.UpdatedAt = version+1, time.Now().UTC()
 	s.docs[doc.ID] = clone(doc)
+	return nil
+}
+
+func documentSize(doc Document) error {
+	if doc.pendingEvent != nil {
+		doc.FinancialEvents = append(append([]FinancialEvent{}, doc.FinancialEvents...), *doc.pendingEvent)
+	}
+	raw, err := bson.Marshal(doc)
+	if err != nil {
+		return invalid("document cannot be encoded")
+	}
+	if len(raw) > 16*1024*1024 {
+		return invalid("document exceeds MongoDB BSON limit")
+	}
 	return nil
 }

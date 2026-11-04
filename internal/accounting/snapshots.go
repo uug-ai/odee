@@ -139,11 +139,16 @@ func (s *Server) newDraft(ctx context.Context, input draftRequest) (Document, er
 		return Document{}, err
 	}
 	captured := doc.PartnerSnapshot
-	doc, err := NewDocument(input.Draft, s.Company)
+	binding := Document{OrganisationID: s.Company, ProjectID: s.Company, Kind: input.Kind}
+	if err := bindNewConfiguration(ctx, s.Store, &binding); err != nil {
+		return Document{}, err
+	}
+	doc, err := NewDocument(input.Draft, s.Company, *binding.ConfigurationSelection)
 	if err != nil {
 		return doc, err
 	}
 	doc.PartnerSnapshot = captured
+	doc.JournalCode = binding.JournalCode
 	err = s.captureCompany(ctx, &doc, 0)
 	return doc, err
 }

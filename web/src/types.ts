@@ -34,6 +34,13 @@ export interface Draft {
   lines: Line[]
 }
 export interface Document extends Draft {
+  configurationSelection?: ConfigurationSelection
+  journalCode?: string
+  financialSnapshot?: FinancialSnapshot
+  financialMeaning?: FinancialSnapshot
+  meaningError?: string
+  organisationId?: string
+  projectId?: string
   partnerSnapshot?: PartnerSnapshot
   ownCompanySnapshot?: CompanySnapshot
   id: string
@@ -57,6 +64,7 @@ export interface Account {
   type: string
 }
 export interface State {
+  configuration?: ConfigurationView
   companyProfile?: CompanyProfile | null
   company: string
   currency: string
@@ -68,6 +76,58 @@ export interface State {
   scannerReady: boolean
   scannerError: string
   contacts: Contact[]
+}
+export interface ConfigAccount extends Account {
+  active: boolean
+}
+export interface ConfigJournal {
+  code: string
+  name: string
+  kind: string
+  active: boolean
+}
+export interface FiscalPeriod {
+  start: string
+  end: string
+  active: boolean
+}
+export interface ConfigurationData {
+  accounts: ConfigAccount[]
+  mappings: Record<string, string>
+  journals: ConfigJournal[]
+  years: { start: string; end: string; periods: FiscalPeriod[] }[]
+  note: string
+}
+export interface ConfigurationSelection {
+  policy?: string
+  versionId?: string
+  digest: string
+}
+export interface FinancialSnapshot {
+  schemaVersion: number
+  selection: ConfigurationSelection
+  accounts: ConfigAccount[]
+  mappings: Record<string, string>
+  journals: ConfigJournal[]
+  period: FiscalPeriod
+}
+export interface PublishedConfiguration {
+  id: string
+  payload: {
+    schemaVersion: number
+    sourceStageId: string
+    sourceStageVersion: number
+    digest: string
+    publishedAt: string
+    data: ConfigurationData
+  }
+}
+export interface ConfigurationView {
+  stage: { version: number; publicationId: string; data: ConfigurationData; digest: string }
+  default: { revision: number; versionId: string | null }
+  readiness: Record<string, string[]>
+  defaultData: ConfigurationData | null
+  defaultError?: string
 }
 export interface Session {
   authMode: 'github' | 'token' | 'development'

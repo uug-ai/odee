@@ -93,10 +93,12 @@ test('normal Mongo result gate requires every persistent branch and the two real
     /Unexpected Mongo fixture skip/,
   )
   for (const phase of ['write', 'read']) {
-    const diskEvents = requiredMongoDiskCases.map((Test) => ({ Test, Action: 'pass' }))
+    const diskEvents = [...requiredMongoDiskCases, 'TestMongoDiskPersistence/configuration'].map(
+      (Test) => ({ Test, Action: 'pass' }),
+    )
     assert.equal(requireMongoResults(diskEvents, phase).phase, phase)
-    for (const name of requiredMongoDiskCases) {
-      assert.match(name, new RegExp(mongoDiskSelector))
+    for (const name of requiredMongoDiskCases) assert.match(name, new RegExp(mongoDiskSelector))
+    for (const { Test: name } of diskEvents) {
       assert.throws(
         () =>
           requireMongoResults(
