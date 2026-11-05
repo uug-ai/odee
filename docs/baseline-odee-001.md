@@ -17,8 +17,8 @@ application baseline recorded below.
 | --- | --- |
 | Current remote `main` and worktree base | `f12c10b2bd586a3808a6f8eabeb9dffa7e446ac5`, observed in the worktree and `origin/main` on 2026-11-05 |
 | Historical application source baseline | `21de316085ec877498300c9408c481553725da11`; preserved as historical evidence, not current main |
-| Worktree at assignment start | `cedricve-automatic-adventure`, based on `f12c10b`; clean before this document-only edit |
-| This document's candidate SHA | Not yet available: the reconciliation is an uncommitted worktree change. Any committed candidate needs fresh exact-SHA checks and required independent QA. |
+| Documentation candidate reviewed before this correction | `eb8e673e832ecb1c068bf2b5c077277721b0195c`, parent `f12c10b2bd586a3808a6f8eabeb9dffa7e446ac5`; this follow-up correction has its own commit SHA |
+| Worktree at assignment start | `cedricve-automatic-adventure`, based on `f12c10b`; clean before the document-only change |
 
 ### Behavior added since the historical source baseline
 
@@ -44,14 +44,17 @@ acceptance verdict or evidence that all related tests passed.
 
 ### Current-main checks and protection evidence
 
-Independent reports identified five required CI contexts. The read-only
-`gh api` check-runs query for exact SHA
+Independent reports identified five required CI contexts on the parent
+application baseline. The read-only `gh api` check-runs query for exact SHA
 `f12c10b2bd586a3808a6f8eabeb9dffa7e446ac5` confirms completed/success for all
 five reported contexts: `server`, `web`, `agents`,
 `security-scan (arm64, ubuntu-24.04-arm)`, and
-`security-scan (amd64, ubuntu-24.04)`. These are checks on current `main`, not
-on this uncommitted document candidate; the token-visible check list does not
-establish which contexts are configured as required.
+`security-scan (amd64, ubuntu-24.04)`. These inherited parent checks do not
+show that CI ran on documentation candidate
+`eb8e673e832ecb1c068bf2b5c077277721b0195c`. Fresh checks on that exact candidate
+and required independent QA remain necessary before ODEE-001 acceptance. The
+token-visible check list does not establish which contexts are configured as
+required.
 
 The branch summary reports `main` as protected at `f12c10b`. The detailed branch
 protection endpoint returned HTTP 403 (`Resource not accessible by
@@ -68,14 +71,18 @@ no local test pass is claimed. In this documentation worker, Go and npm
 executables are present, while MongoDB executables and a `chromium` executable
 are absent; those presence probes are not test results.
 
-The active fallback is app-managed coordinator authority only: the parent
-session is the single writer for current assignments, ownership, control, and
-handoffs. This worker cannot use a Project/session identity as a filesystem
-ledger or independently verify the parent's full active-assignment inventory.
-There is no `.odee` directory or `.odee/loop.json` in this worker, and no
-replacement ledger was created. That local absence does not establish whether
-any historical root exists elsewhere. No new dirty-path inventory is inferred;
-the original dirty-work and classification evidence below remains historical.
+The coordinator reports that the user designated the parent Project as the
+temporary app-managed authority, operating-guide amendment PR #16 was merged
+at `940b2174d7e83f9903e8d9ff05a355bc6cf52b2a`, and the parent Project recorded
+`RUNNING` status. On that reported basis, app-managed fallback adoption is in
+effect: the parent session is the single writer for current assignments,
+ownership, control, and handoffs. This worker cannot independently verify
+current parent status or its full active-assignment inventory, and cannot use a
+Project/session identity as a filesystem ledger. There is no `.odee` directory
+or `.odee/loop.json` in this worker, and no replacement ledger was created.
+That local absence does not establish whether any historical root exists
+elsewhere. No new dirty-path inventory is inferred; the original dirty-work
+and classification evidence below remains historical.
 
 ## Historical identity and control (recorded 2026-11-04)
 
