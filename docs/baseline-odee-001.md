@@ -17,8 +17,10 @@ application baseline recorded below.
 | --- | --- |
 | Current remote `main` and worktree base | `f12c10b2bd586a3808a6f8eabeb9dffa7e446ac5`, observed in the worktree and `origin/main` on 2026-11-05 |
 | Historical application source baseline | `21de316085ec877498300c9408c481553725da11`; preserved as historical evidence, not current main |
-| Documentation candidate reviewed before this correction | `eb8e673e832ecb1c068bf2b5c077277721b0195c`, parent `f12c10b2bd586a3808a6f8eabeb9dffa7e446ac5`; this follow-up correction has its own commit SHA |
-| Worktree at assignment start | `cedricve-automatic-adventure`, based on `f12c10b`; clean before the document-only change |
+| Prior documentation candidate | `eb8e673e832ecb1c068bf2b5c077277721b0195c`, parent `f12c10b2bd586a3808a6f8eabeb9dffa7e446ac5`; its candidate-ID/provenance evidence was corrected in the follow-up below |
+| Follow-up documentation candidate | `9f39500e77039dd85d2b27ceb610effb12bf673a`, parent `eb8e673e832ecb1c068bf2b5c077277721b0195c`, based on application main `f12c10b2bd586a3808a6f8eabeb9dffa7e446ac5` |
+| Assigned worktree at start | Clean at `9f39500e77039dd85d2b27ceb610effb12bf673a`; the pushed candidate branch is `cedricve-automatic-adventure` |
+| Identity of this document revision | Read the containing Git commit or GitHub metadata; this document does not make a self-referential SHA claim |
 
 ### Behavior added since the historical source baseline
 
@@ -50,11 +52,18 @@ application baseline. The read-only `gh api` check-runs query for exact SHA
 five reported contexts: `server`, `web`, `agents`,
 `security-scan (arm64, ubuntu-24.04-arm)`, and
 `security-scan (amd64, ubuntu-24.04)`. These inherited parent checks do not
-show that CI ran on documentation candidate
-`eb8e673e832ecb1c068bf2b5c077277721b0195c`. Fresh checks on that exact candidate
-and required independent QA remain necessary before ODEE-001 acceptance. The
-token-visible check list does not establish which contexts are configured as
-required.
+show that CI ran on either documentation candidate. Exact-candidate CI for
+follow-up `9f39500e77039dd85d2b27ceb610effb12bf673a` is absent from the
+available check evidence; its status is pending/unverified, not inherited from
+the parent. A read-only API/data review reported that the stale candidate-ID
+and provenance concerns were corrected on `9f39500`; this limited finding is
+not a required ODEE-001 verdict. A fresh independent review errored before
+returning, and the integration reassessment has not returned. Required
+independent QA therefore remains pending. This document-only correction creates
+another candidate revision: its exact-candidate CI and QA are likewise
+pending, and its SHA must be read from the containing commit/GitHub metadata,
+not inferred from an embedded claim. The token-visible check list does not
+establish which contexts are configured as required.
 
 The branch summary reports `main` as protected at `f12c10b`. The detailed branch
 protection endpoint returned HTTP 403 (`Resource not accessible by
@@ -443,11 +452,15 @@ deployment-side controls were not audited here.
 no longer a current dirty-work blocker: the parent reports a clean, committed
 user-work branch, and this note compares its net source diff with main and
 identifies observable behavior differences. That branch remains unmerged and
-its acceptance is separate. PR #14's prior exact-head web check failed;
-candidate-bound `qa-api-data`/`qa-integration` verdicts and fresh checks after
-the evidence update are required. Detailed protection/release-control settings
-remain inaccessible (HTTP 403). Local MongoDB/OCR/browser/persistence gaps are
-recorded; remote CI results do not retroactively erase them.
+its acceptance is separate. PR #14's prior exact-head web check failed.
+Although the read-only API/data review reported the specific candidate-ID and
+provenance corrections on `9f39500`, exact-candidate CI is absent, the fresh
+independent review errored before returning, and integration reassessment is
+pending. Required candidate-bound `qa-api-data`/`qa-integration` verdicts and
+fresh checks on the revision containing this correction remain necessary.
+Detailed protection/release-control settings remain inaccessible (HTTP 403).
+Local MongoDB/OCR/browser/persistence gaps are recorded; remote parent CI
+results do not retroactively erase them.
 
 Only after coordinator acceptance of this gate could these direct successors
 become dependency-ready, subject to current revisions, leases and control:
