@@ -1,12 +1,13 @@
 # Peppol provider discovery and offline adapter contract
 
-ODEE-013, specification revision 2. Research date: 2026-11-03.
+ODEE-013, specification revision 2. Research update: 2026-11-05.
 Status: documentation candidate; no provider selection, account, credentials,
 registration, commercial commitment or network-send authorization.
 
 This is an original summary of public documentation, not a tested integration
 or a compliance opinion. Unknowns block only the dependent integration claims.
 ODEE-014 must separately pin and test applicable validation artifacts.
+Unverified provider evidence does not block unrelated safe finance work.
 
 ## Public-source comparison
 
@@ -14,7 +15,10 @@ The [OpenPeppol member directory](https://peppol.org/members/full-members-list/)
 lists Billit, Storecove/Datajust and Qvalia with Access Point roles. A membership
 listing alone is not proof of current certification or accreditation. The
 separate [certified-provider directory](https://peppol.org/members/peppol-certified-service-providers/)
-was checked on 2026-11-03:
+was checked on 2026-11-03. A refresh was attempted on 2026-11-05, but public
+documentation hosts could not be resolved from this research environment.
+Accordingly, the directory entries below are a dated snapshot, not a claim of
+current certification; recheck the exact contracting entity before selection.
 
 | Candidate legal entity | AP certified listing | SMP certified listing |
 | --- | --- | --- |
@@ -24,31 +28,47 @@ was checked on 2026-11-03:
 | Storecove Belgium | Separate entry not established | Separate entry not established |
 
 This is a mutable registry snapshot, not permanent accreditation or approval
-of a contract. Verify the exact contracting entity again before selection;
-do not transfer the Dutch entity's certification to the Belgian entity.
+of a contract. The 2026-11-05 refresh is unverified. Verify the exact
+contracting entity again before selection; do not transfer the Dutch entity's
+certification to the Belgian entity.
 
 | Question | Billit | Storecove / Storecove Belgium | Qvalia |
 | --- | --- | --- | --- |
-| Test environment | Separate sandbox endpoints and credentials; registration required | Test account offered; access and duration need confirmation | Separate test API and credentials; account/onboarding required |
-| Outbound invoice / credit note | Both described in the Order API | Invoice submission documented; credit-note support described, exact schema unverified | Both explicitly listed in the Invoicing API |
-| Inbound access | Purchase documents, notifications and file references described | Inbound notification described; exact retrieval contract unverified | Incoming-document events described; exact retrieval contract needs verification |
-| Payload / originals | UBL/XML and attachments retrievable through file references; delivery-evidence file is reportedly UI-only | JSON submission documented; original transported XML retrieval unverified | JSON/XML representation described; byte-exact transported-original retrieval unverified |
-| Authentication | API key and account/party context; entity identification required | Authorization/API-key example; exact scope lifecycle unverified | API key and documented token option; separate environments |
-| Request idempotency | Not established by the pages reviewed | Not established by the pages reviewed | Not established by the pages reviewed |
-| Reconciliation | Document lookup/listing and delivery-status fields documented | Submission GUID and status lookup described | Polling or notifications described; exact lookup contract unverified |
-| Callback verification | Secret/signature mechanism documented; implement its exact specification | Signature/replay contract unverified | Signature/replay contract unverified |
+| Test environment | Separate sandbox endpoints and credentials; registration required ([environment guide](https://docs.accesspoint.billit.eu/docs/sandbox-vs-production.md)); 2026-11-05 access check unverified | Test-account path described in the vendor FAQ; account access, duration and production parity unverified ([FAQ](https://www.storecove.com/us/en/mystorecove/faq/)) | Test API described in developer materials; account activation and production parity unverified ([developer tools](https://qvalia.com/api-developer-tools/)) |
+| Outbound invoice / credit note | Invoice and credit-note operations described in the [API documentation](https://docs.accesspoint.billit.eu/llms.txt); exact profile coverage needs confirmation | Invoice submission documented in the [submission example](https://help.storecove.com/en/articles/4640597-submit-invoices-via-the-api); credit-note schema/support unverified | Invoice and credit-note APIs described in the [developer documentation](https://api.qvalia.io/); exact profile coverage needs confirmation |
+| Inbound access | Participant lookup, inbound notifications and file references described ([participant lookup](https://docs.accesspoint.billit.eu/docs/who-is-a-invoice-receiver.md), [webhooks](https://docs.accesspoint.billit.eu/docs/webhooks.md), [files](https://docs.accesspoint.billit.eu/docs/get-files.md)); enrollment and retrieval limits unverified | Inbound notification described in vendor material; exact public retrieval contract unverified ([API reference](https://www.storecove.com/docs/#_storecove_api_reference)) | Incoming-document events described; exact retrieval and original-byte contract unverified ([developer tools](https://api.qvalia.io/)) |
+| Payload / originals | UBL/XML and attachments described; file retrieval is documented, while byte-exact transport originals and delivery-evidence availability need confirmation ([files](https://docs.accesspoint.billit.eu/docs/get-files.md)) | JSON submission documented; original transported XML retrieval unverified ([submission example](https://help.storecove.com/en/articles/4640597-submit-invoices-via-the-api)) | JSON/XML representations described; byte-exact transported-original retrieval unverified ([developer tools](https://api.qvalia.io/)) |
+| Authentication | API key and account/party context; entity identification required ([authentication](https://docs.accesspoint.billit.eu/docs/authentication.md), [identification](https://docs.accesspoint.billit.eu/docs/identification.md)); recheck current credential scopes | Authorization/API-key example referenced by vendor documentation; exact scope lifecycle and sandbox/production separation unverified ([API reference](https://www.storecove.com/docs/#_storecove_api_reference)) | API key and token option described; credential lifecycle and environment separation unverified ([developer documentation](https://api.qvalia.io/)) |
+| Request idempotency | No explicit request-idempotency guarantee found in the 2026-11-03 review; current behavior unverified | Not established by the pages reviewed | Not established by the pages reviewed |
+| Reconciliation / unknown send | Document lookup and delivery-status fields described ([status](https://docs.accesspoint.billit.eu/docs/get-status-of-a-sales-invoice.md)); whether a timeout can be resolved safely or retried is unverified | Submission GUID and status lookup described; safe recovery after a lost response is unverified ([submission example](https://help.storecove.com/en/articles/4640597-submit-invoices-via-the-api)) | Polling/notifications described; authoritative lookup and unknown-send semantics unverified ([developer documentation](https://api.qvalia.io/)) |
+| Callback verification | Secret/signature mechanism described; implement only its exact current specification ([webhooks](https://docs.accesspoint.billit.eu/docs/webhooks.md)) | Signature/replay contract unverified | Signature/replay contract unverified |
 | Rate limits / retry guarantees | Unverified | Unverified | Unverified |
-| Residency / retention / price | Unverified | Unverified; incorporation or archive marketing is not a residency guarantee | Unverified |
+| Commercial prerequisites | Price, service levels, residency, retention and DPA terms unverified; obtain written terms before selection | Price, service levels, residency, retention and DPA terms unverified; FAQ or marketing is not a contract | Price, service levels, residency, retention and DPA terms unverified |
 
-Billit currently has the most concrete retrieved public file/status/callback
-documentation for an initial technical spike. This is not a provider approval.
-Obtain contractual answers about duplicate suppression, unknown outcomes,
-original retrieval, data processing, retention, support and total cost first.
-No signup or sandbox invocation is implicitly authorized by this comparison.
+This comparison preserves the 2026-11-03 public-source review and adds exact
+primary-source pointers. On 2026-11-05, direct retrieval of OpenPeppol, Billit,
+Storecove and Qvalia documentation failed at DNS resolution. Search-index
+snippets were used only to discover candidate source URLs, not to upgrade any
+capability or guarantee. Cells marked unverified therefore remain open
+questions, not evidence that a provider lacks the feature. No test accounts,
+credentials or provider endpoints were used.
+
+In the 2026-11-03 snapshot, Billit had the most concrete retrieved public
+file/status/callback documentation for an initial technical spike. The
+2026-11-05 refresh does not rank or approve a provider. Obtain contractual
+answers about duplicate suppression, unknown outcomes, original retrieval,
+data processing, retention, support and total cost first. No signup or sandbox
+invocation is implicitly authorized by this comparison.
 
 ### Sources
 
-- [Billit documentation index](https://docs.accesspoint.billit.eu/llms.txt),
+- The following public pages were reviewed for the dated 2026-11-03 snapshot;
+  direct refresh on 2026-11-05 was unavailable as noted above.
+  The provider pages did not expose a versioned immutable snapshot identifier
+  in the reviewed evidence; the URLs are mutable.
+- OpenPeppol [full members list](https://peppol.org/members/full-members-list/)
+  and [certified service providers](https://peppol.org/members/peppol-certified-service-providers/).
+- Billit [documentation index](https://docs.accesspoint.billit.eu/llms.txt),
   [environments](https://docs.accesspoint.billit.eu/docs/sandbox-vs-production.md),
   [authentication](https://docs.accesspoint.billit.eu/docs/authentication.md),
   [entity identification](https://docs.accesspoint.billit.eu/docs/identification.md).
@@ -58,8 +78,13 @@ No signup or sandbox invocation is implicitly authorized by this comparison.
   [callbacks](https://docs.accesspoint.billit.eu/docs/webhooks.md),
   [invoice responses](https://docs.accesspoint.billit.eu/docs/imr-more-information.md).
 - Storecove [submission example](https://help.storecove.com/en/articles/4640597-submit-invoices-via-the-api)
-  and [official FAQ](https://www.storecove.com/us/en/mystorecove/faq/).
+  and [official FAQ](https://www.storecove.com/us/en/mystorecove/faq/);
+  its [API reference](https://www.storecove.com/docs/#_storecove_api_reference)
+  remains subject to access and version confirmation.
 - Qvalia [developer tools](https://qvalia.com/api-developer-tools/),
+  [developer portal](https://api.qvalia.io/),
+  [quick start](https://api.qvalia.io/quick-start) and
+  [transaction API](https://api.qvalia.io/api-documentation/apis/transaction-api),
   [API onboarding](https://qvalia.com/help/how-to-access-peppol-api-step-by-step-guide/)
   and [message-level status](https://qvalia.com/help/what-is-peppol-message-level-status-mls/).
 - Primary Peppol specifications distinguish
@@ -99,7 +124,7 @@ implementation is an offline mock; live transport is disabled by default.
 | --- | --- | --- |
 | Discover participant | Canonical scope and scheme/identifier pair | Registration and supported document types with observation time/evidence; unavailable discovery is an error, not "unregistered" |
 | Submit | Prepared immutable document, participants, bytes/hash and stable local key | Accepted provider reference, already-known identical submission, or explicit error/unknown outcome |
-| Reconcile | Canonical scope and known local attempt reference | Separate transport/technical/business observations with provider codes, time and evidence; never a payment mutation |
+| Poll / reconcile | Canonical scope and known local attempt reference | Separate transport/technical/business observations with provider codes, time and evidence; retain the exact raw response; never a payment mutation |
 | Ingest notification | Configured provider-account reference, headers and original request bytes | Durable accepted/duplicate acknowledgement, retained quarantine or explicit rejection; route outbound observations to a known submission and first inbound documents to admission |
 | Admit inbound | Authenticated account/receiver evidence, provider document ID, kind, original reference and exact bytes/hash | One scoped original receipt, duplicate acknowledgement or explicit quarantine/conflict; no outgoing submission is required |
 | Retrieve original | Canonical scope and known document/message reference | Exact bytes, MIME type, hash and provenance, or an explicit unavailable-original error |
@@ -289,7 +314,7 @@ Expected SHA-256 values, including the LF where specified:
 - Invalid: `b76cd21f24358c3778f41dd68d27a0a9307241769074000c90fa8686ad5616d6`
   (7 bytes).
 
-The configured normal scenario yields the following request/result.
+The configured normal scenario yields the following send request/result.
 
 ```json
 {
@@ -322,6 +347,28 @@ bind scope, document/revision, kind and participants to the durable intent.
 An identical repeat returns the identical accepted result, with no additional
 attempt or provider invocation. A changed binding under the same scoped key
 returns the error below, preserving the original attempt.
+
+A poll of the attempt returns a separate transport observation. This
+deterministic fixture uses `provider_accepted`; it does not imply delivery or
+business acceptance.
+
+```json
+{
+  "operation": "poll",
+  "attemptId": "mock-attempt-001"
+}
+```
+
+```json
+{
+  "outcome": "observed",
+  "attemptId": "mock-attempt-001",
+  "transport": "provider_accepted",
+  "businessResponse": "none",
+  "source": "mock-poll",
+  "financialMutation": false
+}
+```
 
 ```json
 {
@@ -361,7 +408,31 @@ For a reproducible outbound callback, use event ID `mock-event-001`, timestamp
 `{"subjectType":"outbound","providerSubmissionId":"mock-submission-001","providerRevision":1,"transport":"delivered"}`.
 Its signature under the policy above is
 `3742866e293e66b560cf8d019d5bf0977d81d6b3f485e1b97d4329f2f967e322`.
-The verified event advances transport only; an identical retry is a duplicate.
+Retain those exact 116 request bytes before acknowledging, together with the
+content type, SHA-256
+`1c6b1035bf004efa833da3cda6a6aa546e8ee982ea9a645854dfdb9b475ca396`,
+account reference, event ID, authentication result and durable receipt. The
+verified event advances transport only; an identical retry is a duplicate.
+
+```json
+{
+  "outcome": "accepted",
+  "eventId": "mock-event-001",
+  "duplicate": false,
+  "retainedRawPayload": {
+    "mediaType": "application/json",
+    "byteLength": 116,
+    "sha256": "1c6b1035bf004efa833da3cda6a6aa546e8ee982ea9a645854dfdb9b475ca396"
+  },
+  "transport": "delivered",
+  "financialMutation": false
+}
+```
+
+Replaying the exact authenticated event returns the existing receipt with
+`"duplicate": true`; it does not add another event or state transition. The
+raw-payload metadata is a reference to retained bytes, not a decoded and
+re-serialized replacement.
 
 A first inbound fixture uses the same bound account, a new signed event ID,
 `subjectType: "inbound"`, `providerDocumentId: "mock-inbound-001"`,
