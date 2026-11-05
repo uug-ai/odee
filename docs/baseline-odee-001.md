@@ -19,7 +19,8 @@ application baseline recorded below.
 | Historical application source baseline | `21de316085ec877498300c9408c481553725da11`; preserved as historical evidence, not current main |
 | Prior documentation candidate | `eb8e673e832ecb1c068bf2b5c077277721b0195c`, parent `f12c10b2bd586a3808a6f8eabeb9dffa7e446ac5`; its candidate-ID/provenance evidence was corrected in the follow-up below |
 | Follow-up documentation candidate | `9f39500e77039dd85d2b27ceb610effb12bf673a`, parent `eb8e673e832ecb1c068bf2b5c077277721b0195c`, based on application main `f12c10b2bd586a3808a6f8eabeb9dffa7e446ac5` |
-| Assigned worktree at start | Clean at `9f39500e77039dd85d2b27ceb610effb12bf673a`; the pushed candidate branch is `cedricve-automatic-adventure` |
+| Latest reviewed documentation candidate | `06ee8ecc0c8ebb125cd6a81e3babd11f93b19a16`, parent `9f39500e77039dd85d2b27ceb610effb12bf673a`, based on application main `f12c10b2bd586a3808a6f8eabeb9dffa7e446ac5` |
+| Assigned worktree at start | Clean at `06ee8ecc0c8ebb125cd6a81e3babd11f93b19a16`; the pushed candidate branch is `cedricve-automatic-adventure` |
 | Identity of this document revision | Read the containing Git commit or GitHub metadata; this document does not make a self-referential SHA claim |
 
 ### Behavior added since the historical source baseline
@@ -55,15 +56,20 @@ five reported contexts: `server`, `web`, `agents`,
 show that CI ran on either documentation candidate. Exact-candidate CI for
 follow-up `9f39500e77039dd85d2b27ceb610effb12bf673a` is absent from the
 available check evidence; its status is pending/unverified, not inherited from
-the parent. A read-only API/data review reported that the stale candidate-ID
-and provenance concerns were corrected on `9f39500`; this limited finding is
-not a required ODEE-001 verdict. A fresh independent review errored before
-returning, and the integration reassessment has not returned. Required
-independent QA therefore remains pending. This document-only correction creates
-another candidate revision: its exact-candidate CI and QA are likewise
-pending, and its SHA must be read from the containing commit/GitHub metadata,
-not inferred from an embedded claim. The token-visible check list does not
-establish which contexts are configured as required.
+the parent. The later exact-candidate reviews of
+`06ee8ecc0c8ebb125cd6a81e3babd11f93b19a16` were all **PARTIAL**. API/data QA
+reported exact-SHA checks absent and required independent QA still blocking.
+Integration QA reported no exact-SHA checks/statuses; the `main` branch summary
+showed protected, but detailed protection and Actions permissions returned
+HTTP 403, repository rulesets were empty, and required exact-candidate QA and
+detailed protection remained unverified. The independent documentation review
+reported that fallback adoption was overstated because the required adoption
+handoff is not documented here. These are bounded PARTIAL assessments, not
+acceptance or PASS. This further document-only correction creates another
+candidate revision: its exact-SHA checks and all required QA must be obtained
+afresh; its SHA is established by the containing Git commit/GitHub metadata,
+not an embedded self-claim. The token-visible check list does not establish
+which contexts are configured as required.
 
 The branch summary reports `main` as protected at `f12c10b`. The detailed branch
 protection endpoint returned HTTP 403 (`Resource not accessible by
@@ -83,9 +89,12 @@ are absent; those presence probes are not test results.
 The coordinator reports that the user designated the parent Project as the
 temporary app-managed authority, operating-guide amendment PR #16 was merged
 at `940b2174d7e83f9903e8d9ff05a355bc6cf52b2a`, and the parent Project recorded
-`RUNNING` status. On that reported basis, app-managed fallback adoption is in
-effect: the parent session is the single writer for current assignments,
-ownership, control, and handoffs. This worker cannot independently verify
+`RUNNING` status. This document does not record a complete adoption handoff
+with the parent Project/session ID, adopted guide commit, current control state
+and reconciled active assignments as required by `docs/agents.md`.
+Consequently, operational fallback adoption and the active-assignment
+inventory are unverified; the reported designation, merge and `RUNNING` status
+alone do not establish adoption. This worker cannot independently verify
 current parent status or its full active-assignment inventory, and cannot use a
 Project/session identity as a filesystem ledger. There is no `.odee` directory
 or `.odee/loop.json` in this worker, and no replacement ledger was created.
@@ -453,14 +462,20 @@ no longer a current dirty-work blocker: the parent reports a clean, committed
 user-work branch, and this note compares its net source diff with main and
 identifies observable behavior differences. That branch remains unmerged and
 its acceptance is separate. PR #14's prior exact-head web check failed.
-Although the read-only API/data review reported the specific candidate-ID and
-provenance corrections on `9f39500`, exact-candidate CI is absent, the fresh
-independent review errored before returning, and integration reassessment is
-pending. Required candidate-bound `qa-api-data`/`qa-integration` verdicts and
-fresh checks on the revision containing this correction remain necessary.
-Detailed protection/release-control settings remain inaccessible (HTTP 403).
-Local MongoDB/OCR/browser/persistence gaps are recorded; remote parent CI
-results do not retroactively erase them.
+The three review roles assessed exact candidate
+`06ee8ecc0c8ebb125cd6a81e3babd11f93b19a16` as **PARTIAL**: API/data QA
+reported exact-SHA checks absent and independent QA still blocking; integration
+QA reported no exact-SHA checks/statuses, with detailed branch protection and
+Actions permissions inaccessible (HTTP 403), no repository rulesets returned,
+and required QA/protection unverified; independent documentation review found
+that the required adoption handoff is not documented, so operational fallback
+adoption and active assignments are unverified. The `main` protected summary
+does not substitute for the unavailable enforcement details. ODEE-001 is not
+accepted. Any subsequent document revision, including this correction, needs
+fresh exact-SHA checks and candidate-bound QA; the new revision's status must
+be verified from its containing commit/GitHub metadata. Local
+MongoDB/OCR/browser/persistence gaps remain recorded; remote parent CI results
+do not retroactively erase them.
 
 Only after coordinator acceptance of this gate could these direct successors
 become dependency-ready, subject to current revisions, leases and control:
